@@ -1,0 +1,40 @@
+--- Texts.Mod.txt
++++ Texts.Mod.txt
+@@ -71,6 +71,7 @@
+     END;     
+ 
+   VAR TrailerFile: Files.File;
++    OpenTrampoline: PROCEDURE (T: Text; name: ARRAY OF CHAR);
+ 
+   (* -------------------- Filing ------------------------*)
+ 
+@@ -124,6 +125,10 @@
+     T.changed := FALSE; T.org := -1; T.pce := T.trailer (*init cache*)
+   END OpenInternal;
+ 
++  PROCEDURE Open* (T: Text; name: ARRAY OF CHAR);
++  BEGIN OpenTrampoline(T, name);
++  END Open;
++
+   PROCEDURE Store* (VAR W: Files.Rider; T: Text);
+     VAR p, q: Piece;
+       R: Files.Rider;
+@@ -530,7 +535,7 @@
+     WritePair(W, ":", d MOD 40H)  (*sec*)
+   END WriteClock;
+ 
+-  PROCEDURE Open* (T: Text; name: ARRAY OF CHAR);
++  PROCEDURE Open0 (T: Text; name: ARRAY OF CHAR);
+     VAR ascii: BOOLEAN; pos: INTEGER; ch: CHAR;
+       buf: Buffer; R: Reader; W: Writer; 
+   BEGIN OpenInternal(T, name, ascii);
+@@ -546,7 +551,7 @@
+         Read(R, ch)
+       END
+     END
+-  END Open;
++  END Open0;
+ 
+-BEGIN TrailerFile := Files.New("")
++BEGIN TrailerFile := Files.New(""); OpenTrampoline := Open0;
+ END Texts.

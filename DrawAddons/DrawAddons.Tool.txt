@@ -1,0 +1,5 @@
+Splines.MakeOpen     Splines.MakeClosed
+
+PictureTiles.MakePicture Grapes.Pict
+PictureTiles.MakePicture ^ !Escher.Pict !Grapes.Pict
+

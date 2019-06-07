@@ -1,0 +1,55 @@
+--- 1/Texts.Mod.txt
++++ 2/Texts.Mod.txt
+@@ -106,15 +106,15 @@
+     T.trailer := Q; Files.ReadInt(R, T.len); (*Files.Set(R, f, Files.Pos(R) + T.len)*)
+   END Load;
+ 
+-  PROCEDURE Open* (T: Text; name: ARRAY OF CHAR);
++  PROCEDURE OpenInternal (T: Text; name: ARRAY OF CHAR; VAR ascii: BOOLEAN);
+     VAR f: Files.File; R: Files.Rider; Q, q: Piece;
+       tag: CHAR; len: LONGINT;
+-  BEGIN f := Files.Old(name);
++  BEGIN f := Files.Old(name); ascii := FALSE;
+     IF f # NIL THEN
+       Files.Set(R, f, 0); Files.Read(R, tag); 
+       IF tag = TextTag THEN Load(R, T)
+       ELSE (*Ascii file*)
+-        len := Files.Length(f); Q := Trailer();
++        len := Files.Length(f); Q := Trailer(); ascii := TRUE;
+         NEW(q); q.fnt := Fonts.Default; q.col := 1; q.voff := 0; q.f := f; q.off := 0; q.len := len;
+         Q.next := q; q.prev := Q; q.next := Q; Q.prev := q; T.trailer := Q; T.len := len
+       END
+@@ -122,7 +122,7 @@
+       Q := Trailer(); Q.next := Q; Q.prev := Q; T.trailer := Q; T.len := 0
+     END ;
+     T.changed := FALSE; T.org := -1; T.pce := T.trailer (*init cache*)
+-  END Open;
++  END OpenInternal;
+ 
+   PROCEDURE Store* (VAR W: Files.Rider; T: Text);
+     VAR p, q: Piece;
+@@ -529,6 +529,24 @@
+     WritePair(W, ":", d DIV 40H MOD 40H);  (*min*)
+     WritePair(W, ":", d MOD 40H)  (*sec*)
+   END WriteClock;
++
++  PROCEDURE Open* (T: Text; name: ARRAY OF CHAR);
++    VAR ascii: BOOLEAN; pos: INTEGER; ch: CHAR;
++      buf: Buffer; R: Reader; W: Writer; 
++  BEGIN OpenInternal(T, name, ascii);
++    IF ascii THEN 
++      NEW(buf); OpenBuf(buf); OpenReader(R, T, 0); OpenWriter(W); Read(R, ch);
++      WHILE ~R.eot DO
++        IF ch = 0DX THEN 
++          WHILE ch = 0DX DO Read(R, ch) END;
++          IF ch = 0AX THEN pos := Pos(R); Delete(T, pos - 1, pos, buf); OpenReader(R, T, pos - 1) END
++        ELSIF ch = 0AX THEN
++          pos := Pos(R); WriteLn(W); Delete(T, pos - 1, pos, buf); Insert(T, pos - 1, W.buf); OpenReader(R, T, pos)
++        END;
++        Read(R, ch)
++      END
++    END
++  END Open;
+ 
+ BEGIN TrailerFile := Files.New("")
+ END Texts.

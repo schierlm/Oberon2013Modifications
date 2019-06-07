@@ -1,0 +1,11 @@
+--- 1/Graphics.Mod.txt
++++ 2/Graphics.Mod.txt
+@@ -57,7 +57,7 @@
+         nofonts, noflibs, nofclasses: INTEGER;
+         font: ARRAY 10 OF Fonts.Font;
+         lib: ARRAY 4 OF Library;
+-        class: ARRAY 6 OF Modules.Command
++        class: ARRAY 16 OF Modules.Command
+       END;
+ 
+     MethodDesc* = RECORD

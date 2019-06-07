@@ -1,0 +1,57 @@
+MODULE Fonts;
+  IMPORT SYSTEM, Files;
+
+  TYPE Font* = POINTER TO FontDesc;
+    FontDesc* = RECORD
+      name*: ARRAY 32 OF CHAR;
+      height*, minX*, maxX*, minY*, maxY*: INTEGER;
+      next*: Font;
+      T: ARRAY 128 OF INTEGER;
+      raster: ARRAY 2360 OF BYTE
+    END ;
+
+VAR Default*, root*: Font;
+
+PROCEDURE GetPat*(fnt: Font; ch: CHAR; VAR dx, x, y, w, h, pa: INTEGER);
+  VAR b: BYTE; i, o: INTEGER; s: SET;
+BEGIN pa := SYSTEM.ADR(fnt.raster);
+  s := SYSTEM.VAL(SET, fnt.T[ORD(ch) MOD 80H]);
+  b := 3; SYSTEM.PUT(pa, b);
+  b := 6; SYSTEM.PUT(pa+1, b);
+  o := 0; IF 15 IN s THEN o := 1 END; b := 0; SYSTEM.PUT(pa+2, b); SYSTEM.PUT(pa+7, b);
+  FOR i := 0 TO 4 DO
+    b := 0;
+    IF i * 3 IN s THEN INC(b) END;
+    IF i * 3 + 1 IN s THEN INC(b, 2) END;
+    IF i * 3 + 2 IN s THEN INC(b, 4) END;
+    SYSTEM.PUT(pa + 2 + o + (4-i), b);
+  END;
+  dx := 5; x := 1; y := 0; w := 3; h := 6
+END GetPat;
+
+PROCEDURE This*(name: ARRAY OF CHAR): Font;
+  RETURN Default
+END This;
+
+PROCEDURE Free*;
+BEGIN
+END Free;
+
+PROCEDURE InitRange(first, last, adr: INTEGER);
+VAR i: INTEGER; b1, b2: BYTE;
+BEGIN
+  FOR i := first TO last DO
+    SYSTEM.GET(adr, b1);
+    SYSTEM.GET(adr + 1, b2);
+    Default.T[i] := b1 * 100H + b2;
+    INC(adr, 2)
+  END
+END InitRange;
+
+BEGIN NEW(Default);
+  Default.name := "Minimal.Scn.Fnt"; Default.height := 9;
+  Default.minX := 0; Default.maxX := 5;
+  Default.minY := -2; Default.maxY := 7; Default.next := NIL;
+  InitRange( 33, 127, SYSTEM.ADR($20 92 00 2D 5F 7D 7D DF 52 A5 6A AA 00 12 22 4A 29 22 01 55 05 D0 14 00 01 C0 20 00 12 A4 7B 6F 49 74 75 2E 79 A7 49 E9 79 CF 7B CF 12 A7 7B EF 79 EF 04 10 14 10 44 54 0E 38 15 11 20 A7 2F FA DB EA BB EB E2 4E BB 6B F2 CF 92 CF AB CE DB ED F4 97 AB 24 DA ED F2 49 DB FD DF FD AB 6A 92 EB EF 6A DA EB B8 8E A4 97 FB 6D AB 6D D4 2D DA AD A4 AD F2 A7 64 96 44 91 34 93 00 2A 70 00 00 11 5B EA 3B EB 62 4E 3B 6B 72 CF 12 CF 2B CE 5B ED 74 97 2B 24 5A ED 72 49 5B FD 5F FD 2B 6A 12 EB 6F 6A 5A EB 38 8E 24 97 7B 6D 2B 6D 54 2D 5A AD 24 AD 72 A7 44 D4 24 92 15 91 00 15$));
+  root := Default;
+END Fonts.

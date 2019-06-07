@@ -1,0 +1,62 @@
+MODULE FontsDumper;
+  IMPORT SYSTEM, Fonts, Texts, Oberon;
+
+  VAR W: Texts.Writer; ccc: INTEGER;
+
+  PROCEDURE WriteHexShort (VAR W: Texts.Writer; x: INTEGER);
+    VAR i, y: INTEGER; ch: CHAR;
+  BEGIN ASSERT((x >= 0) & (x < 100H)); INC(ccc);
+    i := 0; Texts.Write(W, " "); x := (x DIV 10H MOD 10H) + (x MOD 10H) * 10H;
+    REPEAT y := x MOD 10H;
+      IF y < 10 THEN ch := CHR(y + 30H) ELSE ch := CHR(y + 37H) END;
+      Texts.Write(W, ch); x := x DIV 10H; INC(i)
+    UNTIL i = 2
+  END WriteHexShort;
+
+  PROCEDURE DumpChar(ch: CHAR);
+  VAR dx, x, y, w, h, patadr: INTEGER; b: BYTE;
+  BEGIN Fonts.GetPat(Fonts.Default, ch, dx, x, y, w, h, patadr);
+    WriteHexShort(W, dx);
+    WriteHexShort(W, x);
+    WriteHexShort(W, y MOD 100H);
+    WriteHexShort(W, w);
+    WriteHexShort(W, h);
+    INC(patadr, 2);
+    x := (w + 7) DIV 8 * h;
+    WHILE x > 0 DO
+      SYSTEM.GET(patadr, b);
+      WriteHexShort(W, b); INC(patadr); DEC(x)
+    END
+  END DumpChar;
+
+  PROCEDURE DumpRange(first, last: INTEGER);
+  VAR i: INTEGER;
+  BEGIN ccc := 0; Texts.WriteInt(W, first, 4); Texts.WriteInt(W, last, 4); Texts.WriteString(W, " $");
+    FOR i := first TO last DO DumpChar(CHR(i)) END;
+    Texts.Write(W, "$");
+    Texts.WriteLn(W);
+    (* Texts.WriteInt(W, ccc, 8); Texts.WriteLn(W); *)
+    Texts.Append(Oberon.Log, W.buf)
+  END DumpRange;
+
+  PROCEDURE Dump*;
+  VAR i: INTEGER;
+  BEGIN
+    Texts.WriteString(W, Fonts.Default.name);
+    Texts.WriteInt(W, Fonts.Default.height, 10);
+    Texts.WriteInt(W, Fonts.Default.minX, 10);
+    Texts.WriteInt(W, Fonts.Default.maxX, 10);
+    Texts.WriteInt(W, Fonts.Default.minY, 10);
+    Texts.WriteInt(W, Fonts.Default.maxY, 10);
+    Texts.WriteLn(W);
+    Texts.Append(Oberon.Log, W.buf);
+    DumpRange(9, 9);
+    DumpRange(32, 51);
+    DumpRange(52, 71);
+    DumpRange(72, 87);
+    DumpRange(88, 107);
+    DumpRange(108, 126)
+  END Dump;
+
+BEGIN Texts.OpenWriter(W);
+END FontsDumper.

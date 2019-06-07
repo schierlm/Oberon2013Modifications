@@ -1,0 +1,65 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -2,7 +2,7 @@
+   IMPORT SYSTEM;
+   CONST SectorLength* = 1024;
+     timer = -64;
+-    FSoffset = 80000H; (*256MB in 512-byte blocks*)
++    FSoffset = 80080H; (*256MB in 512-byte blocks*)
+     mapsize = 10000H; (*1K sectors, 64MB*)
+ 
+   TYPE Sector* = ARRAY SectorLength OF BYTE;
+--- 1/Modules.RS.Mod.txt
++++ 2/Modules.RS.Mod.txt
+@@ -23,7 +23,8 @@
+       filename: ModuleName;
+   BEGIN i := 0;
+     WHILE name[i] # 0X DO filename[i] := name[i]; INC(i) END ;
+-    filename[i] := "."; filename[i+1] := "r"; filename[i+2] := "s"; filename[i+3] := "c"; filename[i+4] := 0X;
++    filename[i] := "."; filename[i+1] := "r"; filename[i+2] := "s"; filename[i+3] := "c"; 
++    filename[i+4] := "."; filename[i+5] := "R"; filename[i+6] := "S"; filename[i+7] := 0X;
+     RETURN Files.Old(filename)
+   END ThisFile;
+ 
+--- 1/System.RS.Mod.txt
++++ 2/System.RS.Mod.txt
+@@ -372,8 +372,8 @@
+     main := TextFrames.NewText(Oberon.Log, 0);
+     logV := MenuViewers.New(menu, main, TextFrames.menuH, X, Y);
+     Oberon.AllocateSystemViewer(0, X, Y);
+-    menu := TextFrames.NewMenu("System.Tool", StandardMenu);
+-    main := TextFrames.NewText(TextFrames.Text("System.Tool"), 0);
++    menu := TextFrames.NewMenu("System.Tool.RS", StandardMenu);
++    main := TextFrames.NewText(TextFrames.Text("System.Tool.RS"), 0);
+     toolV := MenuViewers.New(menu, main, TextFrames.menuH, X, Y)
+   END OpenViewers;
+ 
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -68,6 +68,7 @@
+     DW, DH, CL: INTEGER;
+     ActCnt: INTEGER; (*action count for GC*)
+     Mod: Modules.Module;
++    CommandsExecuted: BOOLEAN;
+ 
+   (*user identification*)
+ 
+@@ -276,12 +277,18 @@
+   PROCEDURE SetPar*(F: Display.Frame; T: Texts.Text; pos: LONGINT);
+   BEGIN Par.vwr := Viewers.This(F.X, F.Y); Par.frame := F; Par.text := T; Par.pos := pos
+   END SetPar;
++
++  PROCEDURE DisarmRescueSystem;
++  VAR sec: Kernel.Sector;
++  BEGIN Kernel.GetSector(-62 * 29, sec); sec[4] := 0; Kernel.PutSector(-62 * 29, sec)
++  END DisarmRescueSystem;
+ 
+   PROCEDURE Call* (name: ARRAY OF CHAR; VAR res: INTEGER);
+     VAR mod: Modules.Module; P: Modules.Command;
+       i, j: INTEGER; ch: CHAR;
+       Mname, Cname: ARRAY 32 OF CHAR;
+   BEGIN i := 0; ch := name[0];
++    IF ~CommandsExecuted THEN DisarmRescueSystem; CommandsExecuted := TRUE END;
+     WHILE (ch # ".") & (ch # 0X) DO Mname[i] := ch; INC(i); ch := name[i] END ;
+     IF ch = "." THEN
+       Mname[i] := 0X; INC(i);

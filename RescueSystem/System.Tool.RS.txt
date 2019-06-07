@@ -1,0 +1,29 @@
+~~~ RESCUE SYSTEM ~~~
+
+Clipboard.Paste  Clipboard.CopySelection  Clipboard.CopyViewer
+
+System.Open ^  System.Recall  System.Watch  System.Collect
+Edit.Open ^  Edit.Recall
+
+System.Directory ^   *.Mod  *.Bak
+
+ORP.Compile @  ORP.Compile @/s  ORP.Compile name~
+System.Free ~
+System.CopyFiles ~
+System.RenameFiles ~
+
+PCLink1.Run
+
+ORP.Compile Kernel.Mod/s FileDir.Mod/s Files.Mod/s Modules.Mod/s ~
+Boot.Link Modules ~
+Boot.Load Modules.bin ~
+
+ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
+ORP.Compile Fonts.Mod/s Texts.Mod/s ~
+ORP.Compile Oberon.Mod/s ~
+ORP.Compile MenuViewers.Mod/s ~
+ORP.Compile TextFrames.Mod/s ~
+ORP.Compile System.Mod/s ~
+ORP.Compile Edit.Mod/s ~
+ORP.Compile ORS.Mod/s ORB.Mod/s ~
+ORP.Compile ORG.Mod/s ORP.Mod/s ~

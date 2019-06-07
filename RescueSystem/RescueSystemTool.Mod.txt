@@ -1,0 +1,66 @@
+MODULE RescueSystemTool;
+  IMPORT SYSTEM, Kernel, Files;
+
+CONST RSoffset = 40H;
+
+PROCEDURE LastUsedSector(): INTEGER;
+VAR secno, i: INTEGER;
+  sec: Kernel.Sector;
+  used: BOOLEAN;
+BEGIN secno := 0FFFFH * 29; used := FALSE;
+  (* secno := Kernel.LastUsedSector(); *)
+  WHILE (~used) & (secno > 0) DO
+    Kernel.GetSector(secno, sec); i := 0;
+    WHILE (~used) & (i < Kernel.SectorLength) DO
+      IF sec[i] # 0 THEN used := TRUE ELSE INC(i) END
+    END;
+    IF (~used) THEN DEC(secno, 29) END
+  END;
+  RETURN secno
+END LastUsedSector;
+
+PROCEDURE MoveFilesystem*;
+VAR secno: INTEGER;
+  sec: Kernel.Sector;
+BEGIN secno := LastUsedSector();
+  WHILE secno >= 0 DO
+    Kernel.GetSector(secno, sec);
+    Kernel.PutSector(secno + 29 * RSoffset, sec);
+    DEC(secno, 29);
+  END
+END MoveFilesystem;
+
+PROCEDURE LoadRescue*;
+VAR secno, i: INTEGER;
+  sec: Kernel.Sector;
+  F: Files.File; R: Files.Rider;
+BEGIN
+  (* Initial sector only contains the directory signature *)
+  FOR i := 0 TO Kernel.SectorLength - 1 DO sec[i] := 0 END;
+  sec[0] := 8DH; sec[1] := 0A3H; sec[2] := 1EH; sec[3] := 9BH;
+  secno := (1 - RSoffset) * 29; Kernel.PutSector(secno, sec); INC(secno, 29);
+  (* initialize start of boot loader *)
+  FOR i := 0 TO 1BH DO sec[i] := 0H END;
+  sec[0] := 06H; sec[3] := 0E7H; sec[11H] := 08H;
+  (* now load up to 2 sectors of RescueSystemLoader.rsc *)
+  F := Files.Old("RescueSystemLoader.rsc"); Files.Set(R, F, 2DH); Files.ReadByte(R, sec[1CH]); i := 1DH;
+  WHILE ~R.eof DO 
+    IF i = Kernel.SectorLength THEN Kernel.PutSector(secno, sec); INC(secno, 29); i := 0 END;
+    Files.ReadByte(R, sec[i]); INC(i)
+  END;
+  WHILE i < Kernel.SectorLength DO sec[i] := 0; INC(i) END;
+  Kernel.PutSector(secno, sec); INC(secno, 29);
+  (* load the boot image Modules.bin.RS *)
+  F := Files.Old("Modules.bin.RS"); Files.Set(R, F, 0); Files.ReadByte(R, sec[0]); i := 1;
+  WHILE ~R.eof DO
+    IF i = Kernel.SectorLength THEN Kernel.PutSector(secno, sec); INC(secno, 29); i := 0 END;
+    Files.ReadByte(R, sec[i]); INC(i)
+  END;
+  WHILE i < Kernel.SectorLength DO sec[i] := 0; INC(i) END;
+  Kernel.PutSector(secno, sec); INC(secno, 29);
+  (* fill the rest with zeroes until and including sector 0 *)
+  FOR i := 0 TO Kernel.SectorLength - 1 DO sec[i] := 0 END;
+  WHILE secno < 29 DO Kernel.PutSector(secno, sec); INC(secno, 29) END
+END LoadRescue;
+
+END RescueSystemTool.
