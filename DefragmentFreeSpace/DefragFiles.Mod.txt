@@ -1,0 +1,241 @@
+MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
+  IMPORT SYSTEM, Kernel, FileDir;
+
+  CONST HS      = FileDir.HeaderSize;
+      SS        = FileDir.SectorSize;
+      STS       = FileDir.SecTabSize;
+      XS        = FileDir.IndexSize;
+
+  TYPE
+    DiskAdr = INTEGER;
+
+    Rider* =
+      RECORD eof*: BOOLEAN;
+        res, apos, bpos: INTEGER
+      END;
+
+    IndexRecord =
+      RECORD adr: DiskAdr;
+        mod, nil: BOOLEAN;
+        sec: FileDir.IndexSector
+      END;
+
+    FileDesc =
+      RECORD
+        aleng, bleng: INTEGER;
+        modH, registered: BOOLEAN;
+        sechint: DiskAdr;
+        name: FileDir.FileName;
+        ext:  ARRAY FileDir.ExTabSize OF IndexRecord;
+        sec: FileDir.SectorTable
+      END ;
+
+    BufferRecord =
+      RECORD apos, lim: INTEGER;
+        mod: BOOLEAN;
+        data: FileDir.DataSector
+      END;
+
+  VAR onlyFile: FileDesc;
+    fileOpen: BOOLEAN;
+    onlyBuf: BufferRecord;
+
+  PROCEDURE Check(s: ARRAY OF CHAR;
+        VAR name: FileDir.FileName; VAR res: INTEGER);
+    VAR i: INTEGER; ch: CHAR;
+  BEGIN ch := s[0]; i := 0;
+    IF (ch >= "A") & (ch <= "Z") OR (ch >= "a") & (ch <= "z") THEN
+      REPEAT name[i] := ch; INC(i); ch := s[i]
+      UNTIL ~((ch >= "0") & (ch <= "9") OR (ch >= "A") & (ch <= "Z")
+        OR (ch >= "a") & (ch <= "z") OR (ch = ".")) OR (i = FileDir.FnLength);
+      IF i = FileDir.FnLength THEN res := 4
+      ELSIF ch = 0X THEN res := 0;
+        WHILE i < FileDir.FnLength DO name[i] := 0X; INC(i) END
+      ELSE res := 5
+      END
+    ELSIF ch = 0X THEN name[0] := 0X; res := -1
+    ELSE res := 3
+    END
+  END Check;
+
+  PROCEDURE Old*(name: ARRAY OF CHAR);
+    VAR i, k, res: INTEGER;
+      header: DiskAdr;
+      F: FileDir.FileHd;
+      namebuf: FileDir.FileName;
+  BEGIN ASSERT(~fileOpen); Check(name, namebuf, res);
+    ASSERT(res = 0);
+    FileDir.Search(namebuf, header);
+    ASSERT(header # 0);
+    onlyBuf.apos := 0; onlyBuf.mod := FALSE;
+    F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(onlyBuf.data));
+    Kernel.GetSector(header, onlyBuf.data); ASSERT(F.mark = FileDir.HeaderMark);
+    onlyFile.aleng := F.aleng; onlyFile.bleng := F.bleng;
+    IF onlyFile.aleng = 0 THEN onlyBuf.lim := onlyFile.bleng ELSE onlyBuf.lim := SS END;
+    onlyFile.name := namebuf; onlyFile.registered := TRUE;
+    onlyFile.sec := F.sec;
+    k := (onlyFile.aleng + (XS-STS)) DIV XS; i := 0;
+    WHILE i < k DO
+      onlyFile.ext[i].nil := FALSE; onlyFile.ext[i].adr := F.ext[i]; onlyFile.ext[i].mod := FALSE;
+      Kernel.GetSector(onlyFile.ext[i].adr, onlyFile.ext[i].sec); INC(i)
+    END;
+    WHILE i < FileDir.ExTabSize DO onlyFile.ext[i].nil := TRUE; INC(i) END;
+    onlyFile.sechint := header; onlyFile.modH := FALSE;
+    fileOpen := TRUE
+  END Old;
+
+  PROCEDURE New*(name: ARRAY OF CHAR);
+    VAR i, res: INTEGER;
+      F: FileDir.FileHd;
+      namebuf: FileDir.FileName;
+  BEGIN ASSERT(~fileOpen); Check(name, namebuf, res);
+    ASSERT(res <= 0);
+    onlyBuf.apos := 0; onlyBuf.mod := TRUE; onlyBuf.lim := HS;
+    F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(onlyBuf.data));
+    F.mark := FileDir.HeaderMark;
+    F.aleng := 0; F.bleng := HS; F.name := namebuf;
+    F.date := Kernel.Clock();
+    onlyFile.aleng := 0; onlyFile.bleng := HS; onlyFile.modH := TRUE;
+    onlyFile.registered := FALSE;
+    onlyFile.name := namebuf; onlyFile.sechint := 0;
+    i := 0;
+    REPEAT onlyFile.ext[i].nil := TRUE; F.ext[i] := 0; INC(i) UNTIL i = FileDir.ExTabSize;
+    i := 0;
+    REPEAT onlyFile.sec[i] := 0; F.sec[i] := 0; INC(i) UNTIL i = STS;
+    fileOpen := TRUE
+  END New;
+
+  PROCEDURE UpdateHeader(VAR F: FileDir.FileHeader);
+    VAR k: INTEGER;
+  BEGIN ASSERT(fileOpen); F.aleng := onlyFile.aleng; F.bleng := onlyFile.bleng;
+    F.sec := onlyFile.sec; k := (onlyFile.aleng + (XS-STS)) DIV XS;
+    WHILE k > 0 DO DEC(k); F.ext[k] := onlyFile.ext[k].adr END
+  END UpdateHeader;
+
+  PROCEDURE ReadBuf(pos: INTEGER);
+    VAR sec: DiskAdr;
+  BEGIN ASSERT(fileOpen);
+    IF pos < STS THEN sec := onlyFile.sec[pos]
+    ELSE sec := onlyFile.ext[(pos-STS) DIV XS].sec[(pos-STS) MOD XS]
+    END;
+    Kernel.GetSector(sec, onlyBuf.data);
+    IF pos < onlyFile.aleng THEN onlyBuf.lim := SS ELSE onlyBuf.lim := onlyFile.bleng END ;
+    onlyBuf.apos := pos; onlyBuf.mod := FALSE
+  END ReadBuf;
+
+  PROCEDURE WriteBuf();
+    VAR i, k: INTEGER;
+      secadr: DiskAdr;
+  BEGIN ASSERT(fileOpen);
+    IF onlyBuf.apos < STS THEN
+      secadr := onlyFile.sec[onlyBuf.apos];
+      IF secadr = 0 THEN
+        Kernel.AllocSector(onlyFile.sechint, secadr);
+        onlyFile.modH := TRUE; onlyFile.sec[onlyBuf.apos] := secadr; onlyFile.sechint := secadr
+      END;
+      IF onlyBuf.apos = 0 THEN
+        UpdateHeader(SYSTEM.VAL(FileDir.FileHeader, onlyBuf.data)); onlyFile.modH := FALSE
+      END
+    ELSE i := (onlyBuf.apos - STS) DIV XS;
+      IF onlyFile.ext[i].nil THEN
+        onlyFile.ext[i].nil := FALSE; onlyFile.ext[i].adr := 0; onlyFile.ext[i].sec[0] := 0; onlyFile.modH := TRUE
+      END;
+      k := (onlyBuf.apos - STS) MOD XS; secadr := onlyFile.ext[i].sec[k];
+      IF secadr = 0 THEN
+        Kernel.AllocSector(onlyFile.sechint, secadr);
+        onlyFile.modH := TRUE; onlyFile.ext[i].mod := TRUE; onlyFile.ext[i].sec[k] := secadr; onlyFile.sechint := secadr
+      END
+    END;
+    Kernel.PutSector(secadr, onlyBuf.data); onlyBuf.mod := FALSE
+  END WriteBuf;
+
+  PROCEDURE GetBuf(pos: INTEGER);
+  BEGIN ASSERT(fileOpen);
+    IF onlyBuf.apos # pos THEN
+      IF onlyBuf.mod THEN WriteBuf() END;
+      IF pos <= onlyFile.aleng THEN ReadBuf(pos) ELSE onlyBuf.apos := pos; onlyBuf.lim := 0; onlyBuf.mod := FALSE END
+    END
+  END GetBuf;
+
+  PROCEDURE Unbuffer();
+    VAR i, k: INTEGER;
+      head: FileDir.FileHeader;
+  BEGIN ASSERT(fileOpen);
+    IF onlyBuf.mod THEN WriteBuf() END;
+    k := (onlyFile.aleng + (XS-STS)) DIV XS; i := 0;
+    WHILE i < k DO
+      IF onlyFile.ext[i].mod THEN
+        IF onlyFile.ext[i].adr = 0 THEN
+          Kernel.AllocSector(onlyFile.sechint, onlyFile.ext[i].adr); onlyFile.sechint := onlyFile.ext[i].adr; onlyFile.modH := TRUE
+        END;
+        Kernel.PutSector(onlyFile.ext[i].adr, onlyFile.ext[i].sec); onlyFile.ext[i].mod := FALSE
+      END; INC(i)
+    END ;
+    IF onlyFile.modH THEN
+      Kernel.GetSector(onlyFile.sec[0], head); UpdateHeader(head);
+      Kernel.PutSector(onlyFile.sec[0], head); onlyFile.modH := FALSE
+    END
+  END Unbuffer;
+
+  PROCEDURE Register*();
+  BEGIN ASSERT(fileOpen);
+    IF onlyFile.name[0] # 0X THEN
+      Unbuffer();
+      IF ~onlyFile.registered THEN
+        FileDir.Insert(onlyFile.name, onlyFile.sec[0]); onlyFile.registered := TRUE
+      END
+    END; fileOpen := FALSE
+  END Register;
+
+  PROCEDURE Close*();
+  BEGIN ASSERT(fileOpen); Unbuffer(); fileOpen := FALSE
+  END Close;
+
+  PROCEDURE Length*(): INTEGER;
+  BEGIN ASSERT(fileOpen);
+  RETURN onlyFile.aleng * SS + onlyFile.bleng - HS
+  END Length;
+
+  PROCEDURE SetAtZero*(VAR r: Rider);
+    VAR a, b: INTEGER;
+  BEGIN ASSERT(fileOpen); r.eof := FALSE; r.res := 0; r.apos := 0; r.bpos := HS
+  END SetAtZero;
+
+  PROCEDURE ReadByte*(VAR r: Rider; VAR x: BYTE);
+  BEGIN ASSERT(fileOpen);
+    IF r.apos # onlyBuf.apos THEN GetBuf(r.apos) END;
+    IF r.bpos < onlyBuf.lim THEN x := onlyBuf.data[r.bpos]; INC(r.bpos)
+    ELSIF r.apos < onlyFile.aleng THEN
+      INC(r.apos); IF onlyBuf.mod THEN WriteBuf() END;
+      ReadBuf(r.apos);
+      x := onlyBuf.data[0]; r.bpos := 1
+    ELSE x := 0; r.eof := TRUE
+    END
+  END ReadByte;
+
+  PROCEDURE NewExt();
+    VAR i, k: INTEGER;
+  BEGIN ASSERT(fileOpen); k := (onlyFile.aleng - STS) DIV XS;
+    onlyFile.ext[k].nil := FALSE; onlyFile.ext[k].adr := 0; onlyFile.ext[k].mod := TRUE; i := XS;
+    REPEAT DEC(i); onlyFile.ext[k].sec[i] := 0 UNTIL i = 0
+  END NewExt;
+
+  PROCEDURE WriteByte*(VAR r: Rider; x: BYTE);
+  BEGIN ASSERT(fileOpen);
+    IF r.apos # onlyBuf.apos THEN GetBuf(r.apos) END;
+    IF r.bpos >= onlyBuf.lim THEN
+      IF r.bpos < SS THEN
+        INC(onlyBuf.lim); INC(onlyFile.bleng); onlyFile.modH := TRUE
+      ELSE WriteBuf(); INC(r.apos);
+        IF r.apos <= onlyFile.aleng THEN ReadBuf(r.apos)
+        ELSE onlyBuf.apos := r.apos; onlyBuf.lim := 1; INC(onlyFile.aleng); onlyFile.bleng := 1; onlyFile.modH := TRUE;
+          IF (onlyFile.aleng - STS) MOD XS = 0 THEN NewExt() END
+        END;
+        r.bpos := 0
+      END
+    END;
+    onlyBuf.data[r.bpos] := x; INC(r.bpos); onlyBuf.mod := TRUE
+  END WriteByte;
+
+BEGIN fileOpen := FALSE
+END DefragFiles.

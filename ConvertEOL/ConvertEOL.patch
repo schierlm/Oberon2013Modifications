@@ -1,6 +1,6 @@
 --- 1/Texts.Mod.txt
 +++ 2/Texts.Mod.txt
-@@ -106,15 +106,15 @@
+@@ -106,15 +106,17 @@
      T.trailer := Q; Files.ReadInt(R, T.len); (*Files.Set(R, f, Files.Pos(R) + T.len)*)
    END Load;
  
@@ -8,18 +8,18 @@
 +  PROCEDURE OpenInternal (T: Text; name: ARRAY OF CHAR; VAR ascii: BOOLEAN);
      VAR f: Files.File; R: Files.Rider; Q, q: Piece;
        tag: CHAR; len: LONGINT;
--  BEGIN f := Files.Old(name);
-+  BEGIN f := Files.Old(name); ascii := FALSE;
+   BEGIN f := Files.Old(name);
++    ascii := FALSE;
      IF f # NIL THEN
        Files.Set(R, f, 0); Files.Read(R, tag); 
        IF tag = TextTag THEN Load(R, T)
        ELSE (*Ascii file*)
--        len := Files.Length(f); Q := Trailer();
-+        len := Files.Length(f); Q := Trailer(); ascii := TRUE;
++        ascii := TRUE;
+         len := Files.Length(f); Q := Trailer();
          NEW(q); q.fnt := Fonts.Default; q.col := 1; q.voff := 0; q.f := f; q.off := 0; q.len := len;
          Q.next := q; q.prev := Q; q.next := Q; Q.prev := q; T.trailer := Q; T.len := len
        END
-@@ -122,7 +122,7 @@
+@@ -122,7 +124,7 @@
        Q := Trailer(); Q.next := Q; Q.prev := Q; T.trailer := Q; T.len := 0
      END ;
      T.changed := FALSE; T.org := -1; T.pce := T.trailer (*init cache*)
@@ -28,7 +28,7 @@
  
    PROCEDURE Store* (VAR W: Files.Rider; T: Text);
      VAR p, q: Piece;
-@@ -529,6 +529,24 @@
+@@ -529,6 +531,24 @@
      WritePair(W, ":", d DIV 40H MOD 40H);  (*min*)
      WritePair(W, ":", d MOD 40H)  (*sec*)
    END WriteClock;

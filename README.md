@@ -23,3 +23,5 @@ which is (for convenience; it is impossible to use that repo as a submodule as i
 | **[DrawAddons](DrawAddons/README.md)** | More features for Oberon Draw | Optionally recompile `Graphics.Mod` |
 | **[Calculator](Calculator/README.md)**| Simple prefix notation calculator | None |
 | **[ResourceMonitor](ResourceMonitor/README.md)**| Continually display module space and heap usage | None |
+| **[DefragmentFreeSpace](DefragmentFreeSpace/README.md)** | Defragment all files and move them to the beginning of the filesystem | Recompile inner code |
+| **[RealTimeClock](RealTimeClock/README.md)** | Add a "ticking" real-time clock that is updated on demand based on `Kernel.Time` | Recompile inner code |

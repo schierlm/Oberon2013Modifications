@@ -1,0 +1,16 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -315,6 +315,13 @@
+     clockTime := Time();
+     SYSTEM.PUT(list0, heapLim - heapOrg); SYSTEM.PUT(list0+4, -1); SYSTEM.PUT(list0+8, 0);
+     allocated := 0; clock := 0; InitSecMap
++    ;SYSTEM.GET(10000H, clock);
++    IF clock = 54696D65H THEN
++      SYSTEM.GET(10004H, clockTime);
++      SYSTEM.GET(10008H, clock)
++    ELSE
++      clock := 0
++    END;
+   END Init;
+ 
+ END Kernel.
