@@ -1,0 +1,38 @@
+MODULE DisplayGrab;
+  IMPORT SYSTEM, Display;
+
+  VAR Span: INTEGER;
+
+  PROCEDURE GrabDot*(x, y: INTEGER) : INTEGER;
+    VAR a, col: INTEGER; s: SET;
+  BEGIN
+    a := Display.Base + (x DIV 32)*4 + y*Span; col := 1;
+    SYSTEM.GET(a, s); IF (s * {x MOD 32} = {}) THEN col := 0 END;
+    RETURN col
+  END GrabDot;
+
+  PROCEDURE GrabPatternRow*(x, y, w: INTEGER): INTEGER;
+    VAR row, a, aL, aR: INTEGER; pix, mask: SET;
+  BEGIN
+    ASSERT((w > 0) & (w <= 32));
+    aL := Display.Base + y*Span; aR := ((x+w-1) DIV 32)*4 + aL; aL := (x DIV 32)*4 + aL;
+    IF aR = aL THEN
+      mask := {(x MOD 32) .. ((x+w-1) MOD 32)};
+      SYSTEM.GET(aL, pix);
+      row := ASR(SYSTEM.VAL(INTEGER, pix * mask), x MOD 32)
+    ELSIF aR = aL + 4 THEN
+      mask := {(x MOD 32) .. 31};
+      SYSTEM.GET(aL, pix);
+      row := ASR(SYSTEM.VAL(INTEGER, pix * mask), x MOD 32);
+      mask := {0 .. 31 - x MOD 32};
+      row := SYSTEM.VAL(INTEGER, SYSTEM.VAL(SET, row) * mask);
+      mask := {0 .. ((x+w-1) MOD 32)};
+      SYSTEM.GET(aR, pix);
+      row := row + LSL(SYSTEM.VAL(INTEGER, pix * mask), 32 - x MOD 32)
+    ELSE ASSERT(FALSE)
+    END;
+    RETURN row
+  END GrabPatternRow;
+
+BEGIN Span := 128
+END DisplayGrab.
