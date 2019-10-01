@@ -1,0 +1,148 @@
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -1,13 +1,11 @@
+ MODULE Oberon; (*JG 6.9.90 / 23.9.93 / 13.8.94 / NW 14.4.2013 / 22.12.2015*)
+-  IMPORT SYSTEM, Kernel, Files, Modules, Input, Display, Viewers, Fonts, Texts;
++  IMPORT SYSTEM, Kernel, Files, Modules, Display, Texts;
+ 
+-  CONST (*message ids*)
+-    consume* = 0; track* = 1; defocus* = 0; neutralize* = 1; mark* = 2;
++  CONST
+     off = 0; idle = 1; active = 2;   (*task states*)
+     BasicCycle = 20;
+-    ESC = 1BX; SETSTAR = 1AX;
+ 
+-  TYPE Painter* = PROCEDURE (x, y: INTEGER);
++  TYPE (* Painter* = PROCEDURE (x, y: INTEGER);
+     Marker* = RECORD Fade*, Draw*: Painter END;
+     
+     Cursor* = RECORD
+@@ -36,6 +34,7 @@
+     CopyMsg* = RECORD (Display.FrameMsg)
+       F*: Display.Frame
+     END;
++    *)
+ 
+     Task* = POINTER TO TaskDesc;
+ 
+@@ -47,21 +46,19 @@
+       handle: Handler
+     END;
+ 
+-  VAR User*: ARRAY 8 OF CHAR; Password*: LONGINT;
++  VAR (* User*: ARRAY 8 OF CHAR; Password*: LONGINT;
+     Arrow*, Star*: Marker;
+     Mouse, Pointer: Cursor;
+     FocusViewer*: Viewers.Viewer;
++    *)
+     Log*: Texts.Text;
+ 
+     Par*: RECORD
+-      vwr*: Viewers.Viewer;
+       frame*: Display.Frame;
+       text*: Texts.Text;
+       pos*: LONGINT
+     END;
+ 
+-    CurFnt*: Fonts.Font;
+-    CurCol*, CurOff*: INTEGER;
+     NofTasks*: INTEGER;
+ 
+     CurTask: Task;
+@@ -71,6 +68,7 @@
+ 
+   (*user identification*)
+ 
++  (*
+   PROCEDURE Code(VAR s: ARRAY OF CHAR): LONGINT;
+     VAR i: INTEGER; a, b, c: LONGINT;
+   BEGIN
+@@ -267,6 +265,7 @@
+     VAR M: ControlMsg;
+   BEGIN M.id := defocus; FocusViewer.handle(FocusViewer, M); FocusViewer := V
+   END PassFocus;
++  *)
+ 
+   PROCEDURE OpenLog*(T: Texts.Text);
+   BEGIN Log := T
+@@ -274,7 +273,7 @@
+ 
+   (*command interpretation*)
+   PROCEDURE SetPar*(F: Display.Frame; T: Texts.Text; pos: LONGINT);
+-  BEGIN Par.vwr := Viewers.This(F.X, F.Y); Par.frame := F; Par.text := T; Par.pos := pos
++  BEGIN Par.frame := F; Par.text := T; Par.pos := pos
+   END SetPar;
+ 
+   PROCEDURE Call* (name: ARRAY OF CHAR; VAR res: INTEGER);
+@@ -298,10 +297,8 @@
+   END Call;
+ 
+   PROCEDURE GetSelection* (VAR text: Texts.Text; VAR beg, end, time: LONGINT);
+-    VAR M: SelectionMsg;
+   BEGIN
+-    M.time := -1; Viewers.Broadcast(M); time := M.time;
+-    IF time >= 0 THEN text := M.text; beg := M.beg; end := M.end END
++    time := -1
+   END GetSelection;
+ 
+   PROCEDURE GC;
+@@ -345,6 +342,7 @@
+   BEGIN ActCnt := count
+   END Collect;
+ 
++  (*
+   PROCEDURE SetFont* (fnt: Fonts.Font);
+   BEGIN CurFnt := fnt
+   END SetFont;
+@@ -356,12 +354,14 @@
+   PROCEDURE SetOffset* (voff: INTEGER);
+   BEGIN CurOff := voff
+   END SetOffset;
++  *)
+ 
+   PROCEDURE Loop*;
+-    VAR V: Viewers.Viewer; M: InputMsg; N: ControlMsg;
++    VAR
+        prevX, prevY, X, Y, t: INTEGER; keys: SET; ch: CHAR;
+   BEGIN
+     REPEAT
++      (*
+       Input.Mouse(keys, X, Y);
+       IF Input.Available() > 0 THEN Input.Read(ch);
+         IF ch = ESC THEN
+@@ -382,11 +382,11 @@
+           IF Y >= Display.Height THEN Y := Display.Height END ;
+           M.Y := Y; M.keys := keys; V := Viewers.This(X, Y); V.handle(V, M); prevX := X; prevY := Y
+         END;
++      *)
+         CurTask := CurTask.next; t := Kernel.Time();
+         IF t >= CurTask.nextTime THEN
+           CurTask.nextTime := t + CurTask.period; CurTask.state := active; CurTask.handle; CurTask.state := idle
+         END
+-      END
+     UNTIL FALSE
+   END Loop;
+ 
+@@ -396,16 +396,18 @@
+     SYSTEM.LDREG(14, Kernel.stackOrg); (*reset stack pointer*) Loop
+   END Reset;
+ 
+-BEGIN User[0] := 0X;
++BEGIN (* User[0] := 0X;
+   Arrow.Fade := FlipArrow; Arrow.Draw := FlipArrow;
+   Star.Fade := FlipStar; Star.Draw := FlipStar;
+   OpenCursor(Mouse); OpenCursor(Pointer);
++  *)
+ 
+   DW := Display.Width; DH := Display.Height; CL := DW;
++  (*
+   OpenDisplay(DW DIV 8 * 5, DW DIV 8 * 3, DH);
+   FocusViewer := Viewers.This(0, 0);
+   CurFnt := Fonts.Default; CurCol := Display.white; CurOff := 0;
+-
++  *)
+   ActCnt := 0; CurTask := NewTask(GC, 1000); Install(CurTask);
+-  Modules.Load("System", Mod); Mod := NIL; Loop
++  Modules.Load("BootstrapSystem", Mod); Mod := NIL; Loop
+ END Oberon.
+\ No newline at end of file

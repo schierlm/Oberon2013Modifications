@@ -1,0 +1,17 @@
+MODULE TrapTester;
+
+  TYPE
+    X = POINTER TO XDesc;
+    XDesc = RECORD next: X END;
+
+  PROCEDURE Boom*;
+    VAR x,y : X;
+  BEGIN y := NIL;
+    WHILE TRUE DO
+      NEW(x);
+      x.next := y;
+      y := x;
+    END
+  END Boom;
+
+END TrapTester.

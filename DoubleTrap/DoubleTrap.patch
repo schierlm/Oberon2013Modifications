@@ -1,0 +1,115 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -258,6 +258,14 @@
+     ELSE (*stop*) LED(w + 192); REPEAT UNTIL FALSE
+     END
+   END Trap;
++
++  PROCEDURE ForceFree*(adr: INTEGER);
++    VAR tag, size: INTEGER;
++  BEGIN
++    SYSTEM.GET(adr, tag); SYSTEM.GET(tag, size);
++    ASSERT((size > 0) & (size MOD 256 = 0)); DEC(allocated, size);
++    SYSTEM.PUT(adr, size); SYSTEM.PUT(adr + 4, -1); SYSTEM.PUT(adr + 8, list0); list0 := adr;
++  END ForceFree;
+ 
+   PROCEDURE Init*;
+   BEGIN Install(SYSTEM.ADR(Trap), 20H);  (*install temporary trap*)
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -46,6 +46,9 @@
+       next: Task;
+       handle: Handler
+     END;
++
++    Sacrifice = POINTER TO SacrificeDesc;
++    SacrificeDesc = RECORD buf: ARRAY 1000 OF CHAR END;
+ 
+   VAR User*: ARRAY 8 OF CHAR; Password*: LONGINT;
+     Arrow*, Star*: Marker;
+@@ -68,6 +71,8 @@
+     DW, DH, CL: INTEGER;
+     ActCnt: INTEGER; (*action count for GC*)
+     Mod: Modules.Module;
++    sacrifice: Sacrifice;
++    logDoubleTrap: BOOLEAN;
+ 
+   (*user identification*)
+ 
+@@ -305,7 +310,7 @@
+   END GetSelection;
+ 
+   PROCEDURE GC;
+-    VAR mod: Modules.Module;
++    VAR mod: Modules.Module; W: Texts.Writer;
+   BEGIN
+     IF (ActCnt <= 0) OR (Kernel.allocated >= Kernel.heapLim - Kernel.heapOrg - 10000H) THEN
+       mod := Modules.root; LED(21H);
+@@ -316,9 +321,23 @@
+       LED(23H);
+       Files.RestoreList; LED(27H);
+       Kernel.Scan; LED(20H);
++      IF logDoubleTrap THEN
++        Texts.OpenWriter(W); Texts.WriteLn(W); Texts.WriteString(W, "  DOUBLE TRAP");
++        Texts.WriteLn(W); Texts.Append(Log, W.buf); logDoubleTrap := FALSE
++      END;
++      IF sacrifice = NIL THEN NEW(sacrifice) END;
+       ActCnt := BasicCycle
+     END
+   END GC;
++
++  PROCEDURE Unsacrifice*();
++  BEGIN
++    IF sacrifice # NIL THEN Kernel.ForceFree(SYSTEM.ADR(sacrifice.buf) - 8); sacrifice := NIL END
++  END Unsacrifice;
++
++  PROCEDURE LogDoubleTrap*();
++  BEGIN logDoubleTrap := TRUE
++  END LogDoubleTrap;
+ 
+   PROCEDURE NewTask*(h: Handler; period: INTEGER): Task;
+     VAR t: Task;
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -8,6 +8,7 @@
+ 
+   VAR W: Texts.Writer;
+     pat: ARRAY 32 OF CHAR;
++    inTrap: BOOLEAN;
+ 
+   PROCEDURE GetArg(VAR S: Texts.Scanner);
+     VAR T: Texts.Text; beg, end, time: LONGINT;
+@@ -397,21 +398,29 @@
+     VAR u, v, w: INTEGER; mod: Modules.Module;
+   BEGIN u := SYSTEM.REG(15); SYSTEM.GET(u - 4, v); w := v DIV 10H MOD 10H; (*trap number*)
+     IF w = 0 THEN Kernel.New(a, b)
+-    ELSE (*trap*) Texts.WriteLn(W); Texts.WriteString(W, "  pos "); Texts.WriteInt(W, v DIV 100H MOD 10000H, 4);
++    ELSE (*trap*)
++      Oberon.Unsacrifice();
++      IF ~inTrap THEN inTrap := TRUE;
++      Texts.WriteLn(W); Texts.WriteString(W, "  pos "); Texts.WriteInt(W, v DIV 100H MOD 10000H, 4);
+       Texts.WriteString(W, "  TRAP"); Texts.WriteInt(W, w, 4); mod := Modules.root;
+       WHILE (mod # NIL) & ((u < mod.code) OR (u >= mod.imp)) DO mod := mod.next END ;
+       IF mod # NIL THEN Texts.WriteString(W, " in "); Texts.WriteString(W, mod.name) END ;
+       Texts.WriteString(W, " at"); Texts.WriteHex(W, u);
+-      Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf); Oberon.Reset
++      Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
++      ELSE Oberon.LogDoubleTrap() END; Oberon.Collect(0); inTrap := FALSE; Oberon.Reset
+     END
+   END Trap;
+ 
+   PROCEDURE Abort;
+     VAR n: INTEGER;
+-  BEGIN n := SYSTEM.REG(15); Texts.WriteString(W, "  ABORT  "); Texts.WriteHex(W, n);
+-    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf); Oberon.Reset
++  BEGIN n := SYSTEM.REG(15); Oberon.Unsacrifice();
++    IF ~inTrap THEN inTrap := TRUE;
++    Texts.WriteString(W, "  ABORT  "); Texts.WriteHex(W, n);
++    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
++    ELSE Oberon.LogDoubleTrap() END; Oberon.Collect(0); inTrap := FALSE; Oberon.Reset
+   END Abort;
+   
+ BEGIN Texts.OpenWriter(W);
++  inTrap := FALSE;
+   Oberon.OpenLog(TextFrames.Text("")); OpenViewers;
+   Kernel.Install(SYSTEM.ADR(Trap), 20H); Kernel.Install(SYSTEM.ADR(Abort), 0);

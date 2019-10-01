@@ -1,0 +1,68 @@
+--- 1/Input.Mod.txt
++++ 1/Input.Mod.txt
+@@ -7,6 +7,10 @@
+     KTabAdr: INTEGER;  (*keyboard code translation table*)
+     MW, MH, MX, MY: INTEGER; (*mouse limits and coords*)
+     MK: SET; (*mouse keys*)
++    spacePending: BOOLEAN;
++    keyPending: CHAR;
++    overrideKeys, overrideInterclick: SET;
++    overrideCount: INTEGER;
+ 
+ (*FIFO implemented in hardware, because every read must be handled,
+   including tracking the state of the Shift and Ctrl keys*)
+@@ -28,24 +32,44 @@
+   END Peek;
+ 
+   PROCEDURE Available*(): INTEGER;
+-  BEGIN Peek();
+-    RETURN ORD(Recd)
++  BEGIN IF (~spacePending) & (keyPending = 0X) THEN Peek() END;
++    RETURN ORD(Recd OR spacePending OR (keyPending # 0X))
+   END Available;
+ 
++  PROCEDURE InjectChar*(injectSpace: BOOLEAN; injectChar: CHAR);
++  BEGIN spacePending := injectSpace; keyPending := injectChar
++  END InjectChar;
++
++  PROCEDURE OverrideMouseKeys*(keys, interclick: SET);
++  BEGIN
++    overrideKeys := keys; overrideInterclick := interclick; overrideCount := 0
++  END OverrideMouseKeys;
++
+   PROCEDURE Read*(VAR ch: CHAR);
+   BEGIN
++    IF spacePending THEN ch := 20X; spacePending := FALSE
++    ELSIF keyPending # 0X THEN ch := keyPending; keyPending := 0X ELSE
+     WHILE ~Recd DO Peek() END ;
+     IF Shift OR Ctrl THEN INC(kbdCode, 80H) END; (*ctrl implies shift*)
+   (* ch := kbdTab[kbdCode]; *)
+     SYSTEM.GET(KTabAdr + kbdCode, ch);
+     IF Ctrl THEN ch := CHR(ORD(ch) MOD 20H) END;
+     Recd := FALSE
++    END
+   END Read;
+ 
+   PROCEDURE Mouse*(VAR keys: SET; VAR x, y: INTEGER);
+     VAR w: INTEGER;
+   BEGIN SYSTEM.GET(msAdr, w);
+     keys := SYSTEM.VAL(SET, w DIV 1000000H MOD 8);
++    IF (keys # {}) & (overrideKeys # {}) THEN
++      keys := overrideKeys;
++      IF overrideInterclick = {} THEN overrideCount := 10 ELSE overrideCount := 1 END
++    ELSIF (keys = {}) & (overrideCount >= 1) & (overrideCount < 10) THEN
++      keys := overrideInterclick; INC(overrideCount)
++    ELSIF (keys = {}) & (overrideCount = 10) THEN
++      overrideKeys := {}; overrideInterclick := {}; overrideCount := 0
++    END;
+     x := w MOD 400H; y := (w DIV 1000H) MOD 400H;
+     IF y >= MH THEN y := MH-1 END
+   END Mouse;
+@@ -56,6 +80,7 @@
+ 
+   PROCEDURE Init*;
+   BEGIN Up := FALSE; Shift := FALSE; Ctrl := FALSE; Recd := FALSE;
++    spacePending := FALSE; keyPending := 0X;
+     KTabAdr := SYSTEM.ADR($
+       00 00 00 00 00 1A 00 00  00 00 00 00 00 09 60 00
+       00 00 00 00 00 71 31 00  00 00 7A 73 61 77 32 00

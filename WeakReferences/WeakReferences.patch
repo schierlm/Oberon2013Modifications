@@ -1,0 +1,189 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -7,11 +7,17 @@
+     mapsize = 10000H; (*1K sectors, 64MB*)
+ 
+   TYPE Sector* = ARRAY SectorLength OF BYTE;
++    WeakReference* = POINTER TO WeakReferenceDesc;
++    WeakReferenceDesc* = RECORD
++      nextRef: WeakReference;
++      target*: INTEGER;
++    END;
+ 
+   VAR allocated*, NofSectors*: INTEGER;
+     heapOrg*, heapLim*: INTEGER; 
+     stackOrg* ,  stackSize*, MemLim*: INTEGER;
+     clock: INTEGER;
++    weakRefRoot: WeakReference;
+     list0, list1, list2, list3: INTEGER;  (*lists of free blocks of size n*256, 128, 64, 32 bytes*)
+     data: INTEGER; (*SPI data in*)
+     sectorMap: ARRAY mapsize DIV 32 OF SET;
+@@ -246,6 +252,31 @@
+   PROCEDURE SetClock*(dt: INTEGER);
+   BEGIN clock := dt
+   END SetClock;
++
++  PROCEDURE AddWeakReference*(ref: WeakReference);
++  BEGIN
++    ref.nextRef := weakRefRoot;
++    weakRefRoot := ref;
++  END AddWeakReference;
++
++  PROCEDURE RestoreWeakReferences*; (*after mark phase of garbage collection*)
++    VAR r: WeakReference;
++
++    PROCEDURE unmarked(r: WeakReference): BOOLEAN;
++      VAR m: INTEGER;
++    BEGIN
++      IF (r = NIL) OR (r.target = 0) THEN m := -1 ELSE SYSTEM.GET(r.target-4, m) END;
++      RETURN m = 0
++    END unmarked;
++
++  BEGIN
++    WHILE unmarked(weakRefRoot) DO weakRefRoot.target := 0; weakRefRoot := weakRefRoot.nextRef END;
++    r := weakRefRoot; (* r is marked or NIL *)
++    WHILE r # NIL DO
++      WHILE unmarked(r.nextRef) DO r.nextRef.target := 0; r.nextRef := r.nextRef.nextRef END;
++      r := r.nextRef
++    END
++  END RestoreWeakReferences;
+ 
+   PROCEDURE Install*(Padr, at: INTEGER);
+   BEGIN SYSTEM.PUT(at, 0E7000000H + (Padr - at) DIV 4 -1)
+@@ -264,6 +295,7 @@
+     SYSTEM.GET(12, MemLim); SYSTEM.GET(24, heapOrg);
+     stackOrg := heapOrg; stackSize := 8000H; heapLim := MemLim;
+     list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
++    weakRefRoot := NIL;
+     SYSTEM.PUT(list0, heapLim - heapOrg); SYSTEM.PUT(list0+4, -1); SYSTEM.PUT(list0+8, 0);
+     allocated := 0; clock := 0; InitSecMap
+   END Init;
+--- 1/Files.Mod.txt
++++ 2/Files.Mod.txt
+@@ -14,6 +14,7 @@
+ 
+   TYPE  DiskAdr = INTEGER;
+       File*    = POINTER TO FileDesc;
++      WeakFile = POINTER TO WeakFileDesc;
+       Buffer  = POINTER TO BufferRecord;
+       Index   = POINTER TO IndexRecord;
+ 
+@@ -26,7 +27,7 @@
+       END ;
+ 
+     FileDesc =
+-      RECORD next: INTEGER; (*list of files invisible to the GC*)
++      RECORD
+         nofbufs, aleng, bleng: INTEGER;
+         modH, registered: BOOLEAN;
+         firstbuf: Buffer;
+@@ -37,6 +38,10 @@
+         sec: FileDir.SectorTable
+       END ;
+ 
++    WeakFileDesc = RECORD (Kernel.WeakReferenceDesc)
++      next: WeakFile
++    END;
++
+     BufferRecord =
+       RECORD apos, lim: INTEGER;
+         mod: BOOLEAN;
+@@ -56,7 +61,7 @@
+       0 <= apos <= aleng < PgTabSize
+       (apos < aleng) & (lim = SS) OR (apos = aleng) *)
+ 
+-  VAR root: INTEGER (*File*);  (*list of open files*)
++  VAR weakRoot: WeakFile;  (*list of open files*)
+ 
+   PROCEDURE Check(s: ARRAY OF CHAR;
+         VAR name: FileDir.FileName; VAR res: INTEGER);
+@@ -78,7 +83,7 @@
+ 
+   PROCEDURE Old*(name: ARRAY OF CHAR): File;
+     VAR i, k, res: INTEGER;
+-      f: File;
++      f: File; wf: WeakFile;
+       header: DiskAdr;
+       buf: Buffer;
+       F: FileDir.FileHd;
+@@ -88,8 +93,12 @@
+     IF res = 0 THEN
+       FileDir.Search(namebuf, header);
+       IF header # 0 THEN
+-        f := SYSTEM.VAL(File, root);
+-        WHILE (f # NIL) & (f.sec[0] # header) DO f := SYSTEM.VAL(File, f.next) END ;
++        WHILE (weakRoot # NIL) & (weakRoot.target = 0) DO weakRoot := weakRoot.next END;
++        wf := weakRoot; IF wf # NIL THEN f := SYSTEM.VAL(File, wf.target) ELSE f := NIL END;
++        WHILE (f # NIL) & (f.sec[0] # header) DO
++          WHILE (wf.next # NIL) & (wf.next.target = 0) DO wf.next := wf.next.next END;
++          wf := wf.next; IF wf # NIL THEN f := SYSTEM.VAL(File, wf.target) ELSE f := NIL END;
++        END;
+         IF f = NIL THEN (*file not yet present*)
+           NEW(buf); buf.apos := 0; buf.next := buf; buf.mod := FALSE;
+           F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(buf.data));
+@@ -104,7 +113,8 @@
+             Kernel.GetSector(inxpg.adr, inxpg.sec); f.ext[i] := inxpg; INC(i)
+           END ;
+           WHILE i < FileDir.ExTabSize DO f.ext[i] := NIL; INC(i) END ;
+-          f.sechint := header; f.modH := FALSE; f.next := root; root := SYSTEM.VAL(INTEGER, f)
++          f.sechint := header; f.modH := FALSE;
++          NEW(wf); wf.target := SYSTEM.VAL(INTEGER, f); wf.next := weakRoot; weakRoot := wf; Kernel.AddWeakReference(weakRoot)
+         END
+       END
+     END ;
+@@ -229,11 +239,13 @@
+   END Unbuffer;
+ 
+   PROCEDURE Register*(f: File);
++    VAR wf: WeakFile;
+   BEGIN
+     IF (f # NIL) & (f.name[0] # 0X) THEN
+       Unbuffer(f);
+       IF ~f.registered THEN
+-        FileDir.Insert(f.name, f.sec[0]); f.registered := TRUE; f.next := root; root := SYSTEM.VAL(INTEGER, f)
++        FileDir.Insert(f.name, f.sec[0]); f.registered := TRUE;
++        NEW(wf); wf.target := SYSTEM.VAL(INTEGER, f); wf.next := weakRoot; weakRoot := wf; Kernel.AddWeakReference(weakRoot)
+       END
+     END
+   END Register;
+@@ -480,27 +492,7 @@
+   (*---------------------------System use---------------------------*)
+ 
+   PROCEDURE Init*;
+-  BEGIN root := 0; Kernel.Init; FileDir.Init
++  BEGIN weakRoot := NIL; Kernel.Init; FileDir.Init
+   END Init;
+-
+-  PROCEDURE RestoreList*; (*after mark phase of garbage collection*)
+-    VAR f, f0: INTEGER;
+-
+-    PROCEDURE mark(f: INTEGER): INTEGER;
+-      VAR m: INTEGER;
+-    BEGIN
+-      IF f = 0 THEN m := -1 ELSE SYSTEM.GET(f-4, m) END ;
+-      RETURN m
+-    END mark;
+-
+-  BEGIN (*field "next" has offset 0*)
+-    WHILE mark(root) = 0 DO SYSTEM.GET(root, root) END ;
+-    f := root;
+-    WHILE f # 0 DO
+-      f0 := f;
+-      REPEAT SYSTEM.GET(f0, f0) UNTIL mark(f0) # 0;
+-      SYSTEM.PUT(f, f0); f := f0
+-    END
+-  END RestoreList;
+ 
+ END Files.
+\ No newline at end of file
+--- 1/Oberon.Mod0.txt
++++ 1/Oberon.Mod.txt
+@@ -314,7 +314,7 @@
+         mod := mod.next
+       END ;
+       LED(23H);
+-      Files.RestoreList; LED(27H);
++      Kernel.RestoreWeakReferences; LED(27H);
+       Kernel.Scan; LED(20H);
+       ActCnt := BasicCycle
+     END

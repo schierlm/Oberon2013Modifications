@@ -1,0 +1,6 @@
+F1                                                                                   F1
+Q W E R T Y U I O P     1 2 3 4 5 6 7 8 9 0     [ \ ] ^ _ ` { | } ~
+ A S D F G H J K L      ! " # $ % & ' ( ) * + , - . / : ; < = > ? @
+  Z X C V B N M         SPACE TAB RETURN BKSP ESC DEL
+                                  ML MM MR MLM MLR MMR MLMR
+   ML+R ML+M ML+MR MM+L MM+R MM+LR MR+L MR+M MR+LM

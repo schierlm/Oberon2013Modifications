@@ -1,0 +1,137 @@
+--- 1/Display.Mod.txt
++++ 2/Display.Mod.txt
+@@ -6,7 +6,9 @@
+     base = 0E7F00H;  (*adr of 1024 x 768 pixel, monocolor display frame*)
+ 
+   TYPE Frame* = POINTER TO FrameDesc;
+-    FrameMsg* = RECORD END ;
++    FrameDesc* = RECORD END;
++  VAR Width*, Height*: INTEGER; 
++(*
+     Handler* = PROCEDURE (F: Frame; VAR M: FrameMsg);
+     FrameDesc* = RECORD next*, dsc*: Frame;
+         X*, Y*, W*, H*: INTEGER;
+@@ -34,6 +36,7 @@
+       IF col # black THEN SYSTEM.PUT(a, u + s) ELSE SYSTEM.PUT(a, u - s) END
+     END
+   END Dot;
++*)
+ 
+   PROCEDURE ReplConst*(col, x, y, w, h, mode: INTEGER);
+     VAR al, ar, a0, a1: INTEGER; left, right, mid, pix, pixl, pixr: SET;
+@@ -96,6 +99,7 @@
+     END
+   END CopyPattern;
+ 
++(*
+   PROCEDURE CopyBlock*(sx, sy, w, h, dx, dy, mode: INTEGER); (*only for mode = replace*)
+     VAR sa, da, sa0, sa1, d, len: INTEGER;
+       u0, u1, u2, u3, v0, v1, v2, v3, n: INTEGER;
+@@ -178,8 +182,9 @@
+       END
+     END
+   END ReplPattern;
++*)
+ 
+-BEGIN Base := base; Width := 1024; Height := 768;
++BEGIN Width := 1024; Height := 768; (*
+   arrow := SYSTEM.ADR($0F0F 0060 0070 0038 001C 000E 0007 8003 C101 E300 7700 3F00 1F00 3F00 7F00 FF00$);
+   star := SYSTEM.ADR($0F0F 8000 8220 8410 8808 9004 A002 C001 7F7F C001 A002 9004 8808 8410 8220 8000$);
+   hook := SYSTEM.ADR($0C0C 070F 8707 C703 E701 F700 7F00 3F00 1F00 0F00 0700 0300 01$);
+@@ -187,4 +192,5 @@
+   block := SYSTEM.ADR($0808 FFFF C3C3 C3C3 FFFF$);
+   cross := SYSTEM.ADR($0F0F 0140 0220 0410 0808 1004 2002 4001 0000 4001 2002 1004 0808 0410 0220 0140$);
+   grey := SYSTEM.ADR($2002 0000 5555 5555 AAAA AAAA$)
++*)
+ END Display.
+--- 1/Texts.Mod.txt
++++ 2/Texts.Mod.txt
+@@ -14,7 +14,7 @@
+ 
+     TAB = 9X; CR = 0DX;
+     TextTag = 0F1X;
+-    replace* = 0; insert* = 1; delete* = 2; unmark* = 3;  (*op-codes*)
++    insert* = 1;
+ 
+   TYPE Piece = POINTER TO PieceDesc;
+     PieceDesc = RECORD
+@@ -124,6 +124,7 @@
+     T.changed := FALSE; T.org := -1; T.pce := T.trailer (*init cache*)
+   END Open;
+ 
++(*
+   PROCEDURE Store* (VAR W: Files.Rider; T: Text);
+     VAR p, q: Piece;
+       R: Files.Rider;
+@@ -163,6 +164,7 @@
+   BEGIN f := Files.New(name); Files.Set(w, f, 0);
+     Files.Write(w, TextTag); Store(w, T); Files.Register(f)
+   END Close;
++*)
+ 
+   (* -------------------- Editing ----------------------- *)
+ 
+@@ -198,6 +200,7 @@
+     END
+   END SplitPiece;
+ 
++(*
+   PROCEDURE Save* (T: Text; beg, end: LONGINT; B: Buffer);
+     VAR p, q, qb, qe: Piece; org: LONGINT;
+   BEGIN
+@@ -224,6 +227,7 @@
+     END;
+     DB.last := Q; DB.len := DB.len + SB.len
+   END Copy;
++*)
+ 
+   PROCEDURE Insert* (T: Text; pos: LONGINT; B: Buffer);
+     VAR pl, pr, p, qb, qe: Piece; org, end: LONGINT;
+@@ -248,6 +252,7 @@
+   BEGIN Insert(T, T.len, B)
+   END Append;
+ 
++(*
+   PROCEDURE Delete* (T: Text; beg, end: LONGINT; B: Buffer);
+     VAR pb, pe, pbr, per: Piece; orgb, orge: LONGINT;
+   BEGIN
+@@ -287,6 +292,7 @@
+     VAR p: Piece; org: LONGINT;
+   BEGIN FindPiece(T, pos, org, p); fnt := p.fnt; col := p.col; voff := p.voff
+   END Attributes;
++*)
+ 
+   (* ------------------ Access: Readers ------------------------- *)
+ 
+@@ -405,6 +411,7 @@
+     Files.Set(W.rider, Files.New(""), 0)
+   END OpenWriter;
+ 
++(*
+   PROCEDURE SetFont* (VAR W: Writer; fnt: Fonts.Font);
+   BEGIN W.fnt := fnt
+   END SetFont;
+@@ -416,6 +423,7 @@
+   PROCEDURE SetOffset* (VAR W: Writer; voff: INTEGER);
+   BEGIN W.voff := voff
+   END SetOffset;
++*)
+ 
+   PROCEDURE Write* (VAR W: Writer; ch: CHAR);
+     VAR p: Piece;
+@@ -467,6 +475,7 @@
+     REPEAT DEC(i); Write(W, a[i]) UNTIL i = 0
+   END WriteHex;
+ 
++(*
+  PROCEDURE WriteReal* (VAR W: Writer; x: REAL; n: INTEGER);
+     VAR e, i, k, m: INTEGER;
+       d: ARRAY 16 OF CHAR;
+@@ -532,6 +541,7 @@
+     WritePair(W, ":", d DIV 40H MOD 40H);  (*min*)
+     WritePair(W, ":", d MOD 40H)  (*sec*)
+   END WriteClock;
++*)
+ 
+ BEGIN TrailerFile := Files.New("")
+ END Texts.
