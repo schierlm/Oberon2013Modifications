@@ -17,6 +17,7 @@ which is (for convenience; it is impossible to use that repo as a submodule as i
 
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
+| **[BugFixes](BugFixes/README.md)** | Fixes for what I consider to be bugs | Optionally recompile inner core |
 | **[ConvertEOL](ConvertEOL/README.md)** | Convert line terminators when loading text files as ASCII | Recompile `Texts.Mod` |
 | **[MinimalFonts](MinimalFonts/README.md)** | Minimal Fonts modules with a single font embedded to save space and avoid filesystem access | Recompile `Fonts.Mod` |
 | **[RescueSystem](RescueSystem/README.md)** | Boot into secondary inner core in case main one is unable to boot | Compile two inner cores, move filesystem offset |
@@ -30,3 +31,8 @@ which is (for convenience; it is impossible to use that repo as a submodule as i
 | **[OnScreenKeyboard](OnScreenKeyboard/README.md)** | Little keyboard on the screen when no real keyboard is available | Recompile `Input.Mod` and dependant modules |
 | **[WeakReferences](WeakReferences/README.md)** | Add weak references to the Project Oberon 2013 kernel | Recompile inner core |
 | **[RebuildToolBuilder](RebuildToolBuilder/README.md)**| Build a list of modules that need to be rebuilt | None |
+| **[KeyboardTester](KeyboardTester/README.md)** | Test if all keys on your (emulated) keyboard work | None |
+| **[RemoveFloatingPoint](RemoveFloatingPoint/README.md)** | Build an Oberon system without Floating Point support | Recompile inner core |
+| **[RobustTrapViewer](RobustTrapViewer/README.md)** | Make sure TRAPs in system modules are seen | None (load it manually) |
+| **[TrapBacktrace](TrapBacktrace/README.md)** | Print a backtrace on TRAP and ABORT | Optionally update the boot loader |
+| **[ZeroLocalVariables](ZeroLocalVariables/README.md)** | Zero local variables to avoid memory corruption due to uninitialized variables | Recompile `ORG.Mod` |

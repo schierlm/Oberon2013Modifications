@@ -1,0 +1,25 @@
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -442,9 +442,7 @@
+       WHILE (mod # NIL) & ((u < mod.code) OR (u >= mod.imp)) DO mod := mod.next END ;
+       IF mod # NIL THEN Texts.WriteString(W, " in "); Texts.WriteString(W, mod.name) END ;
+       Texts.WriteString(W, " at"); Texts.WriteHex(W, u);
+-      Texts.WriteLn(W); Backtrace(); Texts.Append(Oberon.Log, W.buf); Oberon.Reset
+-    END
+-      ***PREPATCH APPLIED***
++      Texts.WriteLn(W); Backtrace(); Texts.Append(Oberon.Log, W.buf)
+       ELSE Oberon.LogDoubleTrap() END; Oberon.Collect(0); inTrap := FALSE; Oberon.Reset
+     END
+   END Trap;
+@@ -454,10 +452,7 @@
+   BEGIN n := SYSTEM.REG(15); Oberon.Unsacrifice();
+     IF ~inTrap THEN inTrap := TRUE;
+     Texts.WriteString(W, "  ABORT  "); Texts.WriteHex(W, n);
+-  BEGIN n := SYSTEM.REG(15); Texts.WriteString(W, "  ABORT  "); Texts.WriteHex(W, n);
+-    Texts.WriteLn(W); Backtrace(); Texts.Append(Oberon.Log, W.buf); Oberon.Reset
+-  END Abort;
+-    ***PREPATCH APPLIED***
++    Texts.WriteLn(W); Backtrace(); Texts.Append(Oberon.Log, W.buf)
+     ELSE Oberon.LogDoubleTrap() END; Oberon.Collect(0); inTrap := FALSE; Oberon.Reset
+   END Abort;
+   

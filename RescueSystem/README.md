@@ -195,15 +195,15 @@ Installation
 
       ORP.Compile Modules.RS.Mod Fonts.Embedded.Mod System.RS.Mod ~
       Boot.Link Modules ~
-      
+
       System.RenameFiles
         Modules.bin => Modules.bin.RS
         Fonts.rsc => Fonts.rsc.RS
         System.rsc => System.rsc.RS ~
-      
+
       ORP.Compile Modules.Mod Fonts.Mod System.Mod Oberon.Mod ~
       Boot.Link Modules ~
-      
+
       System.CopyFiles
         Input.rsc => Input.rsc.RS
         Display.rsc => Display.rsc.RS

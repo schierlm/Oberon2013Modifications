@@ -18,7 +18,7 @@ and only this one font is used.
 The second one embeds an ugly, generated font, which is a lot smaller, and might be useful in scenarios
 where you want to boot a system with very constrained memory (In the generated font, lowercase letters
 look like uppercase letters shifted down by one pixel, but compared to the file size, the font is
-[surprisingly easy to read](minimal-font.png)). This font uses only 16 bits for each glyph; 
+[surprisingly easy to read](minimal-font.png)). This font uses only 16 bits for each glyph;
 15 of them provide a 3x5 matrix, and the remaining one is used to shift the glyph down by one pixel.
 
 Both modules only support one font, so regardless which font is requested, it will always return the same
