@@ -26,8 +26,8 @@ Removing Floating Point
 - Recompile `Files.Mod` and rebuild the whole system (including the compiler):
 
       ORP.Compile Files.Mod/s Modules.Mod/s ~
-      Boot.Link Modules ~
-      Boot.Load Modules.bin ~
+      ORL.Link Modules ~
+      ORL.Load Modules.bin ~
 
       ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
       ORP.Compile Fonts.Mod/s Texts.Mod/s ~
@@ -58,8 +58,8 @@ Adding back Floating Point
 - Recompile `Files.Mod` and rebuild the whole system (including the compiler):
 
       ORP.Compile Files.Mod/s Modules.Mod/s ~
-      Boot.Link Modules ~
-      Boot.Load Modules.bin ~
+      ORL.Link Modules ~
+      ORL.Load Modules.bin ~
 
       ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
       ORP.Compile Fonts.Mod/s Texts.Mod/s ~

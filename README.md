@@ -10,8 +10,8 @@ Some modifications require recompiling the *inner core*, or even recompiling the
 but those requirements are clearly listed in the accompanying `README.md` file.
 
 To recompile and link the inner core, you can use
-[Andreas Pirklbauer's Boot Linker](https://github.com/andreaspirklbauer/Oberon-building-tools/blob/master/Sources/OriginalOberon2013/Boot.Mod),
-which is (for convenience; it is impossible to use that repo as a submodule as it is frequently rebased) also available [in this repo](Boot.Mod.txt).
+[Andreas Pirklbauer's Boot Linker](https://github.com/andreaspirklbauer/Oberon-building-tools/blob/master/Sources/FPGAOberon2013/ORL.Mod),
+which is (for convenience; it is impossible to use that repo as a submodule as it is frequently rebased) also available [in this repo](ORL.Mod.txt).
 
 ### Available modifications
 

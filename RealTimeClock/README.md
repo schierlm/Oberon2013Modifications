@@ -28,8 +28,8 @@ Installation
 - Recompile `Kernel.Mod` and rebuild the inner core:
 
       ORP.Compile Kernel.Mod FileDir.Mod Files.Mod Modules.Mod ~
-      Boot.Link Modules ~
-      Boot.Load Modules.bin ~
+      ORL.Link Modules ~
+      ORL.Load Modules.bin ~
 
 
 - Restart the system.

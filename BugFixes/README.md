@@ -48,8 +48,8 @@ Installation
 - Recompile the changed modules and rebuild the inner core:
 
       ORP.Compile Kernel.Mod ~
-      Boot.Link Modules ~
-      Boot.Load Modules.bin ~
+      ORL.Link Modules ~
+      ORL.Load Modules.bin ~
 
       ORP.Compile GraphicFrames.Mod ~
       ORP.Compile ORB.Mod ~

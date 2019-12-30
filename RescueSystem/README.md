@@ -176,8 +176,8 @@ Installation
 - Compile the new modules and the modified inner core, and load the inner core to the boot area:
 
       ORP.Compile Kernel.Mod FileDir.Mod Files.Mod Modules.Mod ~
-      Boot.Link Modules ~
-      Boot.Load Modules.bin ~
+      ORL.Link Modules ~
+      ORL.Load Modules.bin ~
 
 - Move the filesystem by 64KB to the end. After this move, both the "original" boot area
   (before the new Directory Root) and the new boot area will contain the same boot loader,
@@ -194,7 +194,7 @@ Installation
   in both systems.
 
       ORP.Compile Modules.RS.Mod Fonts.Embedded.Mod System.RS.Mod ~
-      Boot.Link Modules ~
+      ORL.Link Modules ~
 
       System.RenameFiles
         Modules.bin => Modules.bin.RS
@@ -202,7 +202,7 @@ Installation
         System.rsc => System.rsc.RS ~
 
       ORP.Compile Modules.Mod Fonts.Mod System.Mod Oberon.Mod ~
-      Boot.Link Modules ~
+      ORL.Link Modules ~
 
       System.CopyFiles
         Input.rsc => Input.rsc.RS
