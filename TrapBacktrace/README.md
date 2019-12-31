@@ -8,6 +8,13 @@ the trap originates. Often, these traps are inside system modules and caused by 
 an invalid value to some exported function. But without a backtrace, it is hard to find
 where exactly the error happens.
 
+This modification add a heuristic to the trap handler that scans the stack for likely
+return addresses (they have to lie inside the code of a module and the previous instruction
+needs to be a jump instruction), and prints a backtrace of those. Note that this
+heuristic can have false positives in exotic cases, resulting in false stack frames
+printed among the real ones (which are still all there). But usually these false stack
+frames can be identified easily when following the execution flow.
+
 In conditional trap jumps, the code position is encoded in some free bits of the
 instruction itself, therefore no symbol files are required to print the position
 in the trap output. However, function call jumps lack those free bits, so a different
