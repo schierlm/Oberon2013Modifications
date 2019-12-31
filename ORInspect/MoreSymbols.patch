@@ -1,0 +1,43 @@
+--- 1/ORB.Mod.txt
++++ 2/ORB.Mod.txt
+@@ -337,12 +337,7 @@
+           size := (size + 3) DIV 4 * 4
+         END;
+         IF ((T.mno # 0) OR (T.base # NIL)) & (obj.val > size) THEN
+-          bp := bufpos + 1;
+-          BufAdd(buffer, "??", bp);
+-          Files.WriteString(R, buffer);
+-          Files.WriteInt(R, Array);
+-          Files.WriteInt(R, obj.val - size);
+-          size := obj.val;
++          ORS.Mark("incomplete symbol file for imported type")
+         END;
+         IF obj.val # size THEN ORS.Mark("noncontiguous ISy record") END;
+         bp := bufpos + 1;
+@@ -409,10 +404,7 @@
+             size := (size + 3) DIV 4 * 4
+           END;
+           IF (obj.type.base # NIL) & (fld.val > size) THEN
+-            Files.WriteString(R, "??");
+-            Files.WriteInt(R, Array);
+-            Files.WriteInt(R, fld.val - size);
+-            size := fld.val;
++            ORS.Mark("incomplete symbol file for imported type")
+           END;
+           IF fld.val # size THEN ORS.Mark("noncontiguous ISy pointer record") END;
+           bufpos := 0;
+@@ -506,7 +498,13 @@
+         WHILE fld # bot DO  (*fields*)
+           IF fld.expo THEN
+             Write(R, Fld); Files.WriteString(R, fld.name); OutType(R, fld.type); Files.WriteNum(R, fld.val)  (*offset*)
+-          ELSE FindHiddenPointers(R, fld.type, fld.val)
++          ELSIF (fld.type.form = Pointer) & (fld.type.base.form = Record) THEN
++            ASSERT(t.typobj # NIL);
++            Write(R, Fld); Files.Write(R, "-"); Files.WriteString(R, fld.name);
++            Write(R, 0); Write(R, Pointer); Write(R, -t.ref); Write(R, 0);
++            Files.WriteNum(R, fld.val)
++          ELSE
++            Write(R, Fld); Files.Write(R, "-"); Files.WriteString(R, fld.name); OutType(R, fld.type); Files.WriteNum(R, fld.val)
+           END ;
+           fld := fld.next
+         END ;

@@ -1,6 +1,6 @@
 --- 1/Kernel.Mod.txt
 +++ 2/Kernel.Mod.txt
-@@ -7,11 +7,17 @@
+@@ -7,8 +7,14 @@
      mapsize = 10000H; (*1K sectors, 64MB*)
  
    TYPE Sector* = ARRAY SectorLength OF BYTE;
@@ -11,13 +11,10 @@
 +    END;
  
    VAR allocated*, NofSectors*: INTEGER;
++    weakRefRoot: WeakReference;
      heapOrg*, heapLim*: INTEGER; 
      stackOrg* ,  stackSize*, MemLim*: INTEGER;
      clock: INTEGER;
-+    weakRefRoot: WeakReference;
-     list0, list1, list2, list3: INTEGER;  (*lists of free blocks of size n*256, 128, 64, 32 bytes*)
-     data: INTEGER; (*SPI data in*)
-     sectorMap: ARRAY mapsize DIV 32 OF SET;
 @@ -246,6 +252,31 @@
    PROCEDURE SetClock*(dt: INTEGER);
    BEGIN clock := dt
@@ -50,14 +47,13 @@
  
    PROCEDURE Install*(Padr, at: INTEGER);
    BEGIN SYSTEM.PUT(at, 0E7000000H + (Padr - at) DIV 4 -1)
-@@ -264,6 +295,7 @@
+@@ -264,5 +295,6 @@
      SYSTEM.GET(12, MemLim); SYSTEM.GET(24, heapOrg);
      stackOrg := heapOrg; stackSize := 8000H; heapLim := MemLim;
-     list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
 +    weakRefRoot := NIL;
+     list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
      SYSTEM.PUT(list0, heapLim - heapOrg); SYSTEM.PUT(list0+4, -1); SYSTEM.PUT(list0+8, 0);
      allocated := 0; clock := 0; InitSecMap
-   END Init;
 --- 1/Files.Mod.txt
 +++ 2/Files.Mod.txt
 @@ -14,6 +14,7 @@

@@ -1,0 +1,266 @@
+--- 1/ORP.Mod.txt
++++ 2/ORP.Mod.txt
+@@ -14,7 +14,7 @@
+   VAR sym: INTEGER;   (*last symbol read*)
+     dc: LONGINT;    (*data counter*)
+     level, exno, version: INTEGER;
+-    newSF: BOOLEAN;  (*option flag*)
++    newSF, debug: BOOLEAN;  (*option flag*)
+     expression: PROCEDURE (VAR x: ORG.Item);  (*to avoid forward reference*)
+     Type: PROCEDURE (VAR type: ORB.Type);
+     FormalType: PROCEDURE (VAR typ: ORB.Type; dim: INTEGER);
+@@ -937,6 +937,7 @@
+       IF sym # ORS.period THEN ORS.Mark("period missing") END ;
+       IF (ORS.errcnt = 0) & (version # 0) THEN
+         ORB.Export(modid, newSF, key);
++        IF (ORS.errcnt = 0) & debug THEN ORB.WriteInspectSymbolFile(modid) END;
+         IF newSF THEN Texts.WriteString(W, " new symbol file") END
+       END ;
+       IF ORS.errcnt = 0 THEN
+@@ -951,9 +952,10 @@
+   END Module;
+ 
+   PROCEDURE Option(VAR S: Texts.Scanner);
+-  BEGIN newSF := FALSE;
+-    IF S.nextCh = "/" THEN
++  BEGIN newSF := FALSE; debug := FALSE;
++    WHILE S.nextCh = "/" DO
+       Texts.Scan(S); Texts.Scan(S); 
++      IF (S.class = Texts.Name) & (S.s[0] = "d") THEN debug := TRUE END;
+       IF (S.class = Texts.Name) & (S.s[0] = "s") THEN newSF := TRUE END
+     END
+   END Option;
+--- 1/ORB.Mod.txt
++++ 2/ORB.Mod.txt
+@@ -239,6 +239,231 @@
+     END
+   END Import;
+   
++  (*-------------------------------- Inspect Symbols -------------------------*)
++
++  PROCEDURE CountPtrFields(typ: Type; VAR pos: INTEGER);
++    VAR fld: Object; i, s: INTEGER;
++  BEGIN
++    IF (typ.form = Pointer) OR (typ.form = NilTyp) THEN INC(pos, 4)
++    ELSIF typ.form = Record THEN
++      fld := typ.dsc;
++      WHILE fld # NIL DO CountPtrFields(fld.type, pos); fld := fld.next END
++    ELSIF typ.form = Array THEN
++      FOR i := 0 TO typ.len - 1 DO CountPtrFields(typ.base, pos) END
++    END
++  END CountPtrFields;
++
++  PROCEDURE BufAdd(VAR buffer: ARRAY OF CHAR; text: ARRAY OF CHAR; VAR bufpos: INTEGER);
++    VAR i: INTEGER;
++  BEGIN i := 0;
++    WHILE text[i] # 0X DO buffer[bufpos] := text[i]; INC(i); INC(bufpos) END;
++    buffer[bufpos] := 0X;
++  END BufAdd;
++
++  PROCEDURE ReverseList(VAR obj: Object): Object;
++  VAR curr, prev, next: Object;
++  BEGIN prev := NIL; curr := obj;
++    WHILE curr # NIL DO
++      next := curr.next;
++      curr.next := prev;
++      prev := curr;
++      curr := next;
++    END;
++    RETURN prev
++  END ReverseList;
++
++  PROCEDURE WriteISyVar(VAR buffer: ARRAY OF CHAR; bufpos: INTEGER; T: Type; VAR R: Files.Rider);
++    VAR size, i, bp: INTEGER; obj: Object;
++  BEGIN size := 0;
++    IF (T.form = Int) & (T.ref = Byte) THEN
++      Files.WriteString(R, buffer);
++      Files.WriteInt(R, Byte);
++      size := 1
++    ELSIF (T.form >= Byte) & (T.form <= Pointer)  THEN
++      Files.WriteString(R, buffer);
++      Files.WriteInt(R, T.form);
++      IF T.form <= Char THEN size := 1 ELSE size := 4 END
++    ELSIF (T.form = NilTyp) THEN
++      Files.WriteString(R, buffer);
++      Files.WriteInt(R, Pointer);
++      size := 4
++    ELSIF (T.form = Proc) THEN
++      Files.WriteString(R, buffer);
++      Files.WriteInt(R, Proc);
++      size := 4
++    ELSIF (T.form = Array) & (T.base.form = Byte) THEN
++      ASSERT(T.len > 0);
++      Files.WriteString(R, buffer);
++      Files.WriteInt(R, Array);
++      Files.WriteInt(R, T.len);
++      size := (T.len + 3) DIV 4 * 4
++    ELSIF (T.form = Array) & (T.base.form = Char) THEN
++      ASSERT(T.len > 0);
++      Files.WriteString(R, buffer);
++      Files.WriteInt(R, String);
++      Files.WriteInt(R, T.len);
++      size := (T.len + 3) DIV 4 * 4
++    ELSIF (T.form = Array) THEN
++      ASSERT(T.len > 0);
++      FOR i := 0 TO T.len - 1 DO
++        bp := bufpos;
++        BufAdd(buffer, "[0000]", bp);
++        buffer[bp-2] := CHR(30H + i MOD 10);
++        buffer[bp-3] := CHR(30H + i DIV 10 MOD 10);
++        buffer[bp-4] := CHR(30H + i DIV 100 MOD 10);
++        buffer[bp-5] := CHR(30H + i DIV 1000 MOD 10);
++        WriteISyVar(buffer, bp, T.base, R);
++        buffer[bufpos] := 0X;
++        INC(size, T.base.size);
++      END;
++      IF (T.base.size < 4) & (size MOD 4 # 0) THEN
++        bp := bufpos;
++        BufAdd(buffer, ".[padding]", bp);
++        Files.WriteString(R, buffer);
++        Files.WriteInt(R, Array);
++        Files.WriteInt(R, (4 - size MOD 4) MOD 4);
++        buffer[bufpos] := 0X;
++        size := (size + 3) DIV 4 * 4
++      END
++    ELSIF (T.form = Record) THEN
++      T.dsc := ReverseList(T.dsc);
++      obj := T.dsc;
++      bp := bufpos;
++      BufAdd(buffer, ".", bp);
++      WHILE obj # NIL DO
++        ASSERT(obj.class = Fld);
++        IF (obj.type.size >= 4) & (size MOD 4 # 0) THEN
++          bp := bufpos + 1;
++          BufAdd(buffer, "[padding]", bp);
++          Files.WriteString(R, buffer);
++          Files.WriteInt(R, Array);
++          Files.WriteInt(R, (4 - size MOD 4) MOD 4);
++          size := (size + 3) DIV 4 * 4
++        END;
++        IF ((T.mno # 0) OR (T.base # NIL)) & (obj.val > size) THEN
++          bp := bufpos + 1;
++          BufAdd(buffer, "??", bp);
++          Files.WriteString(R, buffer);
++          Files.WriteInt(R, Array);
++          Files.WriteInt(R, obj.val - size);
++          size := obj.val;
++        END;
++        IF obj.val # size THEN ORS.Mark("noncontiguous ISy record") END;
++        bp := bufpos + 1;
++        BufAdd(buffer, obj.name, bp);
++        WriteISyVar(buffer, bp, obj.type, R);
++        INC(size, obj.type.size);
++        obj := obj.next
++      END;
++      T.dsc := ReverseList(T.dsc);
++      IF (size MOD 4 # 0) THEN
++        bp := bufpos + 1;
++        BufAdd(buffer, "[padding]", bp);
++        Files.WriteString(R, buffer);
++        Files.WriteInt(R, Array);
++        Files.WriteInt(R, (4 - size MOD 4) MOD 4);
++        size := (size + 3) DIV 4 * 4
++      END;
++      buffer[bufpos] := 0X
++    ELSE
++      ORS.Mark("unsupported ISyVar type")
++    END;
++    IF size # T.size THEN ORS.Mark("ISy variable size mismatch") END
++  END WriteISyVar;
++
++  PROCEDURE WriteInspectSymbolFile*(VAR modid: ORS.Ident);
++    VAR pos, bufpos, ptrpos, size: INTEGER;
++      F: Files.File;
++      filename: ORS.Ident;
++      R: Files.Rider;
++      obj, fld: Object; T: Type;
++      buffer: ARRAY 100 OF CHAR;
++  BEGIN pos := 0;
++    obj := topScope;
++    MakeFileName(filename, modid, ".isy"); F := Files.New(filename); Files.Set(R, F, 0);
++    Files.WriteInt(R, 0); (* placeholder *)
++    WHILE obj # NIL DO
++      IF (obj.class = Typ) & (obj.type.form = Record) THEN
++        Files.WriteInt(R, obj.type.len);
++        Files.WriteInt(R, 0) (* placeholder *)
++      END;
++      obj := obj.next
++    END;
++    Files.WriteInt(R, -1); (* terminator *)
++    ptrpos := 8;
++    obj := topScope;
++    WHILE obj # NIL DO
++      IF (obj.class = Typ) & (obj.type.form = Record) THEN
++        IF obj.type.len # pos THEN ORS.Mark("invalid ISy type descriptor offset") END;
++        size := Files.Pos(R);
++        Files.Set(R, F, ptrpos);
++        Files.WriteInt(R, size);
++        Files.Set(R, F, size);
++        INC(ptrpos, 8);
++        Files.WriteString(R, obj.name);
++        obj.type.dsc := ReverseList(obj.type.dsc);
++        fld := obj.type.dsc;
++        size := 0;
++        WHILE fld # NIL DO
++          ASSERT(fld.class = Fld);
++          IF (fld.type.size >= 4) & (size MOD 4 # 0) THEN
++            Files.WriteString(R, "[padding]");
++            Files.WriteInt(R, Array);
++            Files.WriteInt(R, (4 - size MOD 4) MOD 4);
++            size := (size + 3) DIV 4 * 4
++          END;
++          IF (obj.type.base # NIL) & (fld.val > size) THEN
++            Files.WriteString(R, "??");
++            Files.WriteInt(R, Array);
++            Files.WriteInt(R, fld.val - size);
++            size := fld.val;
++          END;
++          IF fld.val # size THEN ORS.Mark("noncontiguous ISy pointer record") END;
++          bufpos := 0;
++          BufAdd(buffer, fld.name, bufpos);
++          WriteISyVar(buffer, bufpos, fld.type, R);
++          INC(size, fld.type.size);
++          fld := fld.next
++        END;
++        size := (size + 3) DIV 4 * 4;
++        IF (size # obj.type.size) THEN
++          ORS.Mark("field missing for ISy pointerrecord")
++        END;
++        obj.type.dsc := ReverseList(obj.type.dsc);
++        Files.WriteByte(R, 0);
++        T := obj.type;
++        INC(pos, 20);
++        CountPtrFields(T, pos);
++      END;
++      obj := obj.next
++    END;
++    size := Files.Pos(R);
++    Files.Set(R, F, 0);
++    Files.WriteInt(R, size);
++    Files.Set(R, F, size);
++    Files.WriteInt(R, pos);
++    obj := topScope;
++    WHILE obj # NIL DO
++      IF obj.class = Var THEN
++        IF (obj.val > pos) & (obj.type.size >= 4) & (obj.val = (pos + 3) DIV 4 * 4) THEN
++          Files.WriteString(R, "[padding]");
++          Files.WriteInt(R, Array);
++          Files.WriteInt(R, (4 - pos MOD 4) MOD 4);
++          pos := (pos + 3) DIV 4 * 4
++        END;
++        IF (obj.val # pos) THEN ORS.Mark("invalid ISy variable offset") END;
++        bufpos := 0;
++        BufAdd(buffer, obj.name, bufpos);
++        WriteISyVar(buffer, bufpos, obj.type, R);
++        INC(pos, obj.type.size);
++      END;
++      obj := obj.next
++    END;
++    Files.WriteByte(R, 0);
++    Files.WriteInt(R, -2);
++    Files.Register(F);
++  END WriteInspectSymbolFile;
++
+   (*-------------------------------- Export ---------------------------------*)
+ 
+   PROCEDURE Write(VAR R: Files.Rider; x: INTEGER);

@@ -1,0 +1,90 @@
+--- 1/Modules.Mod.txt
++++ 2/Modules.Mod.txt
+@@ -87,7 +87,7 @@
+           IF AllocPtr + size < limit THEN (*allocate*)
+             p := AllocPtr; mod := SYSTEM.VAL(Module, p);
+             AllocPtr := (p + size + 100H) DIV 20H * 20H; mod.size := AllocPtr - p; mod.num := root.num + 1;
+-            mod.next := root; root := mod
++            mod.next := root; root := mod; SYSTEM.PUT(16, AllocPtr+1024);
+           ELSE error(7, name1)
+           END
+         ELSE (*fill hole*) p := SYSTEM.VAL(INTEGER, mod)
+@@ -218,6 +218,7 @@
+   PROCEDURE Init*;
+   BEGIN Files.Init; MTOrg := SYSTEM.REG(MT);
+     SYSTEM.GET(16, AllocPtr); SYSTEM.GET(20, root); SYSTEM.GET(24, limit); DEC(limit, 8000H)
++    ;SYSTEM.PUT(16, AllocPtr+1024)
+   END Init;
+ 
+ BEGIN Init; Load("Oberon", M);
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -393,6 +393,7 @@
+   PROCEDURE Reset*;
+   BEGIN
+     IF CurTask.state = active THEN Remove(CurTask) END ;
++    SYSTEM.PUT(16, Modules.AllocPtr+1024);
+     SYSTEM.LDREG(14, Kernel.stackOrg); (*reset stack pointer*) Loop
+   END Reset;
+ 
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -377,6 +377,16 @@
+     toolV := MenuViewers.New(menu, main, TextFrames.menuH, X, Y)
+   END OpenViewers;
+ 
++  PROCEDURE DisarmTrap(adr: INTEGER);
++  VAR ins, cnt: INTEGER;
++  BEGIN
++    SYSTEM.GET(adr, ins); cnt := 0;
++    WHILE (cnt < 32) & ((ins DIV 1000000H MOD 100H # 0DEH) OR (ins MOD 100H # 9CH)) DO
++      INC(adr, 4); INC(cnt); SYSTEM.GET(adr, ins)
++    END;
++    IF (cnt < 32) THEN SYSTEM.PUT(adr, ins + 01000000H) END
++  END DisarmTrap;
++
+   PROCEDURE ExtendDisplay*;
+     VAR V: Viewers.Viewer;
+       X, Y, DX, DW, DH: INTEGER;
+@@ -395,7 +405,9 @@
+ 
+   PROCEDURE Trap(VAR a: INTEGER; b: INTEGER);
+     VAR u, v, w: INTEGER; mod: Modules.Module;
+-  BEGIN u := SYSTEM.REG(15); SYSTEM.GET(u - 4, v); w := v DIV 10H MOD 10H; (*trap number*)
++  BEGIN u := SYSTEM.REG(15); SYSTEM.GET(u - 4, v);
++    SYSTEM.GET(16, w); SYSTEM.PUT(16, w - 1024);
++    w := v DIV 10H MOD 10H; (*trap number*)
+     IF w = 0 THEN Kernel.New(a, b)
+     ELSE (*trap*) Texts.WriteLn(W); Texts.WriteString(W, "  pos "); Texts.WriteInt(W, v DIV 100H MOD 10000H, 4);
+       Texts.WriteString(W, "  TRAP"); Texts.WriteInt(W, w, 4); mod := Modules.root;
+@@ -404,6 +416,7 @@
+       Texts.WriteString(W, " at"); Texts.WriteHex(W, u);
+       Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf); Oberon.Reset
+     END
++    ;SYSTEM.GET(16, w); SYSTEM.PUT(16, w + 1024);
+   END Trap;
+ 
+   PROCEDURE Abort;
+@@ -414,5 +427,5 @@
+   
+ BEGIN Texts.OpenWriter(W);
+   Oberon.OpenLog(TextFrames.Text("")); OpenViewers;
+-  Kernel.Install(SYSTEM.ADR(Trap), 20H); Kernel.Install(SYSTEM.ADR(Abort), 0);
++  Kernel.Install(SYSTEM.ADR(Trap), 20H); DisarmTrap(SYSTEM.ADR(Trap)); Kernel.Install(SYSTEM.ADR(Abort), 0);
+ END System.
+--- 1/ORG.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -58,6 +58,13 @@
+ 
+   PROCEDURE Put1(op, a, b, im: LONGINT);
+   BEGIN (*emit format-1 instruction,  -10000H <= im < 10000H*)
++    IF check & (op = Sub) & (a = SP) & (b = SP) THEN
++      Put1(Mov, 13, 0, 0);
++      code[pc] := ((Ldr * 10H + 13) * 10H + 13) * 100000H + (16 MOD 100000H); INC(pc); (* Put2(Ldr, 13, 13, 16) *)
++      Put1(Add, 13, 13, im);
++      Put0(Sub, 13, 13, SP);
++      code[pc] := ((BLR+12) * 10H + GT) * 1000000H + ((ORS.Pos()*100H + 9*10H + MT) MOD 1000000H); INC(pc) (* Trap(GT, 9) *)
++    END;
+     IF im < 0 THEN INC(op, V) END ;
+     code[pc] := (((a+40H) * 10H + b) * 10H + op) * 10000H + (im MOD 10000H); INC(pc)
+   END Put1;

@@ -1,0 +1,37 @@
+ORP.Compile ORS.Mod/s ORB.Mod/s ~
+ORP.Compile ORG.Mod/s ORP.Mod/s ~
+ORP.Compile ORL.Mod/s ~
+
+ORP.Compile Kernel.Mod/s FileDir.Mod/s Files.Mod/s Modules.Mod/s ~
+ORL.Link Modules ~
+ORL.Load Modules.bin ~
+
+ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
+ORP.Compile Fonts.Mod/s Texts.Mod/s ~
+ORP.Compile Oberon.Mod/s ~
+ORP.Compile MenuViewers.Mod/s ~
+ORP.Compile TextFrames.Mod/s ~
+ORP.Compile System.Mod/s ~
+ORP.Compile Edit.Mod/s ~
+ORP.Compile ORS.Mod/s ORB.Mod/s ~
+ORP.Compile ORG.Mod/s ORP.Mod/s ~
+ORP.Compile ORL.Mod/s ORTool.Mod/s ~
+ORP.Compile Graphics.Mod/s GraphicFrames.Mod/s ~
+ORP.Compile Rectangles.Mod/s Curves.Mod/s ~
+ORP.Compile Draw.Mod/s MacroTool.Mod/s ~
+
+ORP.Compile BootLoad.Mod ~
+
+ORP.Compile Calc.Mod/s RealCalc.Mod/s ~
+ORP.Compile Splines.Mod/s PictureTiles.Mod/s ~
+ORP.Compile DisplayGrab.Mod/s Fills.Mod/s ~
+ORP.Compile PictureGrab.Mod/s ~
+ORP.Compile PixelizrObjects.Mod/s Pixelizr.Mod/s ~
+
+ORP.Compile ResourceMonitor.Mod/s ~
+ORP.Compile DefragFiles.Mod/s Defragger.Mod/s ~
+ORP.Compile OnScreenKeyboard.Mod/s ~
+ORP.Compile RebuildToolBuilder.Mod/s ~
+ORP.Compile KeyTester.Mod/s ~
+ORP.Compile Trappy.Mod/s ~
+ORP.Compile ORInspect.Mod/s ~

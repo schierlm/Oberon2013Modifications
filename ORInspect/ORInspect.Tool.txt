@@ -1,0 +1,6 @@
+System.ShowModules
+ORInspect.Module ^
+ORInspect.Module FileDir
+
+ORInspect.HeapAddress ^
+ORInspect.HeapAddress 12345678H

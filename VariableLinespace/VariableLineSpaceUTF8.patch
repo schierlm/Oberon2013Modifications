@@ -1,0 +1,363 @@
+--- 1/TextFrames.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -9,6 +9,7 @@
+       len: LONGINT;
+       wid: INTEGER;
+       eot: BOOLEAN;
++      lsp: BYTE;
+       next: Line
+     END;
+ 
+@@ -106,17 +107,31 @@
+     RETURN ox
+   END Width;
+ 
++  PROCEDURE UpdateLineHeight (L: Line; VAR R: Texts.Reader; T: Texts.Text);
++    VAR pos: INTEGER;
++  BEGIN pos := Texts.Pos(R) - Texts.UnicodeWidth(nextCodepoint); L.lsp := 0;
++    WHILE (nextCodepoint # ORD(CR)) & (R.fnt # NIL) DO
++      IF (L.lsp < R.fnt.height) THEN L.lsp := R.fnt.height END;
++      Texts.ReadUnicode(R, nextCodepoint)
++    END;
++    IF (R.fnt # NIL) & (L.lsp = 0) THEN L.lsp := R.fnt.height
++    ELSIF (R.fnt = NIL) & (L.lsp = 0) THEN L.lsp := Fonts.Default.height END;
++    Texts.OpenReader(R, T, pos); Texts.ReadUnicode(R, nextCodepoint);
++  END UpdateLineHeight;
++
+   PROCEDURE DisplayLine (F: Frame; L: Line;
+     VAR R: Texts.Reader; X, Y: INTEGER; len: LONGINT);
+-    VAR patadr, NX,  dx, x, y, w, h: INTEGER;
++    VAR patadr, NX,  dx, x, y, w, h, dy: INTEGER;
+   BEGIN NX := F.X + F.W;
+     WHILE (nextCodepoint # ORD(CR)) & (R.fnt # NIL) DO
+       Fonts.GetUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
++      IF -R.fnt.minY < dsr THEN dy := dsr + R.fnt.minY ELSE dy := 0 END;
+       IF (X + x + w <= NX) & (h # 0) THEN
+-        Display.CopyPattern(R.col, patadr, X + x, Y + y, Display.invert)
++        Display.CopyPattern(R.col, patadr, X + x, Y + y - dy, Display.invert)
+       END;
+       X := X + dx; INC(len, Texts.UnicodeWidth(nextCodepoint)); Texts.ReadUnicode(R, nextCodepoint)
+     END;
++    IF (R.fnt # NIL) & (L.lsp = 0) THEN L.lsp := R.fnt.height END;
+     L.len := len + 1; L.wid := X + eolW - (F.X + F.left);
+     L.eot := R.fnt = NIL; Texts.ReadUnicode(R, nextCodepoint)
+   END DisplayLine;
+@@ -152,8 +167,12 @@
+     L := F.trailer; curY := F.Y + F.H - F.top - asr;
+     WHILE ~L.eot & (curY >= botY) DO
+       NEW(l);
+-      DisplayLine(F, l, R, F.X + F.left, curY, 0);
+-      L.next := l; L := l; curY := curY - lsp
++      UpdateLineHeight(l, R, F.text);
++      curY := curY - l.lsp;
++      IF curY >= botY THEN
++        DisplayLine(F, l, R, F.X + F.left, curY, 0);
++        L.next := l; L := l
++      END
+     END;
+     L.next := F.trailer;
+     F.markH := F.org * F.H DIV (F.text.len + 1)
+@@ -173,15 +192,19 @@
+     botY := F.Y + F.bot + dsr; F.H := F.H + F.Y - newY; F.Y := newY;
+     IF F.trailer.next = F.trailer THEN Validate(F.text, F.org) END;
+     L := F.trailer; org := F.org; curY := F.Y + F.H - F.top - asr;
+-    WHILE (L.next # F.trailer) & (curY >= botY) DO
+-      L := L.next; org := org + L.len; curY := curY - lsp
++    WHILE (L.next # F.trailer) & (curY - L.next.lsp >= botY) DO
++      L := L.next; org := org + L.len; curY := curY - L.lsp
+     END;
+     botY := F.Y + F.bot + dsr;
+     Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
+     WHILE ~L.eot & (curY >= botY) DO
+       NEW(l);
+-      DisplayLine(F, l, R, F.X + F.left, curY, 0);
+-      L.next := l; L := l; curY := curY - lsp
++      UpdateLineHeight(l, R, F.text);
++      curY := curY - l.lsp;
++      IF curY >= botY THEN
++        DisplayLine(F, l, R, F.X + F.left, curY, 0);
++        L.next := l; L := l
++      END
+     END;
+     L.next := F.trailer;
+     F.markH := F.org * F.H DIV (F.text.len + 1)
+@@ -193,7 +216,7 @@
+     botY := F.Y + F.bot + dsr;
+     L := F.trailer; curY := F.Y + F.H - F.top - asr;
+-    WHILE (L.next # F.trailer) & (curY >= botY) DO
+-      L := L.next; curY := curY - lsp
++    WHILE (L.next # F.trailer) & (curY - L.next.lsp >= botY) DO
++      L := L.next; curY := curY - L.lsp
+     END;
+     L.next := F.trailer;
+     IF curY + asr > F.Y THEN
+@@ -215,23 +238,28 @@
+       ELSIF pos > F.org THEN
+         org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr;
+         WHILE (L.next # F.trailer) & (org # pos) DO
+-          org := org + L.len; L := L.next; curY := curY - lsp;
++          org := org + L.len; curY := curY - L.lsp; L := L.next
+         END;
+         IF org = pos THEN
+           F.org := org; F.trailer.next := L; Y0 := curY;
+           WHILE L.next # F.trailer DO (*!*)
+-            org := org + L.len; L := L.next; curY := curY - lsp
++            org := org + L.len; curY := curY - L.lsp; L := L.next
+           END;
+-          Display.CopyBlock (F.X + F.left, curY - dsr, F.W - F.left, Y0 + asr - (curY - dsr),
+-              F.X + F.left, curY - dsr + F.Y + F.H - F.top - asr - Y0, 0);
+-          curY := curY + F.Y + F.H - F.top - asr - Y0;
++          Display.CopyBlock (F.X + F.left, curY - dsr - L.lsp, F.W - F.left, Y0 + asr + L.lsp - (curY - dsr),
++              F.X + F.left, curY - dsr + F.Y + F.H - F.top - asr - L.lsp - Y0, 0);
++          curY := curY + F.Y + F.H - F.top - asr - L.lsp - Y0;
+           Display.ReplConst(F.col, F.X + F.left, F.Y, F.W - F.left, curY - dsr - F.Y, Display.replace);
+           botY := F.Y + F.bot + dsr;
+-          org := org + L.len; curY := curY - lsp;
++          org := org + L.len;
+           Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
+           WHILE ~L.eot & (curY >= botY) DO
+-            NEW(L0); DisplayLine(F, L0, R, F.X + F.left, curY, 0);
+-            L.next := L0; L := L0; curY := curY - lsp
++            NEW(L0);
++            UpdateLineHeight(L0, R, F.text);
++            curY := curY - L0.lsp;
++            IF curY >= botY THEN
++              DisplayLine(F, L0, R, F.X + F.left, curY, 0);
++              L.next := L0; L := L0;
++            END
+           END;
+           L.next := F.trailer; UpdateMark(F)
+         ELSE Mark(F, FALSE);
+@@ -247,9 +275,9 @@
+ 
+   PROCEDURE LocateLine (F: Frame; y: INTEGER; VAR loc: Location);
+     VAR L: Line; org: LONGINT; cury: INTEGER;
+-  BEGIN org := F.org; L := F.trailer.next; cury := F.H - F.top - asr; 
++  BEGIN org := F.org; L := F.trailer.next; cury := F.H - F.top - asr - L.lsp;
+     WHILE (L.next # F.trailer) & (cury > y + dsr) DO
+-      org := org + L.len; L := L.next; cury := cury - lsp
++      org := org + L.len; L := L.next; cury := cury - L.lsp
+     END;
+     loc.org := org; loc.lin := L; loc.y := cury
+   END LocateLine;
+@@ -307,10 +335,10 @@
+     VAR T: Texts.Text; R: Texts.Reader; L: Line;
+       org: LONGINT; cury: INTEGER;  
+   BEGIN T := F.text;
+-    org := F.org; L := F.trailer.next; cury := F.H - F.top - asr;
++    org := F.org; L := F.trailer.next; cury := F.H - F.top - asr - L.lsp;
+     IF pos < org THEN pos := org END;
+     WHILE (L.next # F.trailer) & (pos >= org + L.len) DO
+-      org := org + L.len; L := L.next; cury := cury - lsp
++      org := org + L.len; L := L.next; cury := cury - L.lsp
+     END;
+     IF pos >= org + L.len THEN pos := org + L.len - 1 END;    
+     Texts.OpenReader(R, T, org); Texts.ReadUnicode(R, nextCodepoint);
+@@ -355,15 +383,15 @@
+   PROCEDURE FlipSelection (F: Frame; VAR beg, end: Location);
+     VAR L: Line; Y: INTEGER;
+   BEGIN L := beg.lin; Y := F.Y + beg.y - 2;
+-    IF L = end.lin THEN ReplConst(Display.white, F, F.X + beg.x, Y, end.x - beg.x, selH, Display.invert)
++    IF L = end.lin THEN ReplConst(Display.white, F, F.X + beg.x, Y, end.x - beg.x, L.lsp, Display.invert)
+     ELSE
+-      ReplConst(Display.white, F, F.X + beg.x, Y, F.left + L.wid - beg.x, selH, Display.invert);
+-      L := L.next; Y := Y - lsp;
++      ReplConst(Display.white, F, F.X + beg.x, Y, F.left + L.wid - beg.x, L.lsp, Display.invert);
++      Y := Y - L.lsp; L := L.next;
+       WHILE L # end.lin DO
+-        ReplConst(Display.white, F, F.X + F.left, Y, L.wid, selH, Display.invert);
+-        L := L.next; Y := Y - lsp
++        ReplConst(Display.white, F, F.X + F.left, Y, L.wid, L.lsp, Display.invert);
++        Y := Y - L.lsp; L := L.next
+       END;
+-      ReplConst(Display.white, F, F.X + F.left, Y, end.x - F.left, selH, Display.invert)
++      ReplConst(Display.white, F, F.X + F.left, Y, end.x - F.left, L.lsp, Display.invert)
+     END
+   END FlipSelection;
+ 
+@@ -455,25 +483,34 @@
+   
+   PROCEDURE Replace* (F: Frame; beg, end: LONGINT);
+     VAR R: Texts.Reader; L: Line;
+-      org, len: LONGINT; curY, wid: INTEGER;
++      org, len: LONGINT; curY, ll, wid: INTEGER;
++      hchg: BOOLEAN;
+   BEGIN
+     IF end > F.org THEN
+       IF beg < F.org THEN beg := F.org END;
+-      org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr; 
++      org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr - L.lsp;
+       WHILE (L # F.trailer) & (org + L.len <= beg) DO
+-        org := org + L.len; L := L.next; curY := curY - lsp
++        org := org + L.len; L := L.next; curY := curY - L.lsp
+       END;
+       IF L # F.trailer THEN
+         Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
+-        len := beg - org; wid := Width(R, len);
+-        ReplConst(F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, lsp, Display.replace);
++        ll := L.lsp; curY := curY + L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
++        IF ll # L.lsp THEN
++          hchg := TRUE; len := 0; wid := 0; ReplConst(F.col, F, F.X + F.left + L.wid, curY - dsr, F.W - F.left - L.wid, L.lsp, Display.replace)
++        ELSE
++          hchg := FALSE; len := beg - org; wid := Width(R, len)
++        END;
++        ReplConst(F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp, Display.replace);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+-        org := org + L.len; L := L.next; curY := curY - lsp;
++        org := org + L.len; L := L.next;
+         WHILE (L # F.trailer) & (org <= end) DO
+-          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
++          ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
++          IF ll # L.lsp THEN hchg := TRUE END;
++          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
+           DisplayLine(F, L, R, F.X + F.left, curY, 0);
+-          org := org + L.len; L := L.next; curY := curY - lsp
+-        END
++          org := org + L.len; L := L.next
++        END;
++        IF hchg THEN ll := F.Y; Reduce(F, curY); Extend(F, ll) END
+       END
+     END;
+     UpdateMark(F)
+@@ -485,43 +522,53 @@
+   BEGIN
+     IF beg < F.org THEN F.org := F.org + (end - beg)
+     ELSE
+-      org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr; 
++      org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr - L.lsp;
+       WHILE (L # F.trailer) & (org + L.len <= beg) DO
+-        org := org + L.len; L := L.next; curY := curY - lsp
++        org := org + L.len; L := L.next; curY := curY - L.lsp
+       END;
+       IF L # F.trailer THEN
+         botY := F.Y + F.bot + dsr;
+         Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
+-        len := beg - org; wid := Width(R, len);
+-        ReplConst (F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, lsp, Display.replace);
++        Y1 := curY; curY := curY + L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
++        IF Y1 # curY THEN
++          len := 0; wid := 0; ReplConst(F.col, F, F.X + F.left + L.wid, curY - dsr, F.W - F.left - L.wid, L.lsp, Display.replace)
++        ELSE
++          len := beg - org; wid := Width(R, len)
++        END;
++        ReplConst (F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp, Display.replace);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+-        org := org + L.len; curY := curY - lsp;
++        org := org + L.len;
+         Y0 := curY; L0 := L.next;
+         WHILE (org <= end) & (curY >= botY) DO
+           NEW(l);
+-          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
+-          DisplayLine(F, l, R, F.X + F.left, curY, 0);
+-          L.next := l; L := l;
+-          org := org + L.len; curY := curY - lsp
++          UpdateLineHeight(l, R, F.text);
++          curY := curY - l.lsp;
++          IF curY >= botY THEN
++            Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, l.lsp, Display.replace);
++            DisplayLine(F, l, R, F.X + F.left, curY, 0);
++            L.next := l; L := l;
++            org := org + L.len
++          END
+         END;
+-        IF L0 # L.next THEN Y1 := curY;
+-          L.next := L0;
++        IF (L0 # L.next) OR (Y0 # Y1) THEN Y0 := Y1; Y1 := curY;
++          UpdateLineHeight(L0, R, F.text); L.next := L0;
+           WHILE (L.next # F.trailer) & (curY >= botY) DO
+-            L := L.next; curY := curY - lsp
++            L := L.next; curY := curY - L.lsp
+           END;
+           L.next := F.trailer;
+           dY := Y0 - Y1;
+           IF Y1 > curY + dY THEN
+-            Display.CopyBlock(F.X + F.left, curY + dY + lsp - dsr, F.W - F.left, Y1 - curY - dY,
+-              F.X + F.left, curY + lsp - dsr, 0);
++            Display.CopyBlock(F.X + F.left, curY + dY - dsr, F.W - F.left, Y1 - curY - dY,
++              F.X + F.left, curY - dsr, 0);
+             Y2 := Y1 - dY
+           ELSE Y2 := curY
+           END;
+           curY := Y1; L := L0;
+-          WHILE curY # Y2 DO
+-            Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
++          WHILE curY > Y2 DO
++            curY := curY - L.lsp;
++            Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
+             DisplayLine(F, L, R, F.X + F.left, curY, 0);
+-            L := L.next; curY := curY - lsp
++            L := L.next
+           END
+         END
+       END 
+@@ -539,37 +586,46 @@
+         F.trailer.next.len := F.trailer.next.len + (F.org - beg);
+         F.org := beg
+       END;
+-      org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr;
++      org := F.org; L := F.trailer.next; curY := F.Y + F.H - F.top - asr - L.lsp;
+       WHILE (L # F.trailer) & (org + L.len <= beg) DO
+-        org := org + L.len; L := L.next; curY := curY - lsp
++        org := org + L.len; L := L.next; curY := curY - L.lsp
+       END;
+       IF L # F.trailer THEN
+         botY := F.Y + F.bot + dsr;
+         org0 := org; L0 := L; Y0 := curY;
+         WHILE (L # F.trailer) & (org <= end) DO
+-          org := org + L.len; L := L.next; curY := curY - lsp
++          org := org + L.len; L := L.next; curY := curY - L.lsp
+         END;
+-        Y1 := curY;
+         Texts.OpenReader(R, F.text, org0); Texts.ReadUnicode(R, nextCodepoint);
+-        len := beg - org0; wid := Width(R, len);
+-        ReplConst (F.col, F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, lsp, Display.replace);
++        Y1 := Y0; Y0 := Y0 + L0.lsp; UpdateLineHeight(L0, R, F.text); Y0 := Y0 - L0.lsp;
++        IF Y1 = Y0 THEN
++          len := beg - org0; wid := Width(R, len)
++        ELSE
++          len := 0; wid := 0
++        END;
++        ReplConst (F.col, F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, L0.lsp, Display.replace);
+         DisplayLine(F, L0, R, F.X + F.left + wid, Y0, len);
+-        Y0 := Y0 - lsp;
+-        IF L # L0.next THEN
++        IF (L # L0.next) OR (Y1 # Y0) THEN
++          Y0 := Y0 - L.lsp;
++          Y1 := curY;
+           L0.next := L;
+           L := L0; org := org0 + L0.len;
+           WHILE L.next # F.trailer DO
+-            L := L.next; org := org + L.len; curY := curY - lsp
++            L := L.next; org := org + L.len; curY := curY - L.lsp
+           END;
+-          Display.CopyBlock(F.X + F.left, curY + lsp - dsr, F.W - F.left, Y1 - curY,
+-              F.X + F.left, curY + lsp - dsr + (Y0 - Y1), 0);
++          Display.CopyBlock(F.X + F.left, curY + L0.next.lsp - dsr, F.W - F.left, Y1 - curY,
++              F.X + F.left, curY + L0.next.lsp - dsr + (Y0 - Y1), 0);
+           curY := curY + (Y0 - Y1);
+-          Display.ReplConst (F.col, F.X + F.left, F.Y, F.W - F.left, curY + lsp - (F.Y + dsr), Display.replace);
+-          Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
++          Display.ReplConst (F.col, F.X + F.left, F.Y, F.W - F.left, curY + L0.next.lsp - (F.Y + dsr), Display.replace);
++          Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint); curY := curY + L0.next.lsp;
+           WHILE ~L.eot & (curY >= botY) DO
+             NEW(l);
+-            DisplayLine(F, l, R, F.X + F.left, curY, 0);
+-            L.next := l; L := l; curY := curY - lsp
++            UpdateLineHeight(l, R, F.text);
++            curY := curY - l.lsp;
++            IF curY >= botY THEN
++              DisplayLine(F, l, R, F.X + F.left, curY, 0);
++              L.next := l; L := l
++            END
+           END;
+           L.next := F.trailer
+         END
+@@ -852,7 +908,7 @@
+   left := barW + lsp DIV 2;
+   right := lsp DIV 2;
+   top := lsp DIV 2; bot := lsp DIV 2;
+-  asr := Fonts.Default.maxY;
++  asr := Fonts.Default.maxY - lsp;
+   dsr := -Fonts.Default.minY;
+   selH := lsp; markW := lsp DIV 2;
+   eolW := lsp DIV 2;
