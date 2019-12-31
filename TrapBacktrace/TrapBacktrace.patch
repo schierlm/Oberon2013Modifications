@@ -81,12 +81,12 @@
    END ExtendDisplay;
  
 +  PROCEDURE Backtrace();
-+  VAR sp, adr, v: INTEGER;
++  VAR sp, adr, v, cnt: INTEGER;
 +    mod: Modules.Module;
 +  BEGIN
 +    sp := SYSTEM.REG(14);
-+    INC(sp, 4);
-+    WHILE sp < Kernel.stackOrg DO
++    INC(sp, 4); cnt := 0;
++    WHILE (sp < Kernel.stackOrg) & (cnt < 64) DO
 +      SYSTEM.GET(sp, adr);
 +      DEC(adr, 4);
 +      IF (adr MOD 4 = 0) & (adr >= 100H) & (adr < Modules.AllocPtr) THEN
@@ -108,7 +108,7 @@
 +            Texts.WriteString(W, " (");
 +            Texts.WriteHex(W, adr);
 +            Texts.Write(W, ")");
-+            Texts.WriteLn(W);
++            Texts.WriteLn(W); INC(cnt)
 +          END
 +        END
 +      END;
