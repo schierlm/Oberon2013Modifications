@@ -13,7 +13,7 @@ did inside the emulator; I for myself mostly write the code outside the emulator
 and use `PCLink` to get it in), but it is still a nuisance every time it happens.
 
 Therefore, this set of patches introduces a second "rescue system" on the
-filesystem which includes a compiler and `Boot.Mod`. It uses the same filesystem
+filesystem which includes a compiler and `ORL.Mod`. It uses the same filesystem
 (so in case you break your filesystem, it won't help you), but uses a different
 extension (`.rsc.RS`) for the compiled modules, so it won't interfere with your
 existing system, and when you run the compiler from the rescue system, it will
@@ -219,7 +219,7 @@ Installation
         ORB.rsc => ORB.rsc.RS
         ORG.rsc => ORG.rsc.RS
         ORP.rsc => ORP.rsc.RS
-        Boot.rsc => Boot.rsc.RS ~
+        ORL.rsc => ORL.rsc.RS ~
 
 - You may copy other files if you want to use them in the rescue system.
   (While the rescue system uses the same filesystem, it can only load modules whose name
