@@ -1,0 +1,298 @@
+--- 1/FontsU.Mod.txt
++++ 2/FontsU.Mod.txt
+@@ -1,5 +1,5 @@
+-MODULE Fonts; (*JG 18.11.90; PDR 8.6.12; NW 18.1.2019*)
+-  IMPORT SYSTEM, Files;
++MODULE FontsU; (*JG 18.11.90; PDR 8.6.12; NW 18.1.2019*)
++  IMPORT SYSTEM, Files, Fonts;
+ 
+   CONST FontFileId = 0DBH;
+ 
+@@ -21,6 +21,8 @@
+     
+ VAR Default*, root*: Font;
+   FallbackPat: ARRAY 35 OF BYTE;
++  lastFontsFont: Fonts.Font;
++  lastFont: Font;
+ 
+ PROCEDURE ReadInt16(VAR R: Files.Rider; VAR r: INTEGER);
+   VAR b0, b1: BYTE;
+@@ -224,5 +226,11 @@
+ BEGIN IF root.next # NIL THEN root.next.next := NIL END
+ END Free;
+ 
+-BEGIN root := NIL; Default := This("Oberon10.Scn.Fnt")
+-END Fonts.
++PROCEDURE GetMappedUniPat*(fnt: Fonts.Font; codepoint: INTEGER; VAR dx, x, y, w, h, patadr: INTEGER);
++BEGIN
++  IF fnt # lastFontsFont THEN lastFont := This(fnt.name); lastFontsFont := fnt END;
++  GetUniPat(lastFont, codepoint, dx, x, y, w, h, patadr)
++END GetMappedUniPat;
++
++BEGIN lastFont := NIL; lastFontsFont := NIL; root := NIL; Default := This("Oberon10.Scn.Fnt")
++END FontsU.
+--- 1/TextFramesU.Mod.txt
++++ 1/TextFramesU.Mod.txt
+@@ -1,5 +1,5 @@
+-MODULE TextFrames; (*JG 8.10.90 / NW 10.5.2013 / 11.2.2017*)
+-  IMPORT Modules, Input, Display, Viewers, Fonts, Texts, Oberon, MenuViewers;
++MODULE TextFramesU; (*JG 8.10.90 / NW 10.5.2013 / 11.2.2017*)
++  IMPORT Modules, Input, Display, Viewers, Fonts, FontsU, Texts, TextsU, Oberon, MenuViewers;
+ 
+   CONST replace* = 0; insert* = 1; delete* = 2; unmark* = 3; (*message id*)
+     BS = 8X; TAB = 9X; CR = 0DX; DEL = 7FX;
+@@ -100,8 +100,8 @@
+     VAR patadr, pos: LONGINT; ox, dx, x, y, w, h: INTEGER;
+   BEGIN pos := 0; ox := 0;
+     WHILE pos < len DO
+-      Fonts.GetUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
+-      ox := ox + dx; INC(pos, Texts.UnicodeWidth(nextCodepoint)); Texts.ReadUnicode(R, nextCodepoint)
++      FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
++      ox := ox + dx; INC(pos, TextsU.UnicodeWidth(nextCodepoint)); TextsU.ReadUnicode(R, nextCodepoint)
+     END;
+     RETURN ox
+   END Width;
+@@ -111,14 +111,14 @@
+     VAR patadr, NX,  dx, x, y, w, h: INTEGER;
+   BEGIN NX := F.X + F.W;
+     WHILE (nextCodepoint # ORD(CR)) & (R.fnt # NIL) DO
+-      Fonts.GetUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
++      FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
+       IF (X + x + w <= NX) & (h # 0) THEN
+         Display.CopyPattern(R.col, patadr, X + x, Y + y, Display.invert)
+       END;
+-      X := X + dx; INC(len, Texts.UnicodeWidth(nextCodepoint)); Texts.ReadUnicode(R, nextCodepoint)
++      X := X + dx; INC(len, TextsU.UnicodeWidth(nextCodepoint)); TextsU.ReadUnicode(R, nextCodepoint)
+     END;
+     L.len := len + 1; L.wid := X + eolW - (F.X + F.left);
+-    L.eot := R.fnt = NIL; Texts.ReadUnicode(R, nextCodepoint)
++    L.eot := R.fnt = NIL; TextsU.ReadUnicode(R, nextCodepoint)
+   END DisplayLine;
+ 
+   PROCEDURE Validate (T: Texts.Text; VAR pos: LONGINT);
+@@ -127,7 +127,7 @@
+     IF pos > T.len THEN pos := T.len
+     ELSIF pos > 0 THEN
+       DEC(pos); Texts.OpenReader(R, T, pos);
+-      REPEAT Texts.ReadUnicode(R, nextCodepoint); INC(pos, Texts.UnicodeWidth(nextCodepoint)) UNTIL R.eot OR (nextCodepoint = ORD(CR))
++      REPEAT TextsU.ReadUnicode(R, nextCodepoint); INC(pos, TextsU.UnicodeWidth(nextCodepoint)) UNTIL R.eot OR (nextCodepoint = ORD(CR))
+     ELSE pos := 0
+     END
+   END Validate;
+@@ -148,7 +148,7 @@
+     END;
+     Validate(F.text, F.org);
+     botY := F.Y + F.bot + dsr;
+-    Texts.OpenReader(R, F.text, F.org); Texts.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, F.text, F.org); TextsU.ReadUnicode(R, nextCodepoint);
+     L := F.trailer; curY := F.Y + F.H - F.top - asr;
+     WHILE ~L.eot & (curY >= botY) DO
+       NEW(l);
+@@ -177,7 +177,7 @@
+       L := L.next; org := org + L.len; curY := curY - lsp
+     END;
+     botY := F.Y + F.bot + dsr;
+-    Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
+     WHILE ~L.eot & (curY >= botY) DO
+       NEW(l);
+       DisplayLine(F, l, R, F.X + F.left, curY, 0);
+@@ -228,7 +228,7 @@
+           Display.ReplConst(F.col, F.X + F.left, F.Y, F.W - F.left, curY - dsr - F.Y, Display.replace);
+           botY := F.Y + F.bot + dsr;
+           org := org + L.len; curY := curY - lsp;
+-          Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
++          Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
+           WHILE ~L.eot & (curY >= botY) DO
+             NEW(L0); DisplayLine(F, L0, R, F.X + F.left, curY, 0);
+             L.next := L0; L := L0; curY := curY - lsp
+@@ -262,21 +262,21 @@
+     lim := loc.org + loc.lin.len - 1;
+     bpos := loc.org; bx := F.left;
+     pos := loc.org; ox := F.left;
+-    Texts.OpenReader(R, F.text, loc.org); Texts.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, F.text, loc.org); TextsU.ReadUnicode(R, nextCodepoint);
+     REPEAT
+       WHILE (pos # lim) & (nextCodepoint > ORD(" ")) DO (*scan string*)
+-        Fonts.GetUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+-        INC(pos, Texts.UnicodeWidth(nextCodepoint)); ox := ox + dx; Texts.ReadUnicode(R, nextCodepoint)
++        FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx; TextsU.ReadUnicode(R, nextCodepoint)
+       END;
+       ex := ox;
+       WHILE (pos # lim) & (nextCodepoint <= ORD(" ")) DO (*scan gap*)
+-        Fonts.GetUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+-        INC(pos, Texts.UnicodeWidth(nextCodepoint)); ox := ox + dx; Texts.ReadUnicode(R, nextCodepoint)
++        FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx; TextsU.ReadUnicode(R, nextCodepoint)
+       END;
+       IF (pos # lim) & (ox <= x) THEN
+-        Fonts.GetUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++        FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+         bpos := pos; bx := ox;
+-        INC(pos, Texts.UnicodeWidth(nextCodepoint)); ox := ox + dx; Texts.ReadUnicode(R, nextCodepoint)
++        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx; TextsU.ReadUnicode(R, nextCodepoint)
+       ELSE pos := lim
+       END
+     UNTIL pos = lim;
+@@ -292,10 +292,10 @@
+     pos := loc.org; ox := F.left; dx := eolW;
+     Texts.OpenReader(R, F.text, loc.org);
+     WHILE pos # lim DO
+-      Texts.ReadUnicode(R, nextCodepoint);
+-      Fonts.GetUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++      TextsU.ReadUnicode(R, nextCodepoint);
++      FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+       IF ox + dx <= x THEN
+-        INC(pos, Texts.UnicodeWidth(nextCodepoint)); ox := ox + dx;
++        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx;
+         IF pos = lim THEN dx := eolW END
+       ELSE lim := pos
+       END
+@@ -313,7 +313,7 @@
+       org := org + L.len; L := L.next; cury := cury - lsp
+     END;
+     IF pos >= org + L.len THEN pos := org + L.len - 1 END;    
+-    Texts.OpenReader(R, T, org); Texts.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, T, org); TextsU.ReadUnicode(R, nextCodepoint);
+     loc.org := org; loc.pos := pos; loc.lin := L;
+     loc.x := F.left + Width(R, pos - org); loc.y := cury
+   END LocatePos;
+@@ -386,7 +386,7 @@
+         LocateChar(F, F.left, Y - F.Y, F.selbeg)
+       ELSE F.selbeg := loc
+       END;
+-      INC(loc.pos, Texts.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx; F.selend := loc;
++      INC(loc.pos, TextsU.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx; F.selend := loc;
+       FlipSelection(F, F.selbeg, F.selend); keysum := {};
+       REPEAT
+         Input.Mouse(keys, X, Y);
+@@ -394,7 +394,7 @@
+         Oberon.DrawMouseArrow(X, Y);
+         LocateChar(F, X - F.X, Y - F.Y, loc);
+         IF loc.pos < F.selbeg.pos THEN loc := F.selbeg END;
+-        INC(loc.pos, Texts.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx;
++        INC(loc.pos, TextsU.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx;
+         IF loc.pos < F.selend.pos THEN FlipSelection(F, loc, F.selend); F.selend := loc
+         ELSIF loc.pos > F.selend.pos THEN FlipSelection(F, F.selend, loc); F.selend := loc
+         END
+@@ -464,7 +464,7 @@
+         org := org + L.len; L := L.next; curY := curY - lsp
+       END;
+       IF L # F.trailer THEN
+-        Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
++        Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
+         len := beg - org; wid := Width(R, len);
+         ReplConst(F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, lsp, Display.replace);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+@@ -491,7 +491,7 @@
+       END;
+       IF L # F.trailer THEN
+         botY := F.Y + F.bot + dsr;
+-        Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
++        Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
+         len := beg - org; wid := Width(R, len);
+         ReplConst (F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, lsp, Display.replace);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+@@ -550,7 +550,7 @@
+           org := org + L.len; L := L.next; curY := curY - lsp
+         END;
+         Y1 := curY;
+-        Texts.OpenReader(R, F.text, org0); Texts.ReadUnicode(R, nextCodepoint);
++        Texts.OpenReader(R, F.text, org0); TextsU.ReadUnicode(R, nextCodepoint);
+         len := beg - org0; wid := Width(R, len);
+         ReplConst (F.col, F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, lsp, Display.replace);
+         DisplayLine(F, L0, R, F.X + F.left + wid, Y0, len);
+@@ -565,7 +565,7 @@
+               F.X + F.left, curY + lsp - dsr + (Y0 - Y1), 0);
+           curY := curY + (Y0 - Y1);
+           Display.ReplConst (F.col, F.X + F.left, F.Y, F.W - F.left, curY + lsp - (F.Y + dsr), Display.replace);
+-          Texts.OpenReader(R, F.text, org); Texts.ReadUnicode(R, nextCodepoint);
++          Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
+           WHILE ~L.eot & (curY >= botY) DO
+             NEW(l);
+             DisplayLine(F, l, R, F.X + F.left, curY, 0);
+@@ -638,9 +638,9 @@
+         NEW(TBuf); Texts.OpenBuf(TBuf); Texts.Delete(F.text, F.selbeg.pos, F.selend.pos, TBuf)
+       END
+     ELSIF (20H <= codepoint) & (codepoint <= 010FFFFH) OR (codepoint = ORD(CR)) OR (codepoint = ORD(TAB)) THEN
+-      KW.fnt := fnt; KW.col := col; KW.voff := voff; Texts.WriteUnicode(KW, codepoint);
++      KW.fnt := fnt; KW.col := col; KW.voff := voff; TextsU.WriteUnicode(KW, codepoint);
+       Texts.Insert(F.text, F.carloc.pos, KW.buf);
+-      SetCaret(F, F.carloc.pos + Texts.UnicodeWidth(codepoint))
++      SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(codepoint))
+     END
+   END Write;
+ 
+@@ -804,7 +804,7 @@
+       Oberon.InputMsg:
+         IF M.id = Oberon.track THEN Edit(F, M.X, M.Y, M.keys)
+         ELSIF M.id = Oberon.consume THEN
+-          IF F.hasCar THEN Write(F, M.codepoint, M.fnt, M.col, M.voff) END
++          IF F.hasCar THEN Write(F, ORD(M.ch), M.fnt, M.col, M.voff) END
+         END |
+       Oberon.ControlMsg:
+         IF M.id = Oberon.defocus THEN Defocus(F)
+@@ -858,4 +858,4 @@
+   eolW := lsp DIV 2;
+   ScrollMarker.Fade := FlipSM; ScrollMarker.Draw := FlipSM;
+   Texts.OpenWriter(W); Texts.OpenWriter(KW)
+-END TextFrames.
++END TextFramesU.
+--- 1/Fonts.Mod.txt
++++ 2/Fonts.Mod.txt
+@@ -33,12 +33,13 @@
+ PROCEDURE This*(name: ARRAY OF CHAR): Font;
+   VAR F: Font; LF: LargeFont;
+     f: Files.File; R: Files.Rider;
+-    NofRuns, NofBoxes: BYTE;
++    NofRuns, NofBoxes: INTEGER;
+     NofBytes: INTEGER;
+     height, minX, maxX, minY, maxY: BYTE;
+     i, j, k, m, n: INTEGER;
+     a, a0: INTEGER;
+-    b, beg, end: BYTE;
++    b, UsedBoxes: BYTE;
++    beg, end: INTEGER;
+     run: ARRAY 16 OF RunRec;
+     box: ARRAY 512 OF BoxRec;
+ 
+@@ -46,6 +47,11 @@
+     VAR b1: BYTE;
+   BEGIN Files.ReadByte(R, b0); Files.ReadByte(R, b1)
+   END RdInt16;
++
++  PROCEDURE ReadInt16(VAR R: Files.Rider; VAR r: INTEGER);
++    VAR b0, b1: BYTE;
++  BEGIN Files.ReadByte(R, b0); Files.ReadByte(R, b1); r := b1 * 100H + b0;
++  END ReadInt16;
+ 
+ BEGIN F := root;
+   WHILE (F # NIL) & (name # F.name) DO F := F.next END;
+@@ -57,19 +63,20 @@
+         Files.ReadByte(R, b); (*abstraction*)
+         Files.ReadByte(R, b); (*family*)
+         Files.ReadByte(R, b); (*variant*)
+-        RdInt16(R, height); RdInt16(R, minX); RdInt16(R, maxX); RdInt16(R, minY); RdInt16(R, maxY); RdInt16(R, NofRuns);
+-        NofBoxes := 0; k := 0;
++        RdInt16(R, height); RdInt16(R, minX); RdInt16(R, maxX); RdInt16(R, minY); RdInt16(R, maxY); ReadInt16(R, NofRuns);
++        NofBoxes := 0; k := 0; UsedBoxes := 0;
+         WHILE k # NofRuns DO
+-          RdInt16(R, beg);
+-          run[k].beg := beg; RdInt16(R, end);
+-          run[k].end := end; NofBoxes := NofBoxes + end - beg; INC(k)
++          ReadInt16(R, beg);
++          run[k].beg := beg MOD 100H; ReadInt16(R, end);
++          run[k].end := end MOD 100H; NofBoxes := NofBoxes + end - beg;
++          IF (beg < 128) THEN UsedBoxes := UsedBoxes + end - beg; INC(k) ELSE DEC(NofRuns) END
+         END;
+         NofBytes := 5; j := 0;
+         WHILE j # NofBoxes DO
+           RdInt16(R, box[j].dx); RdInt16(R, box[j].x); RdInt16(R, box[j].y);
+           RdInt16(R, box[j].w); RdInt16(R, box[j].h);
+           NofBytes := NofBytes + 5 + (box[j].w + 7) DIV 8 * box[j].h;
+-          INC(j)
++          IF j < UsedBoxes THEN INC(j) ELSE DEC(NofBoxes) END;
+         END;
+         IF NofBytes < 2300 THEN NEW(F) ELSE NEW(LF); F := LF END ;
+         F.name := name;

@@ -1,0 +1,292 @@
+--- 1/FileDir.Mod.txt
++++ 2/FileDir.Mod.txt
+@@ -6,7 +6,7 @@
+ 
+   CONST FnLength*    = 32;
+         SecTabSize*   = 64;
+-        ExTabSize*   = 12;
++        ExTabSize*   = 11;
+         SectorSize*   = 1024;
+         IndexSize*   = SectorSize DIV 4;
+         HeaderSize*  = 352;
+@@ -29,6 +29,7 @@
+         name*: FileName;
+         aleng*, bleng*, date*: INTEGER;
+         ext*:  ExtensionTable;
++        lext*: DiskAdr;
+         sec*: SectorTable;
+         fill: ARRAY SectorSize - HeaderSize OF BYTE;
+       END ;
+@@ -320,8 +321,15 @@
+           REPEAT DEC(j); Kernel.MarkSector(hd.sec[j]) UNTIL j = 0;
+           n := (hd.aleng - SecTabSize) DIV 256; i := 0;
+           WHILE i <= n DO
+-            Kernel.MarkSector(hd.ext[i]);
+-            Kernel.GetSector(hd.ext[i], B); (*index sector*)
++            IF n < ExTabSize THEN
++              Kernel.MarkSector(hd.ext[i]);
++              Kernel.GetSector(hd.ext[i], B) (*index sector*)
++            ELSIF n = ExTabSize THEN
++              Kernel.MarkSector(hd.lext);
++              Kernel.GetSector(hd.lext, B); (*linked index sector*)
++            ELSE
++              Kernel.GetSector(B[255], B)
++            END;
+             IF i < n THEN j := 256 ELSE j := (hd.aleng - SecTabSize) MOD 256 + 1 END ;
+             REPEAT DEC(j); Kernel.MarkSector(B[j]) UNTIL j = 0;
+             INC(i)
+--- 1/Files.Mod.txt
++++ 2/Files.Mod.txt
+@@ -16,6 +16,7 @@
+       File*    = POINTER TO FileDesc;
+       Buffer  = POINTER TO BufferRecord;
+       Index   = POINTER TO IndexRecord;
++      LinkedIndex = POINTER TO LinkedIndexRecord;
+ 
+     Rider* =
+       RECORD eof*: BOOLEAN;
+@@ -34,6 +35,7 @@
+         name: FileDir.FileName;
+         date: INTEGER;
+         ext:  ARRAY FileDir.ExTabSize OF Index;
++        lext: LinkedIndex;
+         sec: FileDir.SectorTable
+       END ;
+ 
+@@ -50,6 +52,13 @@
+         sec: FileDir.IndexSector
+       END ;
+ 
++    LinkedIndexRecord =
++      RECORD adr: DiskAdr;
++        mod: BOOLEAN;
++        next: LinkedIndex;
++        sec: FileDir.IndexSector
++    END;
++
+     (*aleng * SS + bleng = length (including header)
+       apos * SS + bpos = current position
+       0 <= bpos <= lim <= SS
+@@ -84,6 +93,7 @@
+       F: FileDir.FileHd;
+       namebuf: FileDir.FileName;
+       inxpg: Index;
++      linxpg, linxpg2: LinkedIndex;
+   BEGIN f := NIL; Check(name, namebuf, res);
+     IF res = 0 THEN
+       FileDir.Search(namebuf, header);
+@@ -99,10 +109,23 @@
+           f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf; f.registered := TRUE;
+           f.sec := F.sec;
+           k := (f.aleng + (XS-STS)) DIV XS; i := 0;
+-          WHILE i < k DO
++          f.lext := NIL;
++          IF k > FileDir.ExTabSize THEN
++            k := FileDir.ExTabSize + (f.aleng + XS - STS - FileDir.ExTabSize * XS) DIV (XS - 1)
++          END;
++          WHILE (i < k) & (i < FileDir.ExTabSize) DO
+             NEW(inxpg); inxpg.adr := F.ext[i]; inxpg.mod := FALSE;
+             Kernel.GetSector(inxpg.adr, inxpg.sec); f.ext[i] := inxpg; INC(i)
+           END ;
++          IF i < k THEN
++            NEW(linxpg); linxpg.adr := F.lext; linxpg.mod := FALSE; linxpg.next := NIL;
++            Kernel.GetSector(linxpg.adr, linxpg.sec); f.lext := linxpg; INC(i)
++          END;
++          WHILE (i < k) DO
++            linxpg2 := linxpg;
++            NEW(linxpg); linxpg.adr := linxpg2.sec[XS-1]; linxpg.mod := FALSE; linxpg.next := NIL;
++            Kernel.GetSector(linxpg.adr, linxpg.sec); linxpg2.next := linxpg; INC(i)
++          END;
+           WHILE i < FileDir.ExTabSize DO f.ext[i] := NIL; INC(i) END ;
+           f.sechint := header; f.modH := FALSE; f.next := root; root := SYSTEM.VAL(INTEGER, f)
+         END
+@@ -129,6 +152,7 @@
+       f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf; f.sechint := 0;
+       i := 0;
+       REPEAT f.ext[i] := NIL; F.ext[i] := 0; INC(i) UNTIL i = FileDir.ExTabSize;
++      f.lext := NIL; F.lext := 0;
+       i := 0;
+       REPEAT f.sec[i] := 0; F.sec[i] := 0; INC(i) UNTIL i = STS
+     END ;
+@@ -139,13 +163,19 @@
+     VAR k: INTEGER;
+   BEGIN F.aleng := f.aleng; F.bleng := f.bleng;
+     F.sec := f.sec; k := (f.aleng + (XS-STS)) DIV XS;
++    IF k >= FileDir.ExTabSize THEN k := FileDir.ExTabSize END;
++    IF f.lext = NIL THEN F.lext := 0 ELSE F.lext := f.lext.adr END;
+     WHILE k > 0 DO DEC(k); F.ext[k] := f.ext[k].adr END
+   END UpdateHeader;
+ 
+   PROCEDURE ReadBuf(f: File; buf: Buffer; pos: INTEGER);
+-    VAR sec: DiskAdr;
++    VAR sec: DiskAdr; lidx: LinkedIndex; i: INTEGER;
+   BEGIN
+     IF pos < STS THEN sec := f.sec[pos]
++    ELSIF pos >= STS + FileDir.ExTabSize * XS THEN 
++      lidx := f.lext; i := pos - STS - FileDir.ExTabSize * XS;
++      WHILE i >= XS - 1 DO lidx := lidx.next; DEC(i, XS - 1) END;
++      sec := lidx.sec[i]
+     ELSE sec := f.ext[(pos-STS) DIV XS].sec[(pos-STS) MOD XS]
+     END ;
+     Kernel.GetSector(sec, buf.data);
+@@ -155,7 +185,7 @@
+ 
+   PROCEDURE WriteBuf(f: File; buf: Buffer);
+     VAR i, k: INTEGER;
+-      secadr: DiskAdr; inx: Index;
++      secadr: DiskAdr; inx: Index; linx, linx2: LinkedIndex;
+   BEGIN 
+     IF buf.apos < STS THEN
+       secadr := f.sec[buf.apos];
+@@ -166,7 +196,9 @@
+       IF buf.apos = 0 THEN
+         UpdateHeader(f, SYSTEM.VAL(FileDir.FileHeader, buf.data)); f.modH := FALSE
+       END
+-    ELSE i := (buf.apos - STS) DIV XS; inx := f.ext[i];
++    ELSE i := (buf.apos - STS) DIV XS;
++     IF i < FileDir.ExTabSize THEN
++      inx := f.ext[i];
+       IF inx = NIL THEN
+         NEW(inx); inx.adr := 0; inx.sec[0] := 0; f.ext[i] := inx; f.modH := TRUE
+       END ;
+@@ -175,6 +207,24 @@
+         Kernel.AllocSector(f.sechint, secadr);
+         f.modH := TRUE; inx.mod := TRUE; inx.sec[k] := secadr; f.sechint := secadr
+       END
++     ELSE
++      k := buf.apos - STS - FileDir.ExTabSize * XS;
++      linx := f.lext;
++      IF linx = NIL THEN
++        NEW(linx); linx.adr := 0; linx.mod := TRUE; linx.next := NIL; linx.sec[0] := 0; f.lext := linx; f.modH := TRUE
++      END;
++      WHILE k >= XS - 1 DO
++        IF linx.next = NIL THEN
++          NEW(linx2); linx2.adr := 0; linx2.mod := TRUE; linx2.sec[0] := 0; linx.next := linx2; linx.mod := TRUE
++        END;
++        linx := linx.next; DEC(k, XS - 1)
++      END;
++      secadr := linx.sec[k];
++      IF secadr = 0 THEN
++        Kernel.AllocSector(f.sechint, secadr);
++        f.modH := TRUE; linx.mod := TRUE; linx.sec[k] := secadr; f.sechint := secadr
++      END
++     END
+     END ;
+     Kernel.PutSector(secadr, buf.data); buf.mod := FALSE
+   END WriteBuf;
+@@ -206,6 +256,7 @@
+     VAR i, k: INTEGER;
+       buf: Buffer;
+       inx: Index;
++      linx, linx2: LinkedIndex;
+       head: FileDir.FileHeader;
+   BEGIN buf := f.firstbuf;
+     REPEAT
+@@ -213,7 +264,10 @@
+       buf := buf.next
+     UNTIL buf = f.firstbuf;
+     k := (f.aleng + (XS-STS)) DIV XS; i := 0;
+-    WHILE i < k DO
++    IF k > FileDir.ExTabSize THEN
++      k := FileDir.ExTabSize + (f.aleng + XS - STS - FileDir.ExTabSize * XS) DIV (XS - 1)
++    END;
++    WHILE (i < k) & (i < FileDir.ExTabSize) DO
+       inx := f.ext[i]; INC(i);
+       IF inx.mod THEN
+         IF inx.adr = 0 THEN
+@@ -222,6 +276,24 @@
+         Kernel.PutSector(inx.adr, inx.sec); inx.mod := FALSE
+       END
+     END ;
++    linx := NIL;
++    WHILE (i < k) DO
++      linx2 := linx;
++      IF linx = NIL THEN linx := f.lext ELSE linx := linx.next END; INC(i);
++      IF linx.mod & (linx.adr = 0) THEN
++        Kernel.AllocSector(f.sechint, linx.adr); f.sechint := linx.adr;
++        IF linx2 # NIL THEN linx2.sec[XS - 1] := linx.adr END
++      END
++    END;
++    linx := NIL;
++    i := FileDir.ExTabSize;
++    WHILE (i < k) DO
++      IF linx = NIL THEN linx := f.lext ELSE linx := linx.next END; INC(i);
++      IF linx.mod THEN
++        ASSERT(linx.adr # 0);
++        Kernel.PutSector(linx.adr, linx.sec); linx.mod := FALSE
++      END
++    END;
+     IF f.modH THEN
+       Kernel.GetSector(f.sec[0], head); UpdateHeader(f, head);
+       Kernel.PutSector(f.sec[0], head); f.modH := FALSE
+@@ -246,10 +318,23 @@
+   PROCEDURE Purge*(f: File);
+     VAR a, i, j, k: INTEGER;
+       ind: FileDir.IndexSector;
++      lidx: LinkedIndex;
+   BEGIN
+     IF f # NIL THEN a := f.aleng + 1; f.aleng := 0; f.bleng := HS;
+       IF a <= STS THEN i := a;
+       ELSE i := STS; DEC(a, i); j := (a-1) MOD XS; k := (a-1) DIV XS;
++        IF k >= FileDir.ExTabSize THEN
++          lidx := f.lext;
++          WHILE lidx # NIL DO
++            IF lidx.adr # 0 THEN
++              Kernel.GetSector(lidx.adr, ind);
++              j := XS - 1;
++              REPEAT DEC(j); IF ind[j] # 0 THEN Kernel.FreeSector(ind[j]) END UNTIL j = 0;
++              Kernel.FreeSector(lidx.adr);
++            END; lidx := lidx.next
++          END;
++          k := FileDir.ExTabSize - 1; j := XS
++        END;
+         WHILE k >= 0 DO
+           Kernel.GetSector(f.ext[k].adr, ind);
+           REPEAT DEC(j); Kernel.FreeSector(ind[j]) UNTIL j = 0;
+@@ -395,12 +480,25 @@
+         
+   (*---------------------------Write---------------------------*)
+ 
+-  PROCEDURE NewExt(f: File);
++  PROCEDURE MaybeNewExt(f: File);
+     VAR i, k: INTEGER; ext: Index;
+-  BEGIN k := (f.aleng - STS) DIV XS;
++      olext, lext: LinkedIndex;
++  BEGIN
++   IF (f.aleng < STS + FileDir.ExTabSize * XS) & ((f.aleng - STS) MOD XS = 0) THEN
++    k := (f.aleng - STS) DIV XS;
+     NEW(ext); ext.adr := 0; ext.mod := TRUE; f.ext[k] := ext; i := XS;
+     REPEAT DEC(i); ext.sec[i] := 0 UNTIL i = 0
+-  END NewExt;
++   ELSIF (f.aleng >= STS + FileDir.ExTabSize * XS) & ((f.aleng - STS - FileDir.ExTabSize * XS) MOD (XS - 1) = 0) THEN
++    k := (f.aleng - STS - FileDir.ExTabSize * XS) DIV (XS - 1);
++    NEW(lext); lext.adr := 0; lext.next := NIL; lext.mod := TRUE; i := XS;
++    REPEAT DEC(i); lext.sec[i] := 0 UNTIL i = 0;
++    IF k = 0 THEN
++      f.lext := lext
++    ELSE
++      olext := f.lext; WHILE k > 1 DO olext := olext.next; DEC(k) END; olext.next := lext
++    END
++   END
++  END MaybeNewExt;
+ 
+   PROCEDURE WriteByte*(VAR r: Rider; x: BYTE);
+     VAR f: File; buf: Buffer;
+@@ -413,7 +511,7 @@
+         IF buf = NIL THEN
+           IF r.apos <= f.aleng THEN ReadBuf(f, r.buf, r.apos)
+           ELSE r.buf.apos := r.apos; r.buf.lim := 1; f.aleng := f.aleng + 1; f.bleng := 1; f.modH := TRUE;
+-            IF (f.aleng - STS) MOD XS = 0 THEN NewExt(f) END
++            MaybeNewExt(f)
+           END
+         ELSE r.buf := buf
+         END ;
+@@ -440,7 +538,7 @@
+         IF buf = NIL THEN
+           IF r.apos <= f.aleng THEN ReadBuf(f, r.buf, r.apos)
+           ELSE r.buf.apos := r.apos; r.buf.lim := 1; f.aleng := f.aleng + 1; f.bleng := 1; f.modH := TRUE;
+-            IF (f.aleng - STS) MOD XS = 0 THEN NewExt(f) END
++            MaybeNewExt(f)
+           END
+         ELSE r.buf := buf
+         END ;

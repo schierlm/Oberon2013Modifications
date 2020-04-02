@@ -35,3 +35,6 @@ ORP.Compile RebuildToolBuilder.Mod/s ~
 ORP.Compile KeyTester.Mod/s ~
 ORP.Compile Trappy.Mod/s ~
 ORP.Compile ORInspect.Mod/s ~
+
+ORP.Compile FontsU.Mod/s TextsU.Mod/s ~
+ORP.Compile TextFramesU.Mod/s EditU.Mod/s ~

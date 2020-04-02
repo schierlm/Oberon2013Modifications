@@ -42,5 +42,7 @@ designed to be used on a day-by-day basis.
 | **[ZeroLocalVariables](ZeroLocalVariables/README.md)** | Zero local variables to avoid memory corruption due to uninitialized variables | Recompile `ORG.Mod` |
 | **[VariableLinespace](VariableLinespace/README.md)** | Support lines of different height in the same Text viewer | Recompile `TextFrames.Mod` |
 | **[UTF8Charset](UTF8Charset/README.md)**† | Display UTF-8 characters in a Text viewer | Recompile outer core and compiler |
+| **[UTF8CharsetLite](UTF8CharsetLite/README.md)** | UTF-8 support, limited to special Unicode text viewers | Recompile `Fonts.Mod` |
+| **[RemoveFilesizeLimit](RemoveFilesizeLimit/README.md)**| Remove the 3MB file size limit | Recompile inner core |
 | **[ORInspect](ORInspect/README.md)** | Inspect global module variables and heap pointers | Recompile compiler and all modules you want to inspect |
 | **[StackOverflowProtector](StackOverflowProtector/README.md)** | Trigger TRAP 9 at stack overflows | Recompile inner core |
