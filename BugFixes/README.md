@@ -6,19 +6,11 @@ Description
 Here are some small bugfixes.
 
 
-Fix 1: Handling of aliased modules
-----------------------------------
+Fix 1: Aborting when module exceeds globals size
+------------------------------------------------
 
-
-Consider these modules:
-
-    MODULE M1; TYPE P1* = POINTER TO T1; T1* = RECORD x*: INTEGER END; END M1.
-    MODULE M2; IMPORT M1; TYPE P2* = POINTER TO T2; T2* = RECORD(M1.T1) y*: INTEGER END; END M2.
-    MODULE M3; IMPORT M1, M2; VAR x1: M1.P1; x2: M2.P2; BEGIN x1 := x2; END M3.
-    MODULE M4; IMPORT Y1 := M1, Y2 := M2; VAR x1: Y1.P1; x2: Y2.P2; BEGIN x1 := x2; END M4.
-
-Modules M1 to M3 compile, but M4 (which should do the same as M3) does not.
-
+A module may have at most 64 KB of global variables, as otherwise fixups to
+exported variables may fail. Enforce this in the compiler.
 
 Fix 2: Initializing of `GraphicFrames.TBuf` variable
 ----------------------------------------------------
@@ -39,7 +31,7 @@ as soon as these free lists are used.
 Installation
 ------------
 
-- Apply [`FixAliasedModules.patch`](FixAliasedModules.patch) to `ORB.Mod`
+- Apply [`CheckGlobalsSize.patch`](CheckGlobalsSize.patch) to `ORG.Mod`
 
 - Apply [`InitializeGraphicFramesTbuf.patch`](InitializeGraphicFramesTbuf.patch) to `GraphicFrames.Mod`
 
@@ -52,6 +44,6 @@ Installation
       ORL.Load Modules.bin ~
 
       ORP.Compile GraphicFrames.Mod ~
-      ORP.Compile ORB.Mod ~
+      ORP.Compile ORG.Mod ~
 
 - Restart the system.

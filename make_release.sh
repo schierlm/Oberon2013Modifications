@@ -8,7 +8,7 @@ for i in Kernel FileDir Files Modules Fonts Input Texts Oberon TextFrames System
 	dos2unix work/$i.Mod.txt
 done
 
-patch -d work <BugFixes/FixAliasedModules.patch
+patch -d work <BugFixes/CheckGlobalsSize.patch
 patch -d work <BugFixes/InitializeGraphicFramesTbuf.patch
 patch -d work <BugFixes/NoMemoryCorruptionAfterMemoryAllocationFailure.patch
 patch -d work <ConvertEOL/ConvertEOL.patch

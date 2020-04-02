@@ -1,0 +1,10 @@
+--- ORG.Mod.txt
++++ ORG.Mod.txt
+@@ -90,6 +90,7 @@
+   BEGIN
+     IF RH # 0 THEN ORS.Mark("Reg Stack"); RH := 0 END ;
+     IF pc >= maxCode - 40 THEN ORS.Mark("program too long") END ;
++    IF varsize + strx > 0FFFFH THEN ORS.Mark("too many globals") END;
+     IF frame # 0 THEN ORS.Mark("frame error"); frame := 0 END
+   END CheckRegs;
+ 
