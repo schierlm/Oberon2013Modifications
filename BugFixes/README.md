@@ -28,6 +28,14 @@ When a memory of a small type from a large block fails, the system will still st
 the "second half" of the null pointer into the free lists, resulting in memory corruption
 as soon as these free lists are used.
 
+Fix 4: Avoid illegal IO access (-4) when GC encounters NIL pointers
+-------------------------------------------------------------------
+
+As discussed on the mailing list (`PO: Illegal memory access in GC`), the garbage collector
+will read from IO address -4 when it encounters a NIL pointer and tries to read the metadata
+preceding the pointer. By default, IO address -4 is unused and will return 0, but better
+to avoid these accesses if possible.
+
 Installation
 ------------
 
@@ -36,6 +44,8 @@ Installation
 - Apply [`InitializeGraphicFramesTbuf.patch`](InitializeGraphicFramesTbuf.patch) to `GraphicFrames.Mod`
 
 - Apply [`NoMemoryCorruptionAfterMemoryAllocationFailure.patch`](NoMemoryCorruptionAfterMemoryAllocationFailure.patch) to `Kernel.Mod`
+
+- Apply [`IllegalAccessInGC.patch`](IllegalAccessInGC.patch) to `Kernel.Mod`
 
 - Recompile the changed modules and rebuild the inner core:
 
