@@ -46,3 +46,4 @@ designed to be used on a day-by-day basis.
 | **[RemoveFilesizeLimit](RemoveFilesizeLimit/README.md)**| Remove the 3MB file size limit | Recompile inner core |
 | **[ORInspect](ORInspect/README.md)** | Inspect global module variables and heap pointers | Recompile compiler and all modules you want to inspect |
 | **[StackOverflowProtector](StackOverflowProtector/README.md)** | Trigger TRAP 9 at stack overflows | Recompile inner core |
+| **[CommandExitCodes](CommandExitCodes/README.md)** | Let commands return an exit code so that scripts can react to it | Recompile outer core |

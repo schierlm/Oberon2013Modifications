@@ -26,6 +26,7 @@ patch -d work <TrapBacktrace/POSTPATCH_after_DoubleTrap.patch
 patch -d work <ZeroLocalVariables/ZeroLocalVariables.patch
 patch -d work <ORInspect/InspectSymbols.patch
 patch -d work <StackOverflowProtector/StackOverflowProtector.patch
+patch -d work <CommandExitCodes/CommandExitCodes.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite

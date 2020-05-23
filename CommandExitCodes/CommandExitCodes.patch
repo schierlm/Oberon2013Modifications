@@ -1,0 +1,113 @@
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -60,6 +60,7 @@
+       pos*: LONGINT
+     END;
+ 
++    RetVal*: INTEGER;
+     CurFnt*: Fonts.Font;
+     CurCol*, CurOff*: INTEGER;
+     NofTasks*: INTEGER;
+@@ -275,8 +276,13 @@
+   (*command interpretation*)
+   PROCEDURE SetPar*(F: Display.Frame; T: Texts.Text; pos: LONGINT);
+   BEGIN Par.vwr := Viewers.This(F.X, F.Y); Par.frame := F; Par.text := T; Par.pos := pos
++  ; RetVal := 0
+   END SetPar;
+ 
++  PROCEDURE SetRetVal*(retval: INTEGER);
++  BEGIN RetVal := retval
++  END SetRetVal;
++
+   PROCEDURE Call* (name: ARRAY OF CHAR; VAR res: INTEGER);
+     VAR mod: Modules.Module; P: Modules.Command;
+       i, j: INTEGER; ch: CHAR;
+@@ -295,6 +301,7 @@
+       END
+     ELSE res := 5
+     END
++    ; IF res # 0 THEN RetVal := 0FFH END
+   END Call;
+ 
+   PROCEDURE GetSelection* (VAR text: Texts.Text; VAR beg, end, time: LONGINT);
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -143,7 +143,7 @@
+   PROCEDURE Free1(VAR S: Texts.Scanner);
+   BEGIN Texts.WriteString(W, S.s); Texts.WriteString(W, " unloading");
+     Modules.Free(S.s);
+-    IF Modules.res # 0 THEN Texts.WriteString(W, " failed") END;
++    IF Modules.res # 0 THEN Texts.WriteString(W, " failed"); Oberon.SetRetVal(1) END;
+     EndLine
+   END Free1;
+ 
+@@ -248,7 +248,7 @@
+               Files.Set(Rf, f, 0); Files.Set(Rg, g, 0); Files.Read(Rf, ch);
+               WHILE ~Rf.eof DO Files.Write(Rg, ch); Files.Read(Rf, ch) END;
+               Files.Register(g)
+-            ELSE Texts.WriteString(W, " failed")
++            ELSE Texts.WriteString(W, " failed"); Oberon.SetRetVal(1)
+             END ;
+             EndLine
+           END
+@@ -271,7 +271,7 @@
+           IF S.class = Texts.Name THEN
+             Texts.WriteString(W, name); Texts.WriteString(W, " => "); Texts.WriteString(W, S.s);
+             Texts.WriteString(W, " renaming"); Files.Rename(name, S.s, res);
+-            IF res > 1 THEN Texts.WriteString(W, " failed") END;
++            IF res > 1 THEN Texts.WriteString(W, " failed"); Oberon.SetRetVal(1) END;
+             EndLine
+           END
+         END
+@@ -287,7 +287,7 @@
+     WHILE S.class = Texts.Name DO
+       Texts.WriteString(W, S.s); Texts.WriteString(W, " deleting");
+       Files.Delete(S.s, res);
+-      IF res # 0 THEN Texts.WriteString(W, " failed") END;
++      IF res # 0 THEN Texts.WriteString(W, " failed"); Oberon.SetRetVal(1) END;
+       EndLine; Texts.Scan(S)
+     END
+   END DeleteFiles;
+@@ -392,6 +392,22 @@
+         TextFrames.menuH, X, Y)
+     END
+   END ExtendDisplay;
++
++  PROCEDURE DoCommands*;
++    VAR pos: INTEGER; S: Texts.Scanner; run: BOOLEAN;
++  BEGIN pos := Oberon.Par.pos; run := TRUE;
++    WHILE run DO
++      run := FALSE;
++      Texts.OpenScanner(S, Oberon.Par.text, pos); Texts.Scan(S);
++      IF S.class = Texts.Name THEN
++        TextFrames.Call(Oberon.Par.frame(TextFrames.Frame), pos, FALSE);
++        IF Oberon.RetVal = 0 THEN
++          WHILE (~S.eot) & ~((S.class = Texts.Char) & (S.c = "~")) DO Texts.Scan(S) END;
++          pos := Texts.Pos(S); run := ~S.eot
++        END
++      END
++    END
++  END DoCommands;
+ 
+   PROCEDURE Trap(VAR a: INTEGER; b: INTEGER);
+     VAR u, v, w: INTEGER; mod: Modules.Module;
+--- 1/ORP.Mod.txt
++++ 2/ORP.Mod.txt
+@@ -946,7 +946,7 @@
+       IF ORS.errcnt = 0 THEN
+         ORG.Close(modid, key, exno);
+         Texts.WriteInt(W, ORG.pc, 6); Texts.WriteInt(W, dc, 6); Texts.WriteHex(W, key)
+-      ELSE Texts.WriteLn(W); Texts.WriteString(W, "compilation FAILED")
++      ELSE Texts.WriteLn(W); Texts.WriteString(W, "compilation FAILED"); Oberon.SetRetVal(1)
+       END ;
+       Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
+       ORB.CloseScope; pbsList := NIL
+@@ -986,7 +986,7 @@
+         NEW(T); Texts.Open(T, S.s);
+         IF T.len > 0 THEN Option(S); ORS.Init(T, 0); Module
+         ELSE Texts.WriteString(W, S.s); Texts.WriteString(W, " not found");
+-          Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
++          Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf); Oberon.SetRetVal(1)
+         END ;
+         IF (T.len # 0) & (ORS.errcnt = 0) THEN Texts.Scan(S) ELSE S.class := 0 END
+       END
