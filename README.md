@@ -19,6 +19,8 @@ Modifications marked with a † are not included in the prebuilt release. Either
 larger changes to the system which cannot be done by recompiling a few files and writing a new inner core,or they are not
 designed to be used on a day-by-day basis.
 
+The CommandLineCompiler is available as a separate release.
+
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
 | **[BugFixes](BugFixes/README.md)** | Fixes for what I consider to be bugs | Optionally recompile inner core |
@@ -47,3 +49,4 @@ designed to be used on a day-by-day basis.
 | **[ORInspect](ORInspect/README.md)** | Inspect global module variables and heap pointers | Recompile compiler and all modules you want to inspect |
 | **[StackOverflowProtector](StackOverflowProtector/README.md)** | Trigger TRAP 9 at stack overflows | Recompile inner core |
 | **[CommandExitCodes](CommandExitCodes/README.md)** | Let commands return an exit code so that scripts can react to it | Recompile outer core |
+| **[CommandLineCompiler](CommandLineCompiler/README.md)**† | Run the Oberon compiler in a command line emulator | Patch emulator |
