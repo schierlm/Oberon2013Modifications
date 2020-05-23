@@ -4,7 +4,7 @@ set -e
 rm -rf work
 mkdir work
 for i in Kernel FileDir Files Modules Fonts Input Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad; do
-	cp ../wirth-personal/people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
+       cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
 
