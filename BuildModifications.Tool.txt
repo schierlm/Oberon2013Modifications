@@ -1,6 +1,7 @@
 ORP.Compile ORS.Mod/s ORB.Mod/s ~
 ORP.Compile ORG.Mod/s ORP.Mod/s ~
 ORP.Compile ORL.Mod/s ~
+System.Free ORL ORP ORG ORB ORS ~
 
 ORP.Compile Kernel.Mod/s FileDir.Mod/s Files.Mod/s Modules.Mod/s ~
 ORL.Link Modules ~

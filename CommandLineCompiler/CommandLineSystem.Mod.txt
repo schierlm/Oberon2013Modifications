@@ -56,6 +56,7 @@ MODULE CommandLineSystem;
         Texts.Append(Oberon.Log, W.buf);
         Files.Set(R, F, 0);
         WHILE i > 0 DO Rec(x); Files.WriteByte(R, x); DEC(i) END;
+        Rec(x); ASSERT(x = 0);
         Files.Register(F); Texts.WriteString(W, " done"); Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
       ELSE
         Texts.WriteString(W, "> "); Texts.Append(Oberon.Log, W.buf);

@@ -4,7 +4,7 @@ set -e
 rm -rf work
 mkdir work
 for i in Kernel FileDir Files Modules Fonts Input Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad; do
-       cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
+	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
 
@@ -44,10 +44,13 @@ rmdir work/utf8lite
 patch -d work <VariableLinespace/VariableLineSpace.patch
 
 sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
+sed -i '1,2d' work/BootLoad.Mod.txt
 
 cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt ResourceMonitor/*.txt work
 cp DefragmentFreeSpace/DefragFiles.Mod.txt DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt work
 cp UTF8CharsetLite/*.txt work
+
+rm work/*.orig
 
 echo Done.
