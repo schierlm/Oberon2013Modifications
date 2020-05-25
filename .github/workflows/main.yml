@@ -1,0 +1,105 @@
+name: Build Disk Image
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout this repository
+      uses: actions/checkout@v2
+
+    - name: Checkout wirth-personal repository
+      run: |
+        pushd ..
+        mkdir wirth-personal
+        cd wirth-personal
+        git init
+        git remote add origin https://github.com/Spirit-of-Oberon/wirth-personal.git
+        git fetch --depth 1 origin b9649d310e668c31b09e44ec38d0b517765be0a2
+        git checkout FETCH_HEAD
+        popd
+
+    - name: Install packages
+      run: sudo apt-get -y install dos2unix
+
+    - name: Patch the release files
+      run: ./make_release.sh
+
+    - name: Upload PatchedModules artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: PatchedModules
+        path: work/
+
+    - name: Build the disk image
+      run: |
+        cd work
+        zip -r ../PatchedModules.zip .
+        cd ..
+        ./make_disk_image.sh
+
+    - name: Upload DiskImages artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: DiskImages
+        path: work/OberonModifications.dsk
+
+    - name: Update release metadata and remove old assets
+      if: github.ref == 'refs/heads/master' && github.repository == 'schierlm/Oberon2013Modifications'
+      uses: actions/github-script@v1
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+         var assets = await github.repos.listAssetsForRelease({
+           owner: "schierlm",
+           repo: "Oberon2013Modifications",
+           release_id: 26870489,
+           per_page: 100
+         });
+         for(var asset of assets.data) {
+           await github.repos.deleteReleaseAsset({
+             owner: "schierlm",
+             repo: "Oberon2013Modifications",
+             asset_id: asset.id
+           });
+         }
+         var release = await github.repos.getRelease({
+           owner: "schierlm",
+           repo: "Oberon2013Modifications",
+           release_id: 26870489
+         });
+         var now = new Date().toISOString().replace("T"," ").replace(/(\.[0-9]+)?Z/, "");
+         var newBody = release.data.body.replace(/[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} from [a-z0-9]{40}/, now+" from "+context.sha);
+         await github.repos.updateRelease({
+           owner: "schierlm",
+           repo: "Oberon2013Modifications",
+           release_id: 26870489,
+           body: newBody
+         });
+         return true;
+
+    - name: Upload Release Asset PatchedModules.zip
+      if: github.ref == 'refs/heads/master' && github.repository == 'schierlm/Oberon2013Modifications'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: https://uploads.github.com/repos/schierlm/Oberon2013Modifications/releases/26870489/assets{?name,label}
+        asset_path: ./PatchedModules.zip
+        asset_name: PatchedModules.zip
+        asset_content_type: application/zip
+
+    - name: Upload Release Asset OberonModifications.dsk
+      if: github.ref == 'refs/heads/master' && github.repository == 'schierlm/Oberon2013Modifications'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: https://uploads.github.com/repos/schierlm/Oberon2013Modifications/releases/26870489/assets{?name,label}
+        asset_path: work/OberonModifications.dsk
+        asset_name: OberonModifications.dsk
+        asset_content_type: application/octet-stream

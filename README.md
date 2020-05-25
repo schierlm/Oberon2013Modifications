@@ -1,3 +1,7 @@
+![Build Disk Image](https://github.com/schierlm/Oberon2013Modifications/workflows/Build%20Disk%20Image/badge.svg)
+[![Latest Release](https://img.shields.io/badge/Download-Release%202020.05-blue)](https://github.com/schierlm/Oberon2013Modifications/releases/tag/2020.05)
+[![Latest Automated Build](https://img.shields.io/badge/Download-Latest%20Automated%20Build-blue)](https://github.com/schierlm/Oberon2013Modifications/releases/tag/automatedbuild)
+
 ## Oberon 2013 Modifications
 
 Here you can find modifications (I deliberately do **not** call them *enhancements*) I did to Project Oberon 2013.
