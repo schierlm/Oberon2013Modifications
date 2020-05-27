@@ -15,6 +15,7 @@ cp Defragger.Mod.txt Defragger0.Mod.txt
 patch <../CommandLineCompiler/CommandLineDefragger.patch
 mv Defragger.Mod.txt DefraggerX.Mod.txt
 mv Defragger0.Mod.txt Defragger.Mod.txt
+cp ../Clipboard.Mod.txt .
 for i in *.txt; do unix2mac $i; mv $i ${i%.txt}; done
 
 unzip ../CommandLineCompiler.zip
