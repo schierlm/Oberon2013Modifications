@@ -26,18 +26,29 @@
            END;
            IF fld.val # size THEN ORS.Mark("noncontiguous ISy pointer record") END;
            bufpos := 0;
-@@ -506,7 +498,13 @@
+@@ -527,7 +519,8 @@
          WHILE fld # bot DO  (*fields*)
            IF fld.expo THEN
              Write(R, Fld); Files.WriteString(R, fld.name); OutType(R, fld.type); Files.WriteNum(R, fld.val)  (*offset*)
 -          ELSE FindHiddenPointers(R, fld.type, fld.val)
-+          ELSIF (fld.type.form = Pointer) & (fld.type.base.form = Record) THEN
-+            ASSERT(t.typobj # NIL);
-+            Write(R, Fld); Files.Write(R, "-"); Files.WriteString(R, fld.name);
-+            Write(R, 0); Write(R, Pointer); Write(R, -t.ref); Write(R, 0);
-+            Files.WriteNum(R, fld.val)
 +          ELSE
 +            Write(R, Fld); Files.Write(R, "-"); Files.WriteString(R, fld.name); OutType(R, fld.type); Files.WriteNum(R, fld.val)
            END ;
            fld := fld.next
          END ;
+@@ -576,6 +569,15 @@
+           END
+         ELSIF obj.class = Var THEN Files.WriteNum(R, obj.exno)
+         END
++      ELSIF (obj.class = Typ) & (obj.type.form = Record) THEN
++        Write(R, obj.class); Files.Write(R, "-"); Files.WriteString(R, obj.name);
++        OutType(R, obj.type);
++        obj0 := topScope.next;
++        WHILE obj0 # obj DO
++          IF (obj0.type.form = Pointer) & (obj0.type.base = obj.type) & (obj0.type.ref > 0) THEN Write(R, obj0.type.ref) END;
++          obj0 := obj0.next
++        END;
++        Write(R, 0)
+       END ;
+       obj := obj.next
+     END ;
