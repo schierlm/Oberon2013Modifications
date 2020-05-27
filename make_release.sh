@@ -51,6 +51,13 @@ cp DefragmentFreeSpace/DefragFiles.Mod.txt DefragmentFreeSpace/Defragger.Mod.txt
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt work
 cp UTF8CharsetLite/*.txt work
 
-rm work/*.orig
+mkdir work/debug
+cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
+sed -i 's/maxCode = 8500; /maxCode = 8700; /' work/debug/ORG.Mod.txt
+patch -d work/debug <ORInspect/MoreSymbols.patch
+patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
+cp ORStackInspect/*.txt work/debug
+
+rm work/*.orig work/debug/*.orig
 
 echo Done.

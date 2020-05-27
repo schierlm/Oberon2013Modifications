@@ -32,7 +32,7 @@
    END Option;
 --- 1/ORB.Mod.txt
 +++ 2/ORB.Mod.txt
-@@ -239,6 +239,231 @@
+@@ -247,6 +247,240 @@
      END
    END Import;
    
@@ -88,7 +88,7 @@
 +      Files.WriteString(R, buffer);
 +      Files.WriteInt(R, Proc);
 +      size := 4
-+    ELSIF (T.form = Array) & (T.base.form = Byte) THEN
++    ELSIF (T.form = Array) & (T.base.form = Int) & (T.base.ref = Byte) THEN
 +      ASSERT(T.len > 0);
 +      Files.WriteString(R, buffer);
 +      Files.WriteInt(R, Array);
@@ -127,6 +127,7 @@
 +      obj := T.dsc;
 +      bp := bufpos;
 +      BufAdd(buffer, ".", bp);
++      WHILE (T.mno # 0) & (obj # NIL) & (obj.type.form = NilTyp) DO obj := obj.next END;
 +      WHILE obj # NIL DO
 +        ASSERT(obj.class = Fld);
 +        IF (obj.type.size >= 4) & (size MOD 4 # 0) THEN
@@ -151,6 +152,14 @@
 +        WriteISyVar(buffer, bp, obj.type, R);
 +        INC(size, obj.type.size);
 +        obj := obj.next
++      END;
++      IF ((T.mno # 0) OR (T.base # NIL)) & (T.size > size) THEN
++        bp := bufpos + 1;
++        BufAdd(buffer, "??", bp);
++        Files.WriteString(R, buffer);
++        Files.WriteInt(R, Array);
++        Files.WriteInt(R, T.size - size);
++        size := T.size;
 +      END;
 +      T.dsc := ReverseList(T.dsc);
 +      IF (size MOD 4 # 0) THEN

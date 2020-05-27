@@ -9,10 +9,10 @@ or you can get raw memory dumps. This is far from what you can expect from other
 As a very minimal way of symbolic variable inspection, this modification adds an extra
 .isy (inspect symbol) file type (written by the compiler) and two commands:
 
-`Inspect.Module` will print all global variables of a module. `Inspect.HeapAddress`
+`ORInspect.Module` will print all global variables of a module. `ORInspect.HeapAddress`
 prints all fields of the (actual) record pointing to a given address (determined from
 the type descriptor) Arrays are flattened, and pointers are printed as
-`Inspect.HeapAddress` command, so you can dig deeper if desired.
+`ORInspect.HeapAddress` command, so you can dig deeper if desired.
 
 Due to the flattened arrays, `.isy` files can grow quite large, so you will only want
 to generate them if you want to use them. Therefore, a new compiler switch `/d` was added
@@ -26,8 +26,12 @@ file and therefore cannot be added to the inspect symbol file. If this bothers y
 secondary patch is available which will change the symbol file format to include such fields;
 in the same format as exported fields, but prefixing the name with `-`. Pointer types
 will get erased, as the pointed type may not be exported, and they are not needed since
-`Inspect.HeapAddress` will look up the actual type from the type descriptor anyway.
+`ORInspect.HeapAddress` will look up the actual type from the type descriptor anyway.
 
+When following heap address references, it can happen that the objects get garbage collected
+before you have a chance to inspect them. To minimize this risk, ORInspect can keep references
+to the last up to 256 objects that it printed references to. To use this, call
+`ORInspect.KeepHeapAlive` and pass the number of objects you want to keep alive as a parameter.
 
 Installation
 ------------

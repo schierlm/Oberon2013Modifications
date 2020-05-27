@@ -48,6 +48,12 @@ jobs:
         name: DiskImages
         path: work/OberonModifications.dsk
 
+    - name: Upload DiskImages artifact (Debug)
+      uses: actions/upload-artifact@v2
+      with:
+        name: DiskImages
+        path: work/OberonModificationsDebug.dsk
+
     - name: Update release metadata and remove old assets
       if: github.ref == 'refs/heads/master' && github.repository == 'schierlm/Oberon2013Modifications'
       uses: actions/github-script@v1
@@ -102,4 +108,15 @@ jobs:
         upload_url: https://uploads.github.com/repos/schierlm/Oberon2013Modifications/releases/26870489/assets{?name,label}
         asset_path: work/OberonModifications.dsk
         asset_name: OberonModifications.dsk
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset OberonModificationsDebug.dsk
+      if: github.ref == 'refs/heads/master' && github.repository == 'schierlm/Oberon2013Modifications'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: https://uploads.github.com/repos/schierlm/Oberon2013Modifications/releases/26870489/assets{?name,label}
+        asset_path: work/OberonModificationsDebug.dsk
+        asset_name: OberonModificationsDebug.dsk
         asset_content_type: application/octet-stream

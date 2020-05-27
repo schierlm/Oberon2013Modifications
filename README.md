@@ -20,10 +20,13 @@ which is (for convenience; it is impossible to use that repo as a submodule as i
 ### Available modifications
 
 Modifications marked with a † are not included in the prebuilt release. Either they collide with other modifications, they need
-larger changes to the system which cannot be done by recompiling a few files and writing a new inner core,or they are not
+larger changes to the system which cannot be done by recompiling a few files and writing a new inner core, or they are not
 designed to be used on a day-by-day basis.
 
 The CommandLineCompiler is available as a separate release.
+
+Modifications marked with a ‡ are only included in the prebuilt "debug release". These modifications aid in debugging, but have
+a high performance or binary size overhead, and are therefore undesirable in normal builds.
 
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
@@ -51,6 +54,7 @@ The CommandLineCompiler is available as a separate release.
 | **[UTF8CharsetLite](UTF8CharsetLite/README.md)** | UTF-8 support, limited to special Unicode text viewers | Recompile `Fonts.Mod` |
 | **[RemoveFilesizeLimit](RemoveFilesizeLimit/README.md)**| Remove the 3MB file size limit | Recompile inner core |
 | **[ORInspect](ORInspect/README.md)** | Inspect global module variables and heap pointers | Recompile compiler and all modules you want to inspect |
+| **[ORStackInspect](ORStackInspect/README.md)**‡ | Inspect stack variables when printing a backtrace | Apply DoubleTrap, TrapBacktrace, ZeroLocalVariables and ORInspect; recompile everything including inner core |
 | **[StackOverflowProtector](StackOverflowProtector/README.md)** | Trigger TRAP 9 at stack overflows | Recompile inner core |
 | **[CommandExitCodes](CommandExitCodes/README.md)** | Let commands return an exit code so that scripts can react to it | Recompile outer core |
 | **[CommandLineCompiler](CommandLineCompiler/README.md)**† | Run the Oberon compiler in a command line emulator | Patch emulator |

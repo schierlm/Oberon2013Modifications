@@ -39,3 +39,6 @@ ORP.Compile ORInspect.Mod/s ~
 
 ORP.Compile FontsU.Mod/s TextsU.Mod/s ~
 ORP.Compile TextFramesU.Mod/s EditU.Mod/s ~
+
+DEBUG VERSION ONLY:
+ORP.Compile ORStackInspect.Mod/s ~

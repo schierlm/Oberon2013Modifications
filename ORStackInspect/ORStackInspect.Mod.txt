@@ -1,0 +1,198 @@
+MODULE ORStackInspect;
+  IMPORT SYSTEM, Kernel, Files, Modules, Texts, Oberon, System, ORInspect;
+
+  TYPE SymbolFile* = POINTER TO SymbolFileDesc;
+    SymbolFileDesc* = RECORD
+      next*: SymbolFile;
+      F*: Files.File;
+      name*: Modules.ModuleName;
+    END;
+
+  VAR W: Texts.Writer;
+    SymRoot: SymbolFile;
+
+  PROCEDURE InspectStackFrame(sp: INTEGER; ssy: SymbolFile; idx: INTEGER; Get: ORInspect.GetDataCallback; commandPrefix: ARRAY OF CHAR);
+    VAR cnt, offs: INTEGER;
+      R: Files.Rider;
+  BEGIN
+    Files.Set(R, ssy.F, 0);
+    Files.ReadInt(R, cnt);
+    IF (idx < 0) OR (idx >= cnt) THEN
+      Texts.WriteLn(W);
+      Texts.WriteString(W, "        | | Stack frame info not in symbol file");
+    ELSE
+      Files.Set(R, ssy.F, idx * 4 + 4);
+      Files.ReadInt(R, offs);
+      Files.Set(R, ssy.F, offs);
+      Texts.Append(Oberon.Log, W.buf);
+      ORInspect.InspectLoop(R, sp, -1, "        | | ", Get, commandPrefix)
+    END
+  END InspectStackFrame;
+
+  PROCEDURE InspectBacktrace*(sp: INTEGER; root: Modules.Module; symroot: SymbolFile; Get: ORInspect.GetDataCallback; commandPrefix: ARRAY OF CHAR);
+  VAR adr, v, cnt, len: INTEGER;
+    mod: Modules.Module;
+    prevName: Modules.ModuleName;
+    prevSSY: SymbolFile;
+  BEGIN
+    prevName := ""; prevSSY := NIL; cnt := 0; len := 1;
+    WHILE (sp < Kernel.stackOrg - 4) & (cnt < 64) & (len > 0) DO
+      Get(sp, 4, len);
+      v := len DIV 10000H;
+      len := len MOD 10000H;
+      Texts.WriteString(W, "        Stack Frame Length: ");
+      Texts.WriteInt(W, len, 5);
+      Texts.WriteLn(W);
+      IF v = 0FFFFH THEN
+        Texts.WriteString(W, "        | Module Initializer");
+      ELSIF v = 0FFFEH THEN
+        Texts.WriteString(W, "        | Saved Registers");
+      ELSE
+        Texts.WriteString(W, "        | ");
+        IF v MOD 2 = 0 THEN Texts.WriteString(W, "Interrupt ") END;
+        Texts.WriteString(W, "Procedure Variables");
+        IF prevSSY # NIL THEN
+          Texts.WriteString(W, ":");
+          InspectStackFrame(sp+4, prevSSY, v DIV 2, Get, commandPrefix)
+        ELSIF prevName # "" THEN
+          Texts.WriteString(W, " (");
+          Texts.WriteString(W, prevName);
+          Texts.WriteString(W, ".ssy not loaded)");
+        END
+      END;
+      Texts.WriteLn(W);
+      IF v MOD 2 = 1 THEN
+        Get(sp+4, 4, adr);
+        DEC(adr, 4);
+        IF (adr MOD 4 = 0) & (adr >= 100H) & (adr < Modules.AllocPtr) THEN
+          Get(adr, 4, v);
+          IF (v DIV 10000000H MOD 10H = 0DH) OR (v DIV 10000000H MOD 10H = 0FH) THEN (* BL or BLR instruction *)
+            IF (v DIV 10000000H MOD 10H = 0FH) THEN (* BL instruction *)
+              Get(adr-4, 4, v); (* Check for dummy Trap/BLR *)
+              IF v DIV 1000000H MOD 100H # 0DFH THEN v := 0 END
+            END;
+            mod := root;
+            WHILE (mod # NIL) & ((adr < mod.code) OR (adr >= mod.imp)) DO mod := mod.next END;
+            Texts.WriteString(W, "    at ");
+            IF v = 0 THEN
+              Texts.WriteString(W, "[unknown]")
+            ELSE
+              Texts.WriteInt(W, v DIV 100H MOD 10000H, 5)
+            END;
+            Texts.Write(W, "@");
+            IF mod = NIL THEN
+              Texts.WriteString(W, "[unknown module]");
+              prevName := "";
+              prevSSY := NIL;
+            ELSE
+              Texts.WriteString(W, mod.name);
+              Texts.Write(W, "+");
+              Texts.WriteHex(W, adr - mod.code);
+              IF prevName # mod.name THEN
+                prevName := mod.name;
+                prevSSY := symroot;
+                WHILE (prevSSY # NIL) & (prevSSY.name # mod.name) DO prevSSY := prevSSY.next END
+              END
+            END;
+            Texts.WriteString(W, " (");
+            Texts.WriteHex(W, adr);
+            Texts.Write(W, ")");
+          ELSE
+            Texts.WriteString(W, "    (no jump at return address)");
+          END
+        ELSE
+          Texts.WriteString(W, "    (invalid return address)");
+        END;
+        Texts.WriteLn(W); INC(cnt);
+      END;
+      INC(sp, len);
+    END;
+    Get(sp, 4, len);
+    IF cnt = 64 THEN
+      Texts.WriteString(W, "    (more frames - stack overflow?)")
+    ELSIF (sp # Kernel.stackOrg - 4) OR (len # 0BA5E0000H) THEN
+      Texts.WriteString(W, "    (stack corrupted)");
+      Texts.WriteLn(W)
+    END;
+    Texts.Append(Oberon.Log, W.buf)
+  END InspectBacktrace;
+
+  PROCEDURE InitSymbolFile*(sf, next: SymbolFile; F: Files.File; name: Modules.ModuleName);
+  BEGIN sf.next := next; sf.F := F; sf.name := name
+  END InitSymbolFile;
+
+  PROCEDURE LoadModule(M: Modules.Module);
+  VAR i: INTEGER;
+    F: Files.File;
+    sf: SymbolFile;
+    name: Modules.ModuleName;
+  BEGIN i := 0;
+    WHILE M.name[i] # 0X DO name[i] := M.name[i]; INC(i) END;
+    name[i] := "."; name[i+1] := "s"; name[i+2] := "s"; name[i+3] := "y"; name[i+4] := 0X;
+    F := Files.Old(name);
+    Texts.WriteString(W, name);
+    IF F = NIL THEN
+      Texts.WriteString(W, " not found");
+    ELSE
+      NEW(sf);
+      InitSymbolFile(sf, SymRoot, F, M.name);
+      sf.name := M.name;
+      SymRoot := sf;
+      Texts.WriteString(W, " loaded");
+    END;
+    Texts.WriteLn(W)
+  END LoadModule;
+
+  PROCEDURE Backtrace*;
+  BEGIN InspectBacktrace(SYSTEM.REG(14), Modules.root, SymRoot, ORInspect.GetData, "ORInspect.");
+  END Backtrace;
+
+  PROCEDURE Load*;
+    VAR beg, end, time: INTEGER;
+      T: Texts.Text;
+      S: Texts.Scanner;
+      M: Modules.Module;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF (S.class = Texts.Char) & (S.c = "^") THEN
+      Oberon.GetSelection(T, beg, end, time);
+      IF time >= 0 THEN
+        Texts.OpenScanner(S, T, beg); Texts.Scan(S);
+      END
+    END;
+    IF S.class = Texts.Name THEN
+      M := Modules.root;
+      WHILE (M # NIL) & (M.name # S.s) DO M := M.next END;
+      IF M = NIL THEN
+        Texts.WriteString(W, "Module not loaded");
+      ELSE
+        LoadModule(M)
+      END;
+      Texts.Append(Oberon.Log, W.buf)
+    END
+  END Load;
+
+  PROCEDURE LoadAll*;
+  VAR
+    M: Modules.Module;
+    sf: SymbolFile;
+  BEGIN M := Modules.root;
+    WHILE M # NIL DO
+      sf := SymRoot;
+      WHILE (sf # NIL) & (sf.name # M.name) DO sf := sf.next END;
+      IF sf = NIL THEN LoadModule(M) END;
+      M := M.next
+    END;
+    Texts.WriteString(W, "Done."); Texts.WriteLn(W);
+    Texts.Append(Oberon.Log, W.buf)
+  END LoadAll;
+
+  PROCEDURE OnTrap*;
+  BEGIN System.SetBacktraceCommand(Backtrace, TRUE, FALSE);
+  END OnTrap;
+
+  PROCEDURE OnAbort*;
+  BEGIN System.SetBacktraceCommand(Backtrace, FALSE, TRUE);
+  END OnAbort;
+
+BEGIN Texts.OpenWriter(W); SymRoot := NIL
+END ORStackInspect.

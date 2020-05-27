@@ -1,0 +1,7 @@
+ORStackInspect.Backtrace
+
+ORStackInspect.Load Oberon
+ORStackInspect.LoadAll
+
+ORStackInspect.OnTrap
+ORStackInspect.OnAbort

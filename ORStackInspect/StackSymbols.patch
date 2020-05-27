@@ -1,0 +1,349 @@
+--- 1/ORB.Mod.txt
++++ 2/ORB.Mod.txt
+@@ -16,6 +16,7 @@
+       Byte* = 1; Bool* = 2; Char* = 3; Int* = 4; Real* = 5; Set* = 6;
+       Pointer* = 7; NilTyp* = 8; NoTyp* = 9; Proc* = 10;
+       String* = 11; Array* = 12; Record* = 13;
++      VarParam = 20; OpenArrayParam = 21;
+       
+   TYPE Object* = POINTER TO ObjDesc;
+     Module* = POINTER TO ModDesc;
+@@ -67,6 +68,9 @@
+     intType*, realType*, setType*, nilType*, noType*, strType*: Type;
+     nofmod, Ref: INTEGER;
+     typtab: ARRAY maxTypTab OF Type;
++    ssymCount: INTEGER;
++    ssymInt: ARRAY 200 OF BOOLEAN;
++    ssymScopes: ARRAY 200 OF Object;
+ 
+   PROCEDURE NewObj*(VAR obj: Object; id: ORS.Ident; class: INTEGER);  (*insert new Object with name id*)
+     VAR new, x: Object;
+@@ -389,7 +393,7 @@
+   END WriteISyVar;
+ 
+   PROCEDURE WriteInspectSymbolFile*(VAR modid: ORS.Ident);
+-    VAR pos, bufpos, ptrpos, size: INTEGER;
++    VAR pos, bufpos, ptrpos, size, i: INTEGER;
+       F: Files.File;
+       filename: ORS.Ident;
+       R: Files.Rider;
+@@ -479,8 +483,89 @@
+     Files.WriteByte(R, 0);
+     Files.WriteInt(R, -2);
+     Files.Register(F);
++
++    MakeFileName(filename, modid, ".ssy"); F := Files.New(filename); Files.Set(R, F, 0);
++    Files.WriteInt(R, ssymCount); ptrpos := 4;
++    FOR i := 0 TO ssymCount - 1 DO Files.WriteInt(R, 0) (* placeholder *) END;
++    FOR i := 0 TO ssymCount - 1 DO
++      size := Files.Pos(R);
++      Files.Set(R, F, ptrpos);
++      Files.WriteInt(R, size);
++      Files.Set(R, F, size);
++      INC(ptrpos, 4);
++      IF ssymInt[i] THEN
++        Files.WriteString(R, "Regs[R1]");
++        Files.WriteInt(R, Int);
++        Files.WriteString(R, "Regs[R2]");
++        Files.WriteInt(R, Int);
++        Files.WriteString(R, "Regs[R3]");
++        Files.WriteInt(R, Int);
++        pos := 12
++      ELSE
++        Files.WriteString(R, "ReturnAddress");
++        Files.WriteInt(R, Proc);
++        pos := 4
++      END;
++      obj := ssymScopes[i].next;
++      WHILE obj # NIL DO
++         IF obj.class = Var THEN
++          IF (obj.val > pos) & (obj.val = (pos + 3) DIV 4 * 4) THEN
++            Files.WriteString(R, "[padding]");
++            Files.WriteInt(R, Array);
++            Files.WriteInt(R, (4 - pos MOD 4) MOD 4);
++            pos := (pos + 3) DIV 4 * 4
++          END;
++          IF (obj.val # pos) THEN ORS.Mark("invalid SSy variable offset") END;
++          bufpos := 0;
++          BufAdd(buffer, obj.name, bufpos);
++          WriteISyVar(buffer, bufpos, obj.type, R);
++          INC(pos, obj.type.size);
++        ELSIF obj.class = Par THEN
++          IF (obj.val > pos) & (obj.val = (pos + 3) DIV 4 * 4) THEN
++            Files.WriteString(R, "[padding]");
++            Files.WriteInt(R, Array);
++            Files.WriteInt(R, (4 - pos MOD 4) MOD 4);
++            pos := (pos + 3) DIV 4 * 4
++          END;
++          IF (obj.val # pos) THEN ORS.Mark("invalid SSy parameter offset") END;
++          bufpos := 0;
++          BufAdd(buffer, obj.name, bufpos);
++          Files.WriteString(R, buffer);
++          IF (obj.type.form = Array) & (obj.type.len < 0) THEN
++            Files.WriteInt(R, OpenArrayParam);
++            BufAdd(buffer, "[####]", bufpos);
++            WriteISyVar(buffer, bufpos, obj.type.base, R);
++            Files.WriteByte(R, 0);
++            INC(pos, 8)
++          ELSIF obj.type.form = Record THEN
++            Files.WriteInt(R, Record);
++            BufAdd(buffer, "^", bufpos);
++            WriteISyVar(buffer, bufpos, obj.type, R);
++            Files.WriteByte(R, 0);
++            INC(pos, 8)
++          ELSE
++            Files.WriteInt(R, VarParam);
++            BufAdd(buffer, "^", bufpos);
++            WriteISyVar(buffer, bufpos, obj.type, R);
++            Files.WriteByte(R, 0);
++            INC(pos, 4);
++          END
++        ELSIF (obj.class # Const) & (obj.class # Typ) THEN
++          ORS.Mark("Unsupported SSy class")
++        END;
++        obj := obj.next
++      END;
++      Files.WriteByte(R, 0)
++    END;
++    Files.Register(F);
+   END WriteInspectSymbolFile;
+ 
++  PROCEDURE SSYMForScope*(int: BOOLEAN): INTEGER;
++  BEGIN
++    ssymInt[ssymCount] := int; ssymScopes[ssymCount] := topScope; INC(ssymCount)
++  RETURN ssymCount - 1
++  END SSYMForScope;
++
+   (*-------------------------------- Export ---------------------------------*)
+ 
+   PROCEDURE Write(VAR R: Files.Rider; x: INTEGER);
+@@ -595,7 +680,7 @@
+   END Export;
+ 
+   PROCEDURE Init*;
+-  BEGIN topScope := universe; nofmod := 1
++  BEGIN topScope := universe; nofmod := 1; ssymCount := 0;
+   END Init;
+   
+   PROCEDURE type(ref, form: INTEGER; size: LONGINT): Type;
+--- 1/ORG.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -90,7 +90,7 @@
+   BEGIN
+     IF RH # 0 THEN ORS.Mark("Reg Stack"); RH := 0 END ;
+     IF pc >= maxCode - 40 THEN ORS.Mark("program too long") END ;
+-    IF frame # 0 THEN ORS.Mark("frame error"); frame := 0 END
++    IF frame # 4 THEN ORS.Mark("frame error"); frame := 4 END
+   END CheckRegs;
+ 
+   PROCEDURE SetCC(VAR x: Item; n: LONGINT);
+@@ -633,7 +633,7 @@
+           IF x.type.size = y.type.size THEN Put1a(Mov, RH, 0, (y.type.size+3) DIV 4)
+           ELSE ORS.Mark("different length/size, not implemented")
+           END
+-        ELSE (*y  open array*) Put2(Ldr, RH, SP, y.a+4); s := y.type.base.size;  (*element size*)
++        ELSE (*y  open array*) Put2(Ldr, RH, SP, y.a+8); s := y.type.base.size;  (*element size*)
+           pc0 := pc; Put3(BC, EQ, 0);
+           IF s = 1 THEN Put1(Add, RH, RH, 3); Put1(Asr, RH, RH, 2)
+           ELSIF s # 4 THEN Put1a(Mul, RH, RH, s DIV 4)
+@@ -658,7 +658,7 @@
+    BEGIN loadAdr(x); len := x.type.len;
+     IF len >= 0 THEN
+       IF len <  y.b THEN ORS.Mark("string too long") END
+-    ELSIF check THEN Put2(Ldr, RH, SP, x.a+4);  (*open array len, frame = 0*)
++    ELSIF check THEN Put2(Ldr, RH, SP, x.a+8);  (*open array len, frame = 0*)
+       Put1(Cmp,RH, RH, y.b); Trap(LT, 3)
+     END ;
+     loadStringAdr(y);
+@@ -750,15 +750,18 @@
+   PROCEDURE SaveRegs(r: LONGINT);  (* R[0 .. r-1]*)
+     VAR r0: LONGINT;
+   BEGIN (*r > 0*) r0 := 0;
+-    Put1(Sub, SP, SP, r*4); INC(frame, 4*r);
+-    REPEAT Put2(Str, r0, SP, (r-r0-1)*4); INC(r0) UNTIL r0 = r
++    Put1(Sub, SP, SP, r*4+4); INC(frame, 4*r+4);
++    Put1(Mov+U, 13, 0, 0FFFEH);
++    Put1(Ior, 13, 13, r*4+4);
++    Put2(Str, 13, SP, 0);
++    REPEAT Put2(Str, r0, SP, (r-r0)*4); INC(r0) UNTIL r0 = r
+   END SaveRegs;
+ 
+   PROCEDURE RestoreRegs(r: LONGINT); (*R[0 .. r-1]*)
+     VAR r0: LONGINT;
+   BEGIN (*r > 0*) r0 := r;
+-    REPEAT DEC(r0); Put2(Ldr, r0, SP, (r-r0-1)*4) UNTIL r0 = 0;
+-    Put1(Add, SP, SP, r*4); DEC(frame, 4*r)
++    REPEAT DEC(r0); Put2(Ldr, r0, SP, (r-r0)*4) UNTIL r0 = 0;
++    Put1(Add, SP, SP, r*4+4); DEC(frame, 4*r+4)
+   END RestoreRegs;
+ 
+   PROCEDURE PrepCall*(VAR x: Item; VAR r: LONGINT);
+@@ -781,7 +784,8 @@
+       END
+     ELSE
+       IF x.mode <= ORB.Par THEN load(x); DEC(RH)
+-      ELSE Put2(Ldr, RH, SP, 0); Put1(Add, SP, SP, 4); DEC(r); DEC(frame, 4)
++      ELSIF r = 1 THEN Put2(Ldr, RH, SP, 4); Put1(Add, SP, SP, 8); r := 0; DEC(frame, 8)
++      ELSE Put2(Ldr, RH, SP, 4); Put2(Ldr, 13, SP, 0); Put1(Sub, 13, 13, 4); Put2(Str, 13, SP, 4); Put1(Add, SP, SP, 4); DEC(r); DEC(frame, 4)
+       END ;
+       IF check THEN Trap(EQ, 5) END ;
+       Put3(BLR, 7, ORS.Pos()*100H + RH)
+@@ -793,17 +797,20 @@
+     END
+   END Call;
+ 
+-  PROCEDURE Enter*(parblksize, locblksize: LONGINT; int: BOOLEAN);
++  PROCEDURE Enter*(parblksize, locblksize: LONGINT; int: BOOLEAN; ssym: INTEGER);
+     VAR a, r: LONGINT;
+-  BEGIN frame := 0;
++  BEGIN frame := 4;
+     IF ~int THEN (*procedure prolog*)
+-      IF locblksize >= 10000H THEN ORS.Mark("too many locals") END ;
++      IF locblksize+4 >= 10000H THEN ORS.Mark("too many locals") END ;
+       a := 4; r := 0;
+-      Put1(Sub, SP, SP, locblksize); Put2(Str, LNK, SP, 0);
+-      WHILE a < parblksize DO Put2(Str, r, SP, a); INC(r); INC(a, 4) END
++      Put1(Sub, SP, SP, locblksize+4); Put2(Str, LNK, SP, 4);
++      Put1(Mov+U, 13, 0, ssym*2+1);
++      Put1(Ior, 13, 13, locblksize+4);
++      Put2(Str, 13, SP, 0);
++      WHILE a < parblksize DO Put2(Str, r, SP, a+4); INC(r); INC(a, 4) END
+       ;IF (a + 16 <= locblksize) & (r + 2 < MT) THEN
+         Put1(Mov, r, 0, 0);
+-        Put1(Add, r+1, SP, a);
++        Put1(Add, r+1, SP, a+4);
+         Put1(Mov, r+2, 0, (locblksize-a) DIV 4);
+         Put2(Str, r, r+1, 0);
+         Put1(Add, r+1, r+1, 4);
+@@ -811,10 +818,13 @@
+         Put3(BC, NE, -4)
+       ELSIF a < locblksize THEN
+         Put1(Mov, r, r, 0);
+-        WHILE a < locblksize DO Put2(Str, r, SP, a); INC(a, 4) END
++        WHILE a < locblksize DO Put2(Str, r, SP, a+4); INC(a, 4) END
+       END
+     ELSE (*interrupt procedure*)
+-      Put1(Sub, SP, SP, locblksize); Put2(Str, 0, SP, 0); Put2(Str, 1, SP, 4); Put2(Str, 2, SP, 8)
++      Put1(Sub, SP, SP, locblksize+4); Put2(Str, 0, SP, 4); Put2(Str, 1, SP, 8); Put2(Str, 2, SP, 12);
++      Put1(Mov+U, 13, 0, ssym*2);
++      Put1(Ior, 13, 13, locblksize+4);
++      Put2(Str, 13, SP, 0)
+       (*R0, R1, R2 saved on stack*)
+     END
+   END Enter;
+@@ -823,9 +833,9 @@
+   BEGIN
+     IF form # ORB.NoTyp THEN load(x) END ;
+     IF ~int THEN (*procedure epilog*)
+-      Put2(Ldr, LNK, SP, 0); Put1(Add, SP, SP, size); Put3(BR, 7, LNK)
++      Put2(Ldr, LNK, SP, 4); Put1(Add, SP, SP, size+4); Put3(BR, 7, LNK)
+     ELSE (*interrupt return, restore R2, R1, R0*)
+-      Put2(Ldr, 2, SP, 8); Put2(Ldr, 1, SP, 4); Put2(Ldr, 0, SP, 0); Put1(Add, SP, SP, size);
++      Put2(Ldr, 2, SP, 12); Put2(Ldr, 1, SP, 8); Put2(Ldr, 0, SP, 4); Put1(Add, SP, SP, size+4);
+       Put3(BR, 7, 10H) (*RTI*)
+     END ;
+     RH := 0
+@@ -840,9 +850,9 @@
+     IF x.type = ORB.byteType THEN v := 1 ELSE v := 0 END ;
+     IF y.type.form = ORB.NoTyp THEN y.mode := ORB.Const; y.a := 1 END ;
+     IF (x.mode = ORB.Var) & (x.r > 0) THEN
+-      zr := RH; Put2(Ldr+v, zr, SP, x.a); incR;
++      zr := RH; Put2(Ldr+v, zr, SP, x.a+4); incR;
+       IF y.mode = ORB.Const THEN Put1a(op, zr, zr, y.a) ELSE load(y); Put0(op, zr, zr, y.r); DEC(RH) END ;
+-      Put2(Str+v, zr, SP, x.a); DEC(RH)
++      Put2(Str+v, zr, SP, x.a+4); DEC(RH)
+     ELSE loadAdr(x); zr := RH; Put2(Ldr+v, RH, x.r, 0); incR;
+       IF y.mode = ORB.Const THEN Put1a(op, zr, zr, y.a) ELSE load(y); Put0(op, zr, zr, y.r); DEC(RH) END ;
+       Put2(Str+v, zr, x.r, 0); DEC(RH, 2)
+@@ -1026,7 +1036,11 @@
+   PROCEDURE Header*;
+   BEGIN entry := pc*4;
+     IF version = 0 THEN code[0] := 0E7000000H-1 + pc; Put0(Mov, 11, 0, SP); Put1a(Mov, SP, 0, StkOrg0)  (*RISC-0*)
+-    ELSE Put1(Sub, SP, SP, 4); Put2(Str, LNK, SP, 0)
++    ELSE
++      Put1(Sub, SP, SP, 8); Put2(Str, LNK, SP, 4);
++      Put1(Mov+U, 13, 0, 0FFFFH);
++      Put1(Ior, 13, 13, 8);
++      Put2(Str, 13, SP, 0)
+     END
+   END Header;
+ 
+@@ -1063,7 +1077,7 @@
+       F: Files.File; R: Files.Rider;
+   BEGIN  (*exit code*)
+     IF version = 0 THEN Put1(Mov, 0, 0, 0); Put3(BR, 7, 0)  (*RISC-0*)
+-    ELSE Put2(Ldr, LNK, SP, 0); Put1(Add, SP, SP, 4); Put3(BR, 7, LNK)
++    ELSE Put2(Ldr, LNK, SP, 4); Put1(Add, SP, SP, 8); Put3(BR, 7, LNK)
+     END ;
+     obj := ORB.topScope.next; nofimps := 0; comsize := 4; nofptrs := 0;
+     WHILE obj # NIL DO
+--- 1/ORP.Mod.txt
++++ 2/ORP.Mod.txt
+@@ -872,7 +872,7 @@
+         REPEAT ProcedureDecl; Check(ORS.semicolon, "no ;") UNTIL sym # ORS.procedure;
+         ORG.FixOne(L); proc.val := ORG.Here() * 4; proc.type.dsc := ORB.topScope.next
+       END ;
+-      ORG.Enter(parblksize, locblksize, int);
++      ORG.Enter(parblksize, locblksize, int, ORB.SSYMForScope(int));
+       IF sym = ORS.begin THEN ORS.Get(sym); StatSequence END ;
+       IF sym = ORS.return THEN
+         ORS.Get(sym); expression(x);
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -412,7 +412,8 @@
+   PROCEDURE Reset*;
+   BEGIN
+     IF CurTask.state = active THEN Remove(CurTask) END ;
+-    SYSTEM.LDREG(14, Kernel.stackOrg); (*reset stack pointer*) Loop
++    SYSTEM.PUT(Kernel.stackOrg - 4, 0BA5E0000H);
++    SYSTEM.LDREG(14, Kernel.stackOrg - 4); (*reset stack pointer*) Loop
+   END Reset;
+ 
+ BEGIN User[0] := 0X;
+@@ -435,5 +435,5 @@
+   CurFnt := Fonts.Default; CurCol := Display.white; CurOff := 0;
+ 
+   ActCnt := 0; CurTask := NewTask(GC, 1000); Install(CurTask);
+-  Modules.Load("System", Mod); Mod := NIL; Loop
++  Modules.Load("System", Mod); Mod := NIL; Reset
+ END Oberon.
+\ No newline at end of file
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -7,6 +7,7 @@
+     LogMenu = "Edit.Locate Edit.Search System.Copy System.Grow System.Clear";
+ 
+   VAR W: Texts.Writer;
++    TrapBacktrace, AbortBacktrace: Modules.Command;
+     pat: ARRAY 32 OF CHAR;
+     inTrap: BOOLEAN;
+ 
+@@ -442,7 +443,7 @@
+       WHILE (mod # NIL) & ((u < mod.code) OR (u >= mod.imp)) DO mod := mod.next END ;
+       IF mod # NIL THEN Texts.WriteString(W, " in "); Texts.WriteString(W, mod.name) END ;
+       Texts.WriteString(W, " at"); Texts.WriteHex(W, u);
+-      Texts.WriteLn(W); Backtrace(); Texts.Append(Oberon.Log, W.buf)
++      Texts.WriteLn(W); TrapBacktrace(); Texts.Append(Oberon.Log, W.buf)
+       ELSE Oberon.LogDoubleTrap() END; Oberon.Collect(0); inTrap := FALSE; Oberon.Reset
+     END
+   END Trap;
+@@ -452,11 +453,18 @@
+   BEGIN n := SYSTEM.REG(15); Oberon.Unsacrifice();
+     IF ~inTrap THEN inTrap := TRUE;
+     Texts.WriteString(W, "  ABORT  "); Texts.WriteHex(W, n);
+-    Texts.WriteLn(W); Backtrace(); Texts.Append(Oberon.Log, W.buf)
++    Texts.WriteLn(W); AbortBacktrace(); Texts.Append(Oberon.Log, W.buf)
+     ELSE Oberon.LogDoubleTrap() END; Oberon.Collect(0); inTrap := FALSE; Oberon.Reset
+   END Abort;
+   
++  PROCEDURE SetBacktraceCommand*(command: Modules.Command; onTrap, onAbort: BOOLEAN);
++  BEGIN
++    IF onTrap THEN TrapBacktrace := command END;
++    IF onAbort THEN AbortBacktrace := command END;
++  END SetBacktraceCommand;
++
+ BEGIN Texts.OpenWriter(W);
++  TrapBacktrace := Backtrace; AbortBacktrace := Backtrace;
+   inTrap := FALSE;
+   Oberon.OpenLog(TextFrames.Text("")); OpenViewers;
+   Kernel.Install(SYSTEM.ADR(Trap), 20H); Kernel.Install(SYSTEM.ADR(Abort), 0);
