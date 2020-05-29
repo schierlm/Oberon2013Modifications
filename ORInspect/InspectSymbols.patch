@@ -130,7 +130,7 @@
 +      WHILE (T.mno # 0) & (obj # NIL) & (obj.type.form = NilTyp) DO obj := obj.next END;
 +      WHILE obj # NIL DO
 +        ASSERT(obj.class = Fld);
-+        IF (obj.type.size >= 4) & (size MOD 4 # 0) THEN
++        IF ((obj.type.size >= 4) OR ((T.base # NIL) & (obj.val = (size + 3) DIV 4 * 4))) & (size MOD 4 # 0) THEN
 +          bp := bufpos + 1;
 +          BufAdd(buffer, "[padding]", bp);
 +          Files.WriteString(R, buffer);
@@ -212,7 +212,7 @@
 +        size := 0;
 +        WHILE fld # NIL DO
 +          ASSERT(fld.class = Fld);
-+          IF (fld.type.size >= 4) & (size MOD 4 # 0) THEN
++          IF ((fld.type.size >= 4) OR ((obj.type.base # NIL) & (fld.val = (size + 3) DIV 4 * 4))) & (size MOD 4 # 0) THEN
 +            Files.WriteString(R, "[padding]");
 +            Files.WriteInt(R, Array);
 +            Files.WriteInt(R, (4 - size MOD 4) MOD 4);
