@@ -1,0 +1,97 @@
+--- 1/OnScreenKeyboard.Mod.txt
++++ 2/OnScreenKeyboard.Mod.txt
+@@ -58,7 +58,8 @@
+       beg, end, time: LONGINT;
+   BEGIN NEW(F);
+     Oberon.AllocateSystemViewer(Oberon.Par.vwr.X, X, Y);
+-    TextFrames.Open(F, Handle, TextFrames.Text(FileName), 0, Display.black, TextFrames.left, TextFrames.right, TextFrames.top, TextFrames.bot, TextFrames.lsp);
++    TextFrames.Open1(F, Handle, TextFrames.Text(FileName), 0, Display.black);
++    TextFrames.Open2(F, TextFrames.left, TextFrames.right, TextFrames.top, TextFrames.bot, TextFrames.lsp);
+     V := MenuViewers.New(TextFrames.NewMenu(FileName, StandardMenu), F, TextFrames.menuH, X, 100);
+   END Show;
+ 
+--- 1/Trappy.Mod.txt
++++ 2/Trappy.Mod.txt
+@@ -83,7 +83,7 @@
+       mod := Modules.root;
+       WHILE (mod # NIL) & ((u < mod.code) OR (u >= mod.imp)) DO mod := mod.next END;
+       DoTrap(w, v DIV 100H MOD 10000H, u, mod);
+-      SYSTEM.LDREG(10, u);
++      SYSTEM.LDREG(9, u);
+       NextTrap();
+     END
+   END Trap;
+@@ -93,20 +93,20 @@
+   BEGIN
+     n := SYSTEM.REG(15);
+     HandleTrap("ABORT", "", "", n);
+-    SYSTEM.LDREG(10, n);
++    SYSTEM.LDREG(9, n);
+     NextAbort();
+   END Abort;
+ 
+ BEGIN
+   SYSTEM.GET(20H, NextAdr);
+   NextAdr := ((NextAdr MOD 1000000H) + 1) * 4 + 20H;
+-  CodeArea[0] := 0F00000AH; (* MOV R15 0 R10 *)
++  CodeArea[0] := 0F000009H; (* MOV R15 0 R9 *)
+   CodeArea[1] := 0E7000000H + ((NextAdr - SYSTEM.ADR(CodeArea[1])) DIV 4 - 1) MOD 1000000H;
+   NextTrap := SYSTEM.VAL(NextPointer, SYSTEM.ADR(CodeArea[0]));
+   Kernel.Install(SYSTEM.ADR(Trap), 20H);
+   SYSTEM.GET(0H, NextAdr);
+   NextAdr := ((NextAdr MOD 1000000H) + 1) * 4;
+-  CodeArea[2] := 0F00000AH; (* MOV R15 0 R10 *)
++  CodeArea[2] := 0F000009H; (* MOV R15 0 R9 *)
+   CodeArea[3] := 0E7000000H + ((NextAdr - SYSTEM.ADR(CodeArea[3])) DIV 4 - 1) MOD 1000000H;
+   NextAbort := SYSTEM.VAL(NextPointer, SYSTEM.ADR(CodeArea[2]));
+   Kernel.Install(SYSTEM.ADR(Abort), 0);
+--- 1/TextFramesU.Mod.txt
++++ 2/TextFramesU.Mod.txt
+@@ -660,19 +660,23 @@
+     IF F.H > 0 THEN Mark(F, TRUE); SetChangeMark(F,  F.text.changed) END
+   END Modify;
+ 
+-  PROCEDURE Open* (F: Frame; H: Display.Handler; T: Texts.Text; org: LONGINT;
+-        col, left, right, top, bot, lsp: INTEGER);
++  PROCEDURE Open1* (F: Frame; H: Display.Handler; T: Texts.Text; org: LONGINT; col: INTEGER);
+     VAR L: Line;
+   BEGIN NEW(L);
+     L.len := 0; L.wid := 0; L.eot := FALSE; L.next := L;
+     F.handle := H; F.text := T; F.org := org; F.trailer := L;
+-    F.left := left; F.right := right; F.top := top; F.bot := bot;
+-    F.lsp := lsp; F.col := col; F.hasMark := FALSE; F.hasCar := FALSE; F.hasSel := FALSE
+-  END Open;
++    F.col := col; F.hasMark := FALSE; F.hasCar := FALSE; F.hasSel := FALSE
++  END Open1;
++
++  PROCEDURE Open2* (F: Frame; left, right, top, bot, lsp: INTEGER);
++  BEGIN
++    F.left := left; F.right := right; F.top := top; F.bot := bot; F.lsp := lsp
++  END Open2;
+ 
+   PROCEDURE Copy* (F: Frame; VAR F1: Frame);
+   BEGIN NEW(F1);
+-    Open(F1, F.handle, F.text, F.org, F.col, F.left, F.right, F.top, F.bot, F.lsp)
++    Open1(F1, F.handle, F.text, F.org, F.col);
++    Open2(F1, F.left, F.right, F.top, F.bot, F.lsp);
+   END Copy;
+ 
+   PROCEDURE CopyOver(F: Frame; text: Texts.Text; beg, end: LONGINT);
+@@ -832,13 +836,15 @@
+   PROCEDURE NewMenu* (name, commands: ARRAY OF CHAR): Frame;
+     VAR F: Frame; T: Texts.Text;
+   BEGIN NEW(F); T := Menu(name, commands);
+-    Open(F, Handle, T, 0, Display.white, left DIV 4, 0, 0, 0, lsp); RETURN F
++    Open1(F, Handle, T, 0, Display.white);
++    Open2(F, left DIV 4, 0, 0, 0, lsp); RETURN F
+   END NewMenu;
+ 
+   PROCEDURE NewText* (text: Texts.Text; pos: LONGINT): Frame;
+     VAR F: Frame;
+   BEGIN NEW(F);
+-    Open(F, Handle, text, pos, Display.black, left, right, top, bot, lsp); RETURN F
++    Open1(F, Handle, text, pos, Display.black);
++    Open2(F, left, right, top, bot, lsp); RETURN F
+   END NewText;
+ 
+ BEGIN NEW(TBuf); NEW(DelBuf);

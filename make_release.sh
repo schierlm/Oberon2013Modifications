@@ -3,7 +3,7 @@ set -e
 
 rm -rf work
 mkdir work
-for i in Kernel FileDir Files Modules Fonts Input Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad; do
+for i in Kernel FileDir Files Modules Fonts Input Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad RS232; do
 	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
@@ -53,10 +53,17 @@ cp UTF8CharsetLite/*.txt work
 
 mkdir work/debug
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
-sed -i 's/maxCode = 8500; /maxCode = 8700; /' work/debug/ORG.Mod.txt
+cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/debug
+mv work/RS232.Mod.txt work/debug
+sed -i 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
-cp ORStackInspect/*.txt work/debug
+patch -d work/debug <KernelDebugger/RS232.patch
+patch -d work/debug <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch
+patch -d work/debug <KernelDebugger/ReserveRegisters.patch
+patch -d work/debug -R <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch
+patch -d work/debug <KernelDebugger/ReserveRegistersExtra.patch
+cp ORStackInspect/*.txt KernelDebugger/*.txt work/debug
 
 rm work/*.orig work/debug/*.orig
 

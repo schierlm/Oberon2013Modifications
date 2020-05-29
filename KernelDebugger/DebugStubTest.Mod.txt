@@ -1,0 +1,94 @@
+MODULE DebugStubTest;
+  IMPORT SYSTEM, DebugStub;
+
+  TYPE
+
+    RestoreFlagsHandler = PROCEDURE (VAR flags, regH: INTEGER);
+
+    TestArea = RECORD
+      epilog: ARRAY 9 OF INTEGER;
+      prolog: ARRAY 4 OF INTEGER;
+      buffer1: DebugStub.FlagBuffer1;
+      buffer2: DebugStub.FlagBuffer2;
+    END;
+
+  VAR
+    ta: TestArea;
+    takenBreakpoint, notTakenBreakpoint: DebugStub.Breakpoint;
+    ledValue: INTEGER;
+
+  PROCEDURE TestRestoreFlags*;
+  VAR rfh: RestoreFlagsHandler; f, ff, hh, i: INTEGER;
+  BEGIN
+    rfh := SYSTEM.VAL(RestoreFlagsHandler, SYSTEM.ADR(ta.prolog[0]));
+    FOR i := 0 TO 11 DO
+      f := i * 10000000H + (SYSTEM.H(1) MOD 10000H);
+      DebugStub.RestoreFlags(f, 99999, SYSTEM.ADR(ta.epilog[0]), ta.buffer1, ta.buffer2);
+      rfh(ff, hh);
+      ASSERT(hh = 99999);
+      ASSERT(f = ff);
+    END
+  END TestRestoreFlags;
+
+  PROCEDURE TakenBreakpointHandler;
+  VAR target: INTEGER; taken: BOOLEAN;
+  BEGIN
+    DebugStub.DisableBreakpoint(takenBreakpoint);
+    IF notTakenBreakpoint.enabled THEN DebugStub.DisableBreakpoint(notTakenBreakpoint) END;
+    ledValue := (ledValue MOD 200) + 1; (* use MOD here to clobber regH *)
+    LED(ledValue);
+    IF DebugStub.IsJump(target, taken) THEN
+      IF target = DebugStub.context.regPC + 4 THEN
+        DebugStub.EnableBreakpoint(takenBreakpoint, target)
+      ELSIF taken THEN
+        DebugStub.EnableBreakpoint(takenBreakpoint, target);
+        DebugStub.EnableBreakpoint(notTakenBreakpoint, DebugStub.context.regPC + 4);
+      ELSE
+        DebugStub.EnableBreakpoint(takenBreakpoint, DebugStub.context.regPC + 4);
+        DebugStub.EnableBreakpoint(notTakenBreakpoint, target)
+      END
+    ELSE
+      DebugStub.EnableBreakpoint(takenBreakpoint, DebugStub.context.regPC + 4)
+    END
+  END TakenBreakpointHandler;
+
+  PROCEDURE NotTakenBreakpointHandler;
+  BEGIN
+    DebugStub.DisableBreakpoint(notTakenBreakpoint);
+    DebugStub.DisableBreakpoint(takenBreakpoint);
+    LED(0FFH);
+  END NotTakenBreakpointHandler;
+
+  PROCEDURE EmptyStub;
+  BEGIN
+  END EmptyStub;
+
+  PROCEDURE TestTracing*;
+  BEGIN
+    IF takenBreakpoint = NIL THEN
+      NEW(takenBreakpoint); NEW (notTakenBreakpoint);
+      DebugStub.InitBreakpoint(takenBreakpoint, TakenBreakpointHandler);
+      DebugStub.InitBreakpoint(notTakenBreakpoint, NotTakenBreakpointHandler);
+    END;
+    DebugStub.EnableBreakpoint(takenBreakpoint, SYSTEM.ADR(EmptyStub));
+    EmptyStub()
+  END TestTracing;
+
+BEGIN
+  ta.prolog[0] := 04EE9000CH; (* SUB  SP,  SP,   12   *)
+  ta.prolog[1] := 0AFE00000H; (* STR  LNK, [SP + 0]   *)
+  ta.prolog[2] := 0A0E00004H; (* STR  R0,  [SP + 4]   *)
+  ta.prolog[3] := 0A1E00008H; (* STR  R1,  [SP + 8]   *)
+
+  ta.epilog[0] := 030000000H; (* MOV  R0,  flags      *)
+  ta.epilog[1] := 081E00004H; (* LDR  R1,  [SP + 4]   *)
+  ta.epilog[2] := 0A0100000H; (* STR  R0,  [R1 + 0]   *)
+  ta.epilog[3] := 020000000H; (* MOV  R0,  H          *)
+  ta.epilog[4] := 081E00008H; (* LDR  R1,  [SP + 8]   *)
+  ta.epilog[5] := 0A0100000H; (* STR  R0,  [R1 + 0]   *)
+  ta.epilog[6] := 08FE00000H; (* LDR  LNK, [SP + 0]   *)
+  ta.epilog[7] := 04EE8000CH; (* ADD  SP,  SP, 12     *)
+  ta.epilog[8] := 0C700000FH; (* B    LNK             *)
+
+  takenBreakpoint := NIL; notTakenBreakpoint := NIL; ledValue := 0;
+END DebugStubTest.

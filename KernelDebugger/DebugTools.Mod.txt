@@ -1,0 +1,218 @@
+MODULE DebugTools;
+  IMPORT Texts, Oberon, DebugClient, ORInspect;
+
+  VAR W: Texts.Writer;
+    mnemo0, mnemo1: ARRAY 16, 4 OF CHAR;  (*mnemonics*)
+
+  PROCEDURE WriteResult(ok: BOOLEAN);
+  BEGIN
+    IF ok THEN Texts.WriteString(W, "Ok") ELSE Texts.WriteString(W, "Invalid state") END;
+    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+  END WriteResult;
+
+  PROCEDURE UpdateModuleList*;
+  BEGIN WriteResult(DebugClient.UpdateModuleList())
+  END UpdateModuleList;
+
+  PROCEDURE Registers*;
+    VAR i: INTEGER;
+      regs: DebugClient.Regs;
+      ok: BOOLEAN;
+  BEGIN ok := DebugClient.GetRegs(regs);
+    IF ok THEN
+      FOR i := 0 TO 18 DO
+        Texts.WriteString(W, "DebugTools.SetRegister ");
+        Texts.WriteInt(W, i, 1);
+        Texts.WriteString(W, " 0");
+        ORInspect.WriteHex(W, regs[i], 8);
+        Texts.WriteString(W, "H ~   ");
+        IF i < 16 THEN
+          Texts.WriteString(W, "R"); Texts.WriteInt(W, i, 1)
+        ELSIF i = 16 THEN
+          Texts.WriteString(W, "Flags")
+        ELSIF i = 17 THEN
+          Texts.WriteString(W, "RH")
+        ELSIF i = 18 THEN
+          Texts.WriteString(W, "PC")
+        END;
+        Texts.WriteString(W, " = ");
+        Texts.WriteInt(W, regs[i], 1);
+        Texts.WriteLn(W);
+      END;
+      Texts.WriteString(W, "DebugTools.Disassembly 0");
+      ORInspect.WriteHex(W, regs[18], 8);
+      Texts.WriteString(W, "H");
+      Texts.WriteLn(W);
+    END;
+    WriteResult(ok)
+  END Registers;
+
+  PROCEDURE SetRegister*;
+    VAR reg: INTEGER; ok: BOOLEAN; S: Texts.Scanner;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Int THEN reg := S.i; Texts.Scan(S) END;
+    IF (reg >= 0) & (reg <= 18) & (S.class = Texts.Int) THEN WriteResult(DebugClient.SetReg(reg, S.i)) END
+  END SetRegister;
+
+  PROCEDURE DisasmWriteReg(r: LONGINT);
+  BEGIN Texts.Write(W, " ");
+    IF (r < 12) OR (r = 13) THEN Texts.WriteString(W, " R"); Texts.WriteInt(W, r MOD 10H, 1)
+    ELSIF r = 12 THEN Texts.WriteString(W, "MT")
+    ELSIF r = 14 THEN Texts.WriteString(W, "SP")
+    ELSE Texts.WriteString(W, "LNK")
+    END
+  END DisasmWriteReg;
+
+  PROCEDURE DisasmOpcode(w: LONGINT);
+    VAR k, op, u, a, b, c: LONGINT;
+  BEGIN
+    k := w DIV 40000000H MOD 4;
+    a := w DIV 1000000H MOD 10H;
+    b := w DIV 100000H MOD 10H;
+    op := w DIV 10000H MOD 10H;
+    u := w DIV 20000000H MOD 2;
+    IF k = 0 THEN
+      Texts.WriteString(W, mnemo0[op]);
+      IF u = 1 THEN Texts.Write(W, "'") END ;
+      DisasmWriteReg(a); DisasmWriteReg(b); DisasmWriteReg(w MOD 10H)
+    ELSIF k = 1 THEN
+      Texts.WriteString(W, mnemo0[op]);
+      IF u = 1 THEN Texts.Write(W, "'") END ;
+      DisasmWriteReg(a); DisasmWriteReg(b); w := w MOD 10000H;
+      IF w >= 8000H THEN w := w - 10000H END ;
+      Texts.WriteInt(W, w, 7)
+    ELSIF k = 2 THEN  (*LDR/STR*)
+      IF u = 1 THEN Texts.WriteString(W, "STR ") ELSE Texts.WriteString(W, "LDR") END ;
+      DisasmWriteReg(a); DisasmWriteReg(b); w := w MOD 100000H;
+      IF w >= 80000H THEN w := w - 100000H END ;
+      Texts.WriteInt(W, w, 8)
+    ELSIF k = 3 THEN  (*Branch instr*)
+      Texts.Write(W, "B");
+      IF ODD(w DIV 10000000H) THEN Texts.Write(W, "L") END ;
+      Texts.WriteString(W, mnemo1[a]);
+      IF u = 0 THEN DisasmWriteReg(w MOD 10H) ELSE
+        w := w MOD 100000H;
+        IF w >= 80000H THEN w := w - 100000H END ;
+        Texts.WriteInt(W, w, 8)
+      END;
+      IF (u = 0) & ODD(w DIV 10000000H) & (w DIV 10H MOD 100000H # 0) THEN
+        Texts.WriteString(W, " (trap "); Texts.WriteInt(W, w DIV 10H MOD 10H, 1);
+        Texts.WriteString(W, ", pos "); Texts.WriteInt(W, w DIV 100H MOD 10000H, 1);
+        Texts.WriteString(W, ")")
+      END
+    END
+  END DisasmOpcode;
+
+  PROCEDURE Disassembly*;
+    VAR n, adr, data: INTEGER; ok: BOOLEAN; S: Texts.Scanner;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Int THEN
+      adr := S.i DIV 4 * 4; Texts.Scan(S);
+      IF S.class = Texts.Int THEN n := S.i ELSE n := 16 END ;
+      REPEAT Texts.WriteHex(W, adr); Texts.Write(W, 9X);
+        ok := DebugClient.GetMem(adr, data);
+        Texts.WriteHex(W, data); Texts.Write(W, 9X); DisasmOpcode(data); Texts.WriteLn(W);
+        INC(adr, 4); DEC(n)
+      UNTIL (n = 0) OR ~ok;
+      Texts.WriteString(W, "DebugTools.Disassembly 0");
+      ORInspect.WriteHex(W, adr, 8);
+      Texts.WriteString(W, "H");
+      Texts.WriteLn(W);
+      WriteResult(ok)
+    END
+  END Disassembly;
+
+  PROCEDURE Inspect*;
+    VAR m, n, adr, data: INTEGER;
+      S: Texts.Scanner; ok: BOOLEAN;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Int THEN
+      adr := S.i DIV 20H * 20H; Texts.Scan(S);
+      IF S.class = Texts.Int THEN n := S.i ELSE n := 8 END ;
+      REPEAT DEC(n); Texts.WriteLn(W); Texts.WriteHex(W, adr); Texts.Write(W, 9X); m := 8;
+        REPEAT ok:= DebugClient.GetMem(adr, data); INC(adr, 4); Texts.WriteHex(W, data); DEC(m)
+        UNTIL (m = 0) OR ~ok
+      UNTIL (n = 0) OR ~ok;
+      Texts.WriteLn(W); WriteResult(ok)
+    END
+  END Inspect;
+
+  PROCEDURE SetMemory*;
+    VAR adr: INTEGER; ok: BOOLEAN; S: Texts.Scanner;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Int THEN adr := S.i; Texts.Scan(S) END;
+    IF S.class = Texts.Int THEN WriteResult(DebugClient.SetMem(adr, S.i)) END
+  END SetMemory;
+
+  PROCEDURE Continue*;
+  BEGIN WriteResult(DebugClient.Run(FALSE, FALSE))
+  END Continue;
+
+  PROCEDURE StepInto*;
+  BEGIN WriteResult(DebugClient.Run(TRUE, FALSE))
+  END StepInto;
+
+  PROCEDURE StepOver*;
+  BEGIN WriteResult(DebugClient.Run(TRUE, TRUE))
+  END StepOver;
+
+  PROCEDURE SetBreakpoint*;
+    VAR adr: INTEGER; ok: BOOLEAN; S: Texts.Scanner;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Int THEN
+      adr := S.i; ok := TRUE
+    ELSIF S.class = Texts.Name THEN
+      ok := DebugClient.CommandAddress(S.s, adr)
+    ELSE ok := FALSE END;
+    IF ok THEN
+      Texts.WriteString(W, "To disable: DebugTools.ClearBreakpoint 0"); ORInspect.WriteHex(W, adr, 8); Texts.WriteString(W, "H");
+      Texts.WriteLn(W);
+      ok := DebugClient.ToggleBreakpoint(adr, TRUE)
+    END;
+    WriteResult(ok)
+  END SetBreakpoint;
+
+  PROCEDURE ClearBreakpoint*;
+    VAR S: Texts.Scanner;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Int THEN
+      WriteResult(DebugClient.ToggleBreakpoint(S.i, FALSE))
+    END
+  END ClearBreakpoint;
+
+  PROCEDURE Drain*;
+  VAR x, i: INTEGER;
+  BEGIN i := DebugClient.Drain();
+    Texts.WriteString(W, "Drained "); Texts.WriteInt(W, i, 1); Texts.WriteString(W, " bytes.");
+    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+  END Drain;
+
+BEGIN Texts.OpenWriter(W);
+  mnemo0[0] := "MOV";
+  mnemo0[1] := "LSL";
+  mnemo0[2] := "ASR";
+  mnemo0[3] := "ROR";
+  mnemo0[4] := "AND";
+  mnemo0[5] := "ANN";
+  mnemo0[6] := "IOR";
+  mnemo0[7] := "XOR";
+  mnemo0[8] := "ADD";
+  mnemo0[9] := "SUB";
+  mnemo0[10] := "MUL";
+  mnemo0[11] := "DIV";
+  mnemo0[12] := "FAD";
+  mnemo0[13] := "FSB";
+  mnemo0[14] := "FML";
+  mnemo0[15] := "FDV";
+  mnemo1[0] := "MI ";
+  mnemo1[8] := "PL";
+  mnemo1[1] := "EQ ";
+  mnemo1[9] := "NE ";
+  mnemo1[2] := "LS ";
+  mnemo1[10] := "HI ";
+  mnemo1[5] := "LT ";
+  mnemo1[13] := "GE ";
+  mnemo1[6] := "LE ";
+  mnemo1[14] := "GT ";
+  mnemo1[15] := "NO ";
+END DebugTools.

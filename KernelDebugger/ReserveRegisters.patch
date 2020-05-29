@@ -1,0 +1,157 @@
+--- 1/ORG.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -51,19 +51,28 @@
+ 
+   (*instruction assemblers according to formats*)
+ 
++  PROCEDURE Put0X(op, a, b, c: LONGINT);
++  BEGIN (*emit format-0 instruction*)
++    ASSERT((b # 10) & (b # 11) & (c #10) & (c # 11));
++    code[pc] := ((a*10H + b) * 10H + op) * 10000H + c; INC(pc)
++  END Put0X;
++
+   PROCEDURE Put0(op, a, b, c: LONGINT);
+   BEGIN (*emit format-0 instruction*)
++    ASSERT((a # 10 ) & (a # 11));
+     code[pc] := ((a*10H + b) * 10H + op) * 10000H + c; INC(pc)
+   END Put0;
+ 
+   PROCEDURE Put1(op, a, b, im: LONGINT);
+   BEGIN (*emit format-1 instruction,  -10000H <= im < 10000H*)
+     IF im < 0 THEN INC(op, V) END ;
++    ASSERT((a # 10 ) & (a # 11) & (b # 10) & (b # 11));
+     code[pc] := (((a+40H) * 10H + b) * 10H + op) * 10000H + (im MOD 10000H); INC(pc)
+   END Put1;
+ 
+   PROCEDURE Put1a(op, a, b, im: LONGINT);
+   BEGIN (*same as Put1, but with range test  -10000H <= im < 10000H*)
++    ASSERT((a # 10 ) & (a # 11) & (b # 10) & (b # 11));
+     IF (im >= -10000H) & (im <= 0FFFFH) THEN Put1(op, a, b, im)
+     ELSE Put1(Mov+U, RH, 0, im DIV 10000H);
+       IF im MOD 10000H # 0 THEN Put1(Ior, RH, RH, im MOD 10000H) END ;
+@@ -71,9 +80,16 @@
+     END
+   END Put1a;
+ 
+-  PROCEDURE Put2(op, a, b, off: LONGINT);
++  PROCEDURE Put2X(op, a, b, off: LONGINT);
+   BEGIN (*emit load/store instruction*)
++    ASSERT((a # 10) & (a # 11));
+     code[pc] := ((op * 10H + a) * 10H + b) * 100000H + (off MOD 100000H); INC(pc)
++  END Put2X;
++
++  PROCEDURE Put2(op, a, b, off: LONGINT);
++  BEGIN (*emit load/store instruction*)
++    ASSERT((b # 10) & (b # 11));
++    Put2X(op,a,b,off)
+   END Put2;
+ 
+   PROCEDURE Put3(op, cond, off: LONGINT);
+@@ -83,7 +99,7 @@
+ 
+   PROCEDURE incR;
+   BEGIN
+-    IF RH < MT-1 THEN INC(RH) ELSE ORS.Mark("register stack overflow") END
++    IF RH < MT-3 THEN INC(RH) ELSE ORS.Mark("register stack overflow") END
+   END incR;
+ 
+   PROCEDURE CheckRegs*;
+@@ -147,7 +163,7 @@
+   PROCEDURE GetSB(base: LONGINT);
+   BEGIN
+     IF version = 0 THEN Put1(Mov, RH, 0, VarOrg0)
+-    ELSE Put2(Ldr, RH, -base, pc-fixorgD); fixorgD := pc-1
++    ELSE Put2X(Ldr, RH, -base, pc-fixorgD); fixorgD := pc-1
+     END
+   END GetSB;
+ 
+@@ -808,7 +824,7 @@
+       Put1(Ior, 13, 13, locblksize+4);
+       Put2(Str, 13, SP, 0);
+       WHILE a < parblksize DO Put2(Str, r, SP, a+4); INC(r); INC(a, 4) END
+-      ;IF (a + 16 <= locblksize) & (r + 2 < MT) THEN
++      ;IF (a + 16 <= locblksize) & (r + 4 < MT) THEN
+         Put1(Mov, r, 0, 0);
+         Put1(Add, r+1, SP, a+4);
+         Put1(Mov, r+2, 0, (locblksize-a) DIV 4);
+@@ -817,8 +833,8 @@
+         Put1(Sub, r+2, r+2, 1);
+         Put3(BC, NE, -4)
+       ELSIF a < locblksize THEN
+-        Put1(Mov, r, r, 0);
+-        WHILE a < locblksize DO Put2(Str, r, SP, a+4); INC(a, 4) END
++        Put1(Mov, 13, 13, 0);
++        WHILE a < locblksize DO Put2(Str, 13, SP, a+4); INC(a, 4) END
+       END
+     ELSE (*interrupt procedure*)
+       Put1(Sub, SP, SP, locblksize+4); Put2(Str, 0, SP, 4); Put2(Str, 1, SP, 8); Put2(Str, 2, SP, 12);
+@@ -1035,7 +1051,7 @@
+ 
+   PROCEDURE Header*;
+   BEGIN entry := pc*4;
+-    IF version = 0 THEN code[0] := 0E7000000H-1 + pc; Put0(Mov, 11, 0, SP); Put1a(Mov, SP, 0, StkOrg0)  (*RISC-0*)
++    IF version = 0 THEN code[0] := 0E7000000H-1 + pc; Put0X(Mov, 11, 0, SP); Put1a(Mov, SP, 0, StkOrg0)  (*RISC-0*)
+     ELSE
+       Put1(Sub, SP, SP, 8); Put2(Str, LNK, SP, 4);
+       Put1(Mov+U, 13, 0, 0FFFFH);
+--- 1/ORP.Mod.txt
++++ 2/ORP.Mod.txt
+@@ -686,7 +686,7 @@
+       INC(nofpar); obj.class := cl; obj.type := tp; obj.rdo := rdo; obj.lev := level; obj.val := adr;
+       adr := adr + parsize; obj := obj.next
+     END ;
+-    IF adr >= 52 THEN ORS.Mark("too many parameters") END
++    IF adr >= 52-8 THEN ORS.Mark("too many parameters") END
+   END FPSection;
+ 
+   PROCEDURE ProcedureType(ptype: ORB.Type; VAR parblksize: LONGINT);
+--- 1/TextFrames.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -660,19 +660,23 @@
+     IF F.H > 0 THEN Mark(F, TRUE); SetChangeMark(F,  F.text.changed) END
+   END Modify;
+ 
+-  PROCEDURE Open* (F: Frame; H: Display.Handler; T: Texts.Text; org: LONGINT;
+-        col, left, right, top, bot, lsp: INTEGER);
++  PROCEDURE Open1* (F: Frame; H: Display.Handler; T: Texts.Text; org: LONGINT; col: INTEGER);
+     VAR L: Line;
+   BEGIN NEW(L);
+     L.len := 0; L.wid := 0; L.eot := FALSE; L.next := L;
+     F.handle := H; F.text := T; F.org := org; F.trailer := L;
+-    F.left := left; F.right := right; F.top := top; F.bot := bot;
+-    F.lsp := lsp; F.col := col; F.hasMark := FALSE; F.hasCar := FALSE; F.hasSel := FALSE
+-  END Open;
++    F.col := col; F.hasMark := FALSE; F.hasCar := FALSE; F.hasSel := FALSE
++  END Open1;
++
++  PROCEDURE Open2* (F: Frame; left, right, top, bot, lsp: INTEGER);
++  BEGIN
++    F.left := left; F.right := right; F.top := top; F.bot := bot; F.lsp := lsp
++  END Open2;
+ 
+   PROCEDURE Copy* (F: Frame; VAR F1: Frame);
+   BEGIN NEW(F1);
+-    Open(F1, F.handle, F.text, F.org, F.col, F.left, F.right, F.top, F.bot, F.lsp)
++    Open1(F1, F.handle, F.text, F.org, F.col);
++    Open2(F1, F.left, F.right, F.top, F.bot, F.lsp);
+   END Copy;
+ 
+   PROCEDURE CopyOver(F: Frame; text: Texts.Text; beg, end: LONGINT);
+@@ -832,13 +836,15 @@
+   PROCEDURE NewMenu* (name, commands: ARRAY OF CHAR): Frame;
+     VAR F: Frame; T: Texts.Text;
+   BEGIN NEW(F); T := Menu(name, commands);
+-    Open(F, Handle, T, 0, Display.white, left DIV 4, 0, 0, 0, lsp); RETURN F
++    Open1(F, Handle, T, 0, Display.white);
++    Open2(F, left DIV 4, 0, 0, 0, lsp); RETURN F
+   END NewMenu;
+ 
+   PROCEDURE NewText* (text: Texts.Text; pos: LONGINT): Frame;
+     VAR F: Frame;
+   BEGIN NEW(F);
+-    Open(F, Handle, text, pos, Display.black, left, right, top, bot, lsp); RETURN F
++    Open1(F, Handle, text, pos, Display.black);
++    Open2(F, left, right, top, bot, lsp); RETURN F
+   END NewText;
+ 
+ BEGIN NEW(TBuf); NEW(DelBuf);

@@ -1,0 +1,227 @@
+MODULE DebugStub;
+  IMPORT SYSTEM;
+
+  TYPE
+
+    BreakpointHandler* = PROCEDURE;
+    FlagBuffer1* = ARRAY 8 OF INTEGER;
+    FlagBuffer2* = ARRAY 2 OF INTEGER;
+
+    Breakpoint* = POINTER TO BreakpointDesc;
+
+    BreakpointDesc* = RECORD
+        trampoline: ARRAY 6 OF INTEGER;
+        next: Breakpoint;
+        handler: BreakpointHandler;
+        pc*, pcValue*: INTEGER;
+        enabled*: BOOLEAN;
+    END;
+
+    DebugContext* = RECORD
+      (* variables below are referenced from the assembly stub *)
+      regs*: ARRAY 16 OF INTEGER; (* 00H - 3CH *)
+      flags*, regH*: INTEGER;     (* 40H, 44H *)
+      stoppedBy*: Breakpoint;     (* 48H *)
+      (* variables above are referenced from the assembly stub *)
+      regPC*: INTEGER;
+      flagN*, flagZ*, flagC*, flagV*: BOOLEAN;
+    END;
+
+    Stub = RECORD
+      prolog: ARRAY 19 OF INTEGER;
+      buffer1: FlagBuffer1;
+      restoreRegs: ARRAY 16 OF INTEGER;
+      buffer2: FlagBuffer2;
+    END;
+
+  VAR
+    context*: DebugContext;
+    stub: Stub;
+    breakpointRoot: Breakpoint;
+
+  PROCEDURE RestoreFlags*(flags, regH, regPC: INTEGER; VAR buffer1: FlagBuffer1; VAR buffer2: FlagBuffer2);
+    VAR flagN, flagZ, flagC, flagV: BOOLEAN; factor, tmp: INTEGER;
+  BEGIN
+    flagN := SYSTEM.BIT(SYSTEM.ADR(flags), 31);
+    flagZ := SYSTEM.BIT(SYSTEM.ADR(flags), 30);
+    flagC := SYSTEM.BIT(SYSTEM.ADR(flags), 29);
+    flagV := SYSTEM.BIT(SYSTEM.ADR(flags), 28);
+    ASSERT(~flagN OR ~flagZ);
+    ASSERT(regH # 0FFFFFFFFH);
+    factor := regH;
+    tmp := UML(factor, 0FFFFFFFFH);
+    WHILE (SYSTEM.H(0) # regH) DO INC(factor); tmp := UML(factor, 0FFFFFFFFH) END;
+    buffer1[0] := 06B000000H + (factor DIV 10000H); (* MOV+U R11,      factor DIV 10000H *)
+    buffer1[1] := 04BB60000H + (factor MOD 10000H); (* IOR   R11, R11, factor MOD 10000H *)
+    buffer1[2] := 06900FFFFH;                     (* MOV+U R9,       FFFFH *)
+    buffer1[3] := 04996FFFFH;                     (* IOR   R9,  R9,  FFFFH *)
+    buffer1[4] := 02BBA0009H;                     (* MUL+U R11, R11, R9    *)
+    IF (~flagC & ~flagV) THEN
+      buffer1[5] := 069000000H;                  (* MOV+U R9,       0000H *)
+      buffer1[6] := 06B000000H;                  (* MOV+U R11,      0000H *)
+    ELSIF (flagC & ~flagV) THEN
+      buffer1[5] := 069000000H;                  (* MOV+U R9,       0000H *)
+      buffer1[6] := 06B000100H;                  (* MOV+U R11,      0100H *)
+    ELSIF (~flagC & flagV) THEN
+      buffer1[5] := 069008000H;                  (* MOV+U R9,       8000H *)
+      buffer1[6] := 06B000100H;                  (* MOV+U R11,      0100H *)
+    ELSE (* flagC & flagV *)
+      buffer1[5] := 069007F00H;                  (* MOV+U R9,       7F00H *)
+      buffer1[6] := 06B00FF00H;                  (* MOV+U R11,      FF00H *)
+    END;
+    buffer1[7] := 00B99000BH;                    (* SUB   R11, R9 , R11 *)
+    IF flagZ THEN
+      buffer2[0] := 06B000000H; (* MOV+U R11, 0000H *)
+    ELSIF flagN THEN
+      buffer2[0] := 06B00FFFFH; (* MOV+U R11, FFFFH *)
+    ELSE
+      buffer2[0] := 06B000001H; (* MOV+U R11, 0001H *)
+    END;
+    buffer2[1] := 0E7000000H + ((regPC - SYSTEM.ADR(buffer2[1])) DIV 4 - 1) MOD 1000000H (* BC regPC *)
+  END RestoreFlags;
+
+  PROCEDURE StubHandler;
+  BEGIN context.regPC := context.stoppedBy.pc;
+    context.flagN := SYSTEM.BIT(SYSTEM.ADR(context.flags), 31);
+    context.flagZ := SYSTEM.BIT(SYSTEM.ADR(context.flags), 30);
+    context.flagC := SYSTEM.BIT(SYSTEM.ADR(context.flags), 29);
+    context.flagV := SYSTEM.BIT(SYSTEM.ADR(context.flags), 28);
+    context.stoppedBy.handler();
+    context.stoppedBy := NIL;
+    RestoreFlags(context.flags, context.regH, context.regPC, stub.buffer1, stub.buffer2);
+  END StubHandler;
+
+  PROCEDURE InitBreakpoint*(bp: Breakpoint; h: BreakpointHandler);
+  BEGIN
+    bp.trampoline[0] := 0A0A00000H;                                         (* STR R0, [R10 + 0] *)
+    bp.trampoline[1] := 030000000H;                                         (* MOV  R0,  flags      *)
+    bp.trampoline[2] := 0A0A00040H;                                         (* STR  R0, [R10 + 040H] = flags *)
+    bp.trampoline[3] := 060000000H + (SYSTEM.VAL(INTEGER, bp) DIV 10000H);  (* MOV+U R0,     bp_ptr DIV 10000H *)
+    bp.trampoline[4] := 040060000H + (SYSTEM.VAL(INTEGER, bp) MOD 10000H);  (* IOR   R0, R0, bp_ptr MOD 10000H *)
+    bp.trampoline[5] := 0E7000000H + ((SYSTEM.ADR(stub.prolog[0]) - SYSTEM.ADR(bp.trampoline[5])) DIV 4 - 1) MOD 1000000H; (* BC Stub *)
+    bp.next := breakpointRoot; bp.handler := h;
+    bp.pc := 0; bp.pcValue := 0; bp.enabled := FALSE;
+    breakpointRoot := bp;
+  END InitBreakpoint;
+
+  PROCEDURE EnableBreakpoint*(bp: Breakpoint; pc: INTEGER);
+  BEGIN
+    ASSERT(~bp.enabled);
+    bp.pc := pc;
+    bp.enabled := TRUE;
+    SYSTEM.GET(bp.pc, bp.pcValue);
+    SYSTEM.PUT(bp.pc, 0E7000000H + ((SYSTEM.ADR(bp.trampoline[0]) - bp.pc) DIV 4 - 1) MOD 1000000H);
+  END EnableBreakpoint;
+
+  PROCEDURE DisableBreakpoint*(bp: Breakpoint);
+  VAR oldPC: INTEGER;
+  BEGIN
+    IF bp.enabled THEN
+      SYSTEM.GET(bp.pc, oldPC);
+      ASSERT(oldPC = 0E7000000H + ((SYSTEM.ADR(bp.trampoline[0]) - bp.pc) DIV 4 - 1) MOD 1000000H);
+      SYSTEM.PUT(bp.pc, bp.pcValue);
+      bp.enabled := FALSE;
+    END
+  END DisableBreakpoint;
+
+  PROCEDURE DeleteBreakpoint*(bp: Breakpoint);
+  VAR obp: Breakpoint;
+  BEGIN
+    ASSERT(~bp.enabled);
+    IF breakpointRoot = bp THEN
+      breakpointRoot := bp.next;
+    ELSE
+      obp := breakpointRoot;
+      WHILE (obp.next != NIL) & (obp.next != bp) DO obp := obp.next END;
+      IF obp.next = bp THEN obp.next := bp.next END
+    END;
+    bp.next := NIL;
+  END DeleteBreakpoint;
+
+  PROCEDURE IsJump*(VAR target: INTEGER; VAR taken: BOOLEAN) : BOOLEAN;
+    VAR insn, tag: INTEGER; result: BOOLEAN;
+  BEGIN
+    IF (context.stoppedBy # NIL) & (context.stoppedBy.pc = context.regPC) & (context.stoppedBy.enabled) THEN
+      insn := context.stoppedBy.pcValue
+    ELSE
+      SYSTEM.GET(context.regPC, insn)
+    END;
+    tag := insn DIV 20000000H MOD 8H;
+    IF tag = 6 THEN (* BR, BLR *)
+      result := TRUE;
+      target := context.regs[insn MOD 10H];
+    ELSIF tag = 7 THEN (* B, BL *)
+      result := TRUE;
+      target := context.regPC + 4 + (insn MOD 1000000H) * 4
+    ELSE
+      result := FALSE
+    END;
+    IF result THEN
+      tag := insn DIV 1000000H MOD 8H;
+      IF tag = 0 THEN taken := context.flagN
+      ELSIF tag = 1 THEN taken := context.flagZ
+      ELSIF tag = 2 THEN taken := context.flagC
+      ELSIF tag = 3 THEN taken := context.flagV
+      ELSIF tag = 4 THEN taken := context.flagC OR context.flagZ
+      ELSIF tag = 5 THEN taken := context.flagN # context.flagV
+      ELSIF tag = 6 THEN taken := (context.flagN # context.flagV) OR context.flagZ
+      ELSIF tag = 7 THEN taken := TRUE END;
+      IF insn DIV 8000000H MOD 2H = 1 THEN taken := ~taken END
+    ELSE
+      taken := FALSE
+    END
+  RETURN result
+  END IsJump;
+
+  PROCEDURE GetReg*(regno: INTEGER): INTEGER;
+   VAR val: INTEGER;
+  BEGIN
+    IF (regno >= 0) & (regno < 16) THEN val := context.regs[regno]
+    ELSIF regno = 16 THEN val := context.flags
+    ELSIF regno = 17 THEN val := context.regH
+    ELSIF regno = 18 THEN val := context.regPC
+    ELSE ASSERT(FALSE)
+    END
+  RETURN val
+  END GetReg;
+
+  PROCEDURE SetReg*(regno, value: INTEGER);
+  BEGIN
+    IF (regno >= 0) & (regno < 16) THEN
+      context.regs[regno] := value
+    ELSIF regno = 16 THEN
+      context.flags := value;
+      context.flagN := SYSTEM.BIT(SYSTEM.ADR(context.flags), 31);
+      context.flagZ := SYSTEM.BIT(SYSTEM.ADR(context.flags), 30);
+      context.flagC := SYSTEM.BIT(SYSTEM.ADR(context.flags), 29);
+      context.flagV := SYSTEM.BIT(SYSTEM.ADR(context.flags), 28)
+    ELSIF regno = 17 THEN
+      context.regH := value
+    ELSIF regno = 18 THEN
+      context.regPC := value
+    ELSE ASSERT(FALSE)
+    END
+  END SetReg;
+
+  PROCEDURE Init;
+    VAR h: BreakpointHandler; i: INTEGER;
+  BEGIN
+    stub.prolog[0] := 00A000009H; (* MOV  R10, R9 *)
+    stub.prolog[1] := 0C700000FH; (* BC   LNK     *)
+    h := SYSTEM.VAL(BreakpointHandler, SYSTEM.ADR(stub.prolog[0]));
+    SYSTEM.LDREG(9, SYSTEM.ADR(context)); (* SYSTEM.LDREG 10 would throw assertion *)
+    h();
+    stub.prolog[0] := 0A0A00048H; (* STR  R0, [R10 + 048H] = stoppedBy *)
+    FOR i := 1 TO 15 DO
+      stub.prolog[i] := 0A0A00000H + 1000004H * i (* STR Ri, [R10 + i * 4] *)
+    END;
+    stub.prolog[16] := 020000000H; (* MOV  R0,  H *)
+    stub.prolog[17] := 0A0A00044H; (* STR  R0, [R10 + 044H] = regH *)
+    stub.prolog[18] := 0F7000000H + ((SYSTEM.ADR(StubHandler) - SYSTEM.ADR(stub.prolog[18])) DIV 4 - 1) MOD 1000000H; (* BL StubHandler *)
+    FOR i := 0 TO 15 DO
+      stub.restoreRegs[i] := 080A00000H +  1000004H * i (* LDR  Ri,  [R10 + i * 4] *)
+    END
+  END Init;
+
+BEGIN Init
+END DebugStub.

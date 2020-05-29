@@ -1,0 +1,59 @@
+--- 1/RS232.Mod.txt
++++ 2/RS232.Mod.txt
+@@ -2,22 +2,35 @@
+   IMPORT SYSTEM;
+   CONST data = -56; stat = -52;
+ 
++  PROCEDURE Idle;
++  BEGIN
++    (* SYSTEM.PUT(-64, 7FFFFFFFH) *)
++  END Idle;
++
++  PROCEDURE Available*() : BOOLEAN;
++  RETURN SYSTEM.BIT(stat, 0)
++  END Available;
++
+   PROCEDURE Send*(x: INTEGER);
+   BEGIN
+-    REPEAT UNTIL SYSTEM.BIT(stat, 1);
++    WHILE ~SYSTEM.BIT(stat, 1) DO Idle END;
+     SYSTEM.PUT(data, x)
+   END Send;
+   
+   PROCEDURE Rec*(VAR x: INTEGER);
+   BEGIN
+-    REPEAT UNTIL SYSTEM.BIT(stat, 0);
++    WHILE ~Available() DO Idle END;
+     SYSTEM.GET(data, x)
+   END Rec;
+ 
+-  PROCEDURE SendInt*(x: INTEGER);
++  PROCEDURE SendIntRaw*(x: INTEGER);
+     VAR i: INTEGER;
+-  BEGIN Send(1); i := 4;
++  BEGIN i := 4;
+     REPEAT i := i-1; Send(x);  x := ROR(x, 8) UNTIL i = 0
++  END SendIntRaw;
++
++  PROCEDURE SendInt*(x: INTEGER);
++  BEGIN Send(1); SendIntRaw(x)
+   END SendInt;
+ 
+   PROCEDURE SendHex*(x: INTEGER);
+@@ -32,10 +45,14 @@
+     REPEAT i := i-1; Send(u);  u := ROR(u, 8) UNTIL i = 0
+   END SendReal;
+ 
+-  PROCEDURE SendStr*(x: ARRAY OF CHAR);
++  PROCEDURE SendStrRaw*(x: ARRAY OF CHAR);
+     VAR i, k: INTEGER;
+-  BEGIN Send(4); i := 0;
++  BEGIN i := 0;
+     REPEAT k := ORD(x[i]); Send(k); INC(i) UNTIL k = 0
++  END SendStrRaw;
++
++  PROCEDURE SendStr*(x: ARRAY OF CHAR);
++  BEGIN Send(4); SendStrRaw(x)
+   END SendStr;
+ 
+   PROCEDURE RecInt*(VAR x: INTEGER);

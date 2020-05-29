@@ -1,0 +1,21 @@
+DebugServer.Run
+
+DebugTools.UpdateModuleList
+DebugTools.Inspect 0
+DebugTools.SetMemory 16 0FEDCBA98
+
+DebugTools.SetBreakpoint 20H    DebugTools.SetBreakpoint System.Watch
+DebugTools.ClearBreakpoint 20H
+
+DebugTools.Continue    DebugTools.StepInto    DebugTools.StepOver
+DebugTools.Registers
+DebugTools.Disassembly 20H 1
+
+DebugInspect.Module Oberon
+DebugInspect.HeapAddress 0H
+DebugInspect.Backtrace
+
+DebugInspect.Load Oberon
+DebugInspect.LoadAll
+
+DebugTools.Drain

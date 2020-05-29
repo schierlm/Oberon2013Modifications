@@ -1,0 +1,211 @@
+MODULE DebugServer;
+  IMPORT SYSTEM, RS232, Files, Modules, Oberon, DebugStub, DebugConstants;
+
+  CONST BreakpointCount = 16;
+
+  TYPE
+    MyBreakpoint = POINTER TO MyBreakpointDesc;
+    MyBreakpointDesc = RECORD(DebugStub.BreakpointDesc)
+      used: BOOLEAN;
+    END;
+    RestoreBreakpoint = POINTER TO RestoreBreakpointDesc;
+    RestoreBreakpointDesc = RECORD(DebugStub.BreakpointDesc)
+      idx: INTEGER;
+      used: BOOLEAN;
+    END;
+
+  VAR T: Oberon.Task;
+    bp: ARRAY BreakpointCount OF MyBreakpoint;
+    sbp: MyBreakpoint;
+    rbp: RestoreBreakpoint;
+    DefaultHandler: DebugStub.BreakpointHandler;
+    maxPossibleBP: INTEGER;
+
+  PROCEDURE Rec(VAR x: BYTE);
+    VAR i: INTEGER;
+  BEGIN RS232.Rec(i); x := i
+  END Rec;
+
+  PROCEDURE HandleCommonCode(code: BYTE);
+  VAR addr, val, i: INTEGER;
+    M: Modules.Module;
+    C: Modules.Command;
+    mod, cmd: ARRAY 32 OF CHAR;
+  BEGIN
+    IF code = DebugConstants.ReadWord THEN
+      RS232.RecInt(addr); SYSTEM.GET(addr, val);
+      IF addr <= maxPossibleBP THEN
+        maxPossibleBP := 0;
+        FOR i := 0 TO BreakpointCount - 1 DO
+          IF bp[i].enabled & (bp[i].pc = addr) THEN val := bp[i].pcValue END;
+          IF bp[i].enabled & (bp[i].pc > maxPossibleBP) THEN maxPossibleBP := bp[i].pc END
+        END
+      END;
+      RS232.Send(DebugConstants.OK); RS232.SendIntRaw(val)
+    ELSIF code = DebugConstants.WriteWord THEN
+      RS232.RecInt(addr); RS232.RecInt(val); SYSTEM.PUT(addr, val);
+      RS232.Send(DebugConstants.OK)
+    ELSIF code = DebugConstants.SetBreakpoint THEN
+      RS232.RecInt(addr);
+      IF addr > maxPossibleBP THEN maxPossibleBP := addr END;
+      i := BreakpointCount - 1; WHILE (i >= 0) & bp[i].used DO DEC(i) END;
+      IF i = -1 THEN
+        RS232.Send(DebugConstants.Invalid)
+      ELSE
+        DebugStub.InitBreakpoint(bp[i], DefaultHandler);
+        DebugStub.EnableBreakpoint(bp[i], addr);
+        bp[i].used := TRUE;
+        RS232.Send(DebugConstants.OK)
+      END
+    ELSIF code = DebugConstants.ClearBreakpoint THEN
+      RS232.RecInt(addr);
+      i := 0; WHILE (i < BreakpointCount) & (~bp[i].used OR (bp[i].pc # addr)) DO INC(i) END;
+      IF i = BreakpointCount THEN
+        RS232.Send(DebugConstants.Invalid)
+      ELSE
+        DebugStub.DisableBreakpoint(bp[i]);
+        DebugStub.DeleteBreakpoint(bp[i]);
+        bp[i].used := FALSE;
+        RS232.Send(DebugConstants.OK)
+      END
+    ELSIF code = DebugConstants.FindCommandAddress THEN
+      RS232.RecStr(mod); RS232.RecStr(cmd);
+      Modules.Load(mod, M);
+      IF Modules.res = 0 THEN
+        C := Modules.ThisCommand(M, cmd);
+      END;
+      IF Modules.res = 0 THEN
+        RS232.Send(DebugConstants.OK); RS232.SendIntRaw(SYSTEM.VAL(INTEGER, C))
+      ELSE
+        RS232.Send(DebugConstants.Invalid)
+      END
+    ELSE
+      RS232.Send(DebugConstants.Invalid)
+    END;
+  END HandleCommonCode;
+
+  PROCEDURE Task;
+    VAR code, x: BYTE; len, i: INTEGER;
+    F: Files.File; R: Files.Rider;
+    M: Modules.Module;
+    name: ARRAY 32 OF CHAR;
+  BEGIN
+    IF RS232.Available() THEN
+      Rec(code);
+      IF (code < 150) THEN
+        LED(40H); HandleCommonCode(code);
+      ELSIF code = DebugConstants.GetLoadedModuleInfo THEN
+        LED(10H);
+        RS232.Send(DebugConstants.OK);
+        M := Modules.root;
+        WHILE M # NIL DO
+          FOR i := 0 TO SYSTEM.SIZE(Modules.ModDesc) - 1 DO
+            SYSTEM.GET(SYSTEM.ADR(M^)+i, x); RS232.Send(x)
+          END;
+          FOR i := 0 TO 3 DO
+            name := M.name; len := 0;
+            WHILE name[len] # 0X DO INC(len) END;
+            name[len] := "."; name[len+4] := 0X;
+            IF i = 0 THEN name[len+1] := "M"; name[len+2] := "o"; name[len+3] := "d"
+            ELSIF i = 1 THEN name[len+1] := "r"; name[len+2] := "s"; name[len+3] := "c"
+            ELSIF i = 2 THEN name[len+1] := "i"; name[len+2] := "s"; name[len+3] := "y"
+            ELSIF i = 3 THEN name[len+1] := "s"; name[len+2] := "s"; name[len+3] := "y"
+            END;
+            F := Files.Old(name);
+            IF F # NIL THEN
+              RS232.SendIntRaw(Files.Length(F)); RS232.SendIntRaw(Files.Date(F))
+            ELSE
+              RS232.SendIntRaw(0); RS232.SendIntRaw(0)
+            END
+          END;
+          M := M.next;
+        END
+      ELSIF code = DebugConstants.GetFile THEN
+        LED(20H); RS232.Send(DebugConstants.OK); RS232.RecStr(name); F := Files.Old(name);
+        IF F # NIL THEN
+          RS232.Send(DebugConstants.OK); len := Files.Length(F); Files.Set(R, F, 0);
+          RS232.SendIntRaw(len);
+          FOR i := 0 TO len-1 DO Files.ReadByte(R, x); RS232.Send(x) END;
+        ELSE
+          RS232.Send(DebugConstants.Invalid)
+        END
+      ELSE
+        RS232.Send(DebugConstants.Invalid)
+      END;
+      LED(0);
+    END
+  END Task;
+
+  PROCEDURE RestoreBreakpointHandler;
+  BEGIN
+    DebugStub.DisableBreakpoint(rbp);
+    DebugStub.DeleteBreakpoint(rbp);
+    DebugStub.EnableBreakpoint(bp[rbp.idx], bp[rbp.idx].pc);
+    rbp.used := FALSE
+  END RestoreBreakpointHandler;
+
+  PROCEDURE DefaultBreakpointHandler;
+    VAR running, taken: BOOLEAN; code: BYTE; target, i: INTEGER;
+  BEGIN
+    LED(0FFH); running := TRUE;
+    IF (DebugStub.context.stoppedBy = sbp) THEN
+      DebugStub.DisableBreakpoint(sbp);
+      DebugStub.DeleteBreakpoint(sbp);
+      sbp.used := FALSE
+    END;
+    WHILE running DO
+      Rec(code);
+      IF (code < 150) THEN
+        HandleCommonCode(code);
+      ELSIF code = DebugConstants.Continue THEN
+        RS232.Send(DebugConstants.OK); running := FALSE
+      ELSIF (code = DebugConstants.StepInto) OR (code = DebugConstants.StepOver) THEN
+        ASSERT(~sbp.used);
+        DebugStub.InitBreakpoint(sbp, DefaultBreakpointHandler);
+        IF (code = DebugConstants.StepOver) OR ~DebugStub.IsJump(target, taken) OR ~taken THEN
+          target := DebugStub.context.regPC + 4
+        END;
+        DebugStub.EnableBreakpoint(sbp, target);
+        sbp.used := TRUE;
+        RS232.Send(DebugConstants.OK); running := FALSE
+      ELSIF code = DebugConstants.GetRegs THEN
+        RS232.Send(DebugConstants.OK);
+        FOR i := 0 TO 18 DO RS232.SendIntRaw(DebugStub.GetReg(i)) END
+      ELSIF code = DebugConstants.SetReg THEN
+        RS232.Send(DebugConstants.OK);
+        RS232.RecInt(target); RS232.RecInt(i);
+        IF (target >= 0) & (target <= 18) THEN DebugStub.SetReg(target, i); RS232.Send(DebugConstants.OK)
+        ELSE RS232.Send(DebugConstants.Invalid)
+        END
+      ELSE
+        RS232.Send(DebugConstants.Invalid)
+      END;
+    END;
+    LED(0);
+    (* temporarily disable current breakpoint if still alive *)
+    IF (DebugStub.context.stoppedBy.enabled) & (DebugStub.context.regPC = DebugStub.context.stoppedBy.pc) THEN
+      ASSERT(~rbp.used);
+      DebugStub.DisableBreakpoint(DebugStub.context.stoppedBy);
+      DebugStub.InitBreakpoint(rbp, RestoreBreakpointHandler);
+      IF ~DebugStub.IsJump(target, taken) OR ~taken THEN
+        target := DebugStub.context.regPC + 4
+      END;
+      DebugStub.EnableBreakpoint(rbp, target);
+      rbp.used := TRUE;
+      rbp.idx := 0; WHILE bp[rbp.idx] # DebugStub.context.stoppedBy DO INC(rbp.idx) END
+    END
+  END DefaultBreakpointHandler;
+
+  PROCEDURE Run*;
+  BEGIN Oberon.Install(T); LED(0F1H);
+  END Run;
+
+  PROCEDURE Init;
+    VAR i: INTEGER;
+  BEGIN NEW(rbp); NEW(sbp);
+    FOR i := 0 TO BreakpointCount - 1 DO NEW(bp[i]) END;
+    T := Oberon.NewTask(Task, 0); DefaultHandler := DefaultBreakpointHandler
+  END Init;
+
+BEGIN Init
+END DebugServer.

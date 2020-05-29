@@ -1,0 +1,16 @@
+--- 1/ORG.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -58,13 +58,6 @@
+ 
+   PROCEDURE Put1(op, a, b, im: LONGINT);
+   BEGIN (*emit format-1 instruction,  -10000H <= im < 10000H*)
+-    IF check & (op = Sub) & (a = SP) & (b = SP) THEN
+-      Put1(Mov, 13, 0, 0);
+-      code[pc] := ((Ldr * 10H + 13) * 10H + 13) * 100000H + (16 MOD 100000H); INC(pc); (* Put2(Ldr, 13, 13, 16) *)
+-      Put1(Add, 13, 13, im);
+-      Put0(Sub, 13, 13, SP);
+-      code[pc] := ((BLR+12) * 10H + GT) * 1000000H + ((ORS.Pos()*100H + 9*10H + MT) MOD 1000000H); INC(pc) (* Trap(GT, 9) *)
+-    END;
+     IF im < 0 THEN INC(op, V) END ;
+     code[pc] := (((a+40H) * 10H + b) * 10H + op) * 10000H + (im MOD 10000H); INC(pc)
+   END Put1;

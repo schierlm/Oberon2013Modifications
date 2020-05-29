@@ -42,3 +42,6 @@ ORP.Compile TextFramesU.Mod/s EditU.Mod/s ~
 
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
+ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
+ORP.Compile DebugConstants.Mod/s DebugClient.Mod/s DebugServer.Mod/s ~
+ORP.Compile DebugTools.Mod/s DebugInspect.Mod/s ~

@@ -1,0 +1,182 @@
+MODULE DebugClient;
+  IMPORT SYSTEM, RS232, Files, Modules, DebugConstants;
+
+  CONST BreakpointCount = 16;
+
+  TYPE Regs* = ARRAY 19 OF INTEGER;
+    PendingFile = POINTER TO PendingFileDesc;
+    PendingFileDesc = RECORD
+      next: PendingFile;
+      lname, rname: ARRAY 32 OF CHAR;
+      len, time: INTEGER
+    END;
+
+  VAR modroot*: Modules.Module;
+
+  PROCEDURE Rec(VAR x: BYTE);
+    VAR i: INTEGER;
+  BEGIN RS232.Rec(i); x := i
+  END Rec;
+
+  PROCEDURE SendCommand(s: ARRAY OF CHAR);
+    VAR i, k: INTEGER; dot: BOOLEAN;
+  BEGIN i := 0;
+    REPEAT k := ORD(s[i]);
+      IF (s[i] = ".") & ~dot THEN RS232.Send(0); dot := TRUE ELSE RS232.Send(k) END; INC(i)
+    UNTIL k = 0;
+    IF (~dot) THEN RS232.Send(0) END
+  END SendCommand;
+
+  PROCEDURE UpdateModuleList*(): BOOLEAN;
+    VAR
+      run, result: BOOLEAN;
+      i, j: INTEGER;
+      x: BYTE;
+      M: Modules.Module;
+      PF, PF2: PendingFile;
+      F: Files.File;
+      R: Files.Rider;
+  BEGIN
+    RS232.Send(DebugConstants.GetLoadedModuleInfo); Rec(x);
+    IF x # DebugConstants.OK THEN
+      result := FALSE
+    ELSE
+      run := TRUE; modroot := NIL; PF := NIL; NEW(PF2);
+      WHILE run DO
+        NEW(M);
+        FOR i := 0 TO SYSTEM.SIZE(Modules.ModDesc) - 1 DO
+          Rec(x); SYSTEM.PUT(SYSTEM.ADR(M^)+i, x)
+        END;
+        run := M.next # NIL;
+        M.next := modroot; modroot := M;
+        FOR i := 0 TO 3 DO
+          RS232.RecInt(PF2.len); RS232.RecInt(PF2.time);
+          IF PF2.len # 0 THEN
+            PF2.rname := M.name; j := 0;
+            WHILE PF2.rname[j] # 0X DO INC(j) END;
+            PF2.rname[j] := "."; PF2.rname[j+4] := 0X;
+            IF i = 0 THEN PF2.rname[j+1] := "M"; PF2.rname[j+2] := "o"; PF2.rname[j+3] := "d"
+            ELSIF i = 1 THEN PF2.rname[j+1] := "r"; PF2.rname[j+2] := "s"; PF2.rname[j+3] := "c"
+            ELSIF i = 2 THEN PF2.rname[j+1] := "i"; PF2.rname[j+2] := "s"; PF2.rname[j+3] := "y"
+            ELSIF i = 3 THEN PF2.rname[j+1] := "s"; PF2.rname[j+2] := "s"; PF2.rname[j+3] := "y"
+            END;
+            PF2.lname := PF2.rname;
+            PF2.lname[j+3] := "R";
+            F := Files.Old(PF2.lname);
+            IF (F = NIL) OR (Files.Length(F) # PF2.len) OR (Files.Date(F) < PF2.time) THEN
+              PF2.next := PF; PF := PF2; NEW(PF2)
+            END
+          END
+        END
+      END;
+      result := TRUE;
+      WHILE(PF # NIL) DO
+        RS232.Send(DebugConstants.GetFile);
+        Rec(x);
+        IF x = DebugConstants.OK THEN
+          RS232.SendStrRaw(PF.rname); Rec(x)
+        END;
+        IF x # DebugConstants.OK THEN
+          result := FALSE; PF := NIL;
+        ELSE
+          RS232.RecInt(i);
+          ASSERT(i = PF.len);
+          F := Files.New(PF.lname);
+          Files.Set(R, F, 0);
+          WHILE i > 0 DO
+            Rec(x); Files.WriteByte(R, x); DEC(i)
+          END;
+          Files.Register(F);
+          PF := PF.next;
+        END
+      END
+    END
+  RETURN result
+  END UpdateModuleList;
+
+  PROCEDURE GetRegs* (VAR regs: Regs): BOOLEAN;
+    VAR x: BYTE; i: INTEGER;
+  BEGIN
+    RS232.Send(DebugConstants.GetRegs);
+    Rec(x);
+    IF x = DebugConstants.OK THEN
+      FOR i := 0 TO 18 DO RS232.RecInt(regs[i]) END
+    END
+  RETURN x = DebugConstants.OK
+  END GetRegs;
+
+  PROCEDURE SetReg*(reg, value: INTEGER) : BOOLEAN;
+    VAR x: BYTE;
+  BEGIN
+   RS232.Send(DebugConstants.SetReg);
+   Rec(x);
+   IF x = DebugConstants.OK THEN
+      RS232.SendIntRaw(reg);
+      RS232.SendIntRaw(value);
+      Rec(x)
+   END
+  RETURN x = DebugConstants.OK
+  END SetReg;
+
+  PROCEDURE GetMem*(addr: INTEGER; VAR value: INTEGER): BOOLEAN;
+    VAR x: BYTE;
+  BEGIN
+   RS232.Send(DebugConstants.ReadWord);
+   RS232.SendIntRaw(addr);
+   Rec(x);
+   IF x = DebugConstants.OK THEN
+     RS232.RecInt(value)
+   END
+   RETURN x = DebugConstants.OK
+  END GetMem;
+
+  PROCEDURE SetMem*(addr, value: INTEGER): BOOLEAN;
+    VAR x: BYTE;
+  BEGIN
+    RS232.Send(DebugConstants.WriteWord);
+    RS232.SendIntRaw(addr);
+    RS232.SendIntRaw(value);
+    Rec(x)
+   RETURN x = DebugConstants.OK
+  END SetMem;
+
+  PROCEDURE Run*(step, over: BOOLEAN): BOOLEAN;
+    VAR x: BYTE;
+  BEGIN
+    IF ~step THEN x := DebugConstants.Continue
+    ELSIF over THEN x := DebugConstants.StepOver
+    ELSE x := DebugConstants.StepInto
+    END;
+    RS232.Send(x);
+    Rec(x)
+  RETURN x = DebugConstants.OK
+  END Run;
+
+  PROCEDURE ToggleBreakpoint*(addr: INTEGER; enable: BOOLEAN) : BOOLEAN;
+    VAR x: BYTE;
+  BEGIN
+    IF enable THEN x := DebugConstants.SetBreakpoint ELSE x := DebugConstants.ClearBreakpoint END;
+    RS232.Send(x);
+    RS232.SendIntRaw(addr);
+    Rec(x)
+  RETURN x = DebugConstants.OK
+  END ToggleBreakpoint;
+
+  PROCEDURE CommandAddress*(command: ARRAY OF CHAR; VAR addr: INTEGER): BOOLEAN;
+    VAR x: BYTE;
+  BEGIN
+    RS232.Send(DebugConstants.FindCommandAddress);
+    SendCommand(command);
+    Rec(x);
+    IF x = DebugConstants.OK THEN RS232.RecInt(addr) END
+  RETURN x = DebugConstants.OK
+  END CommandAddress;
+
+  PROCEDURE Drain*(): INTEGER;
+  VAR x, i: INTEGER;
+  BEGIN i := 0;
+    WHILE RS232.Available() DO INC(i); RS232.Rec(x) END
+  RETURN i
+  END Drain;
+
+END DebugClient.

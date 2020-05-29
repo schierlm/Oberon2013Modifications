@@ -1,0 +1,19 @@
+MODULE DebugConstants;
+
+  CONST
+    (* always possible instructions *)
+    ReadWord* = 100; WriteWord* = 101;
+    SetBreakpoint* = 102; ClearBreakpoint* = 103;
+    FindCommandAddress* = 105;
+
+    (* only in breakpoint *)
+    Continue* = 150; StepInto* = 151; StepOver* = 152;
+    GetRegs* = 153; SetReg* = 154;
+
+    (* only outside breakpoint *)
+    GetLoadedModuleInfo* = 200; GetFile* = 201;
+
+    (* answer codes, where needed *)
+    OK* = 0; Invalid* = 1;
+
+END DebugConstants.
