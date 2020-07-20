@@ -58,4 +58,4 @@ a high performance or binary size overhead, and are therefore undesirable in nor
 | **[StackOverflowProtector](StackOverflowProtector/README.md)** | Trigger TRAP 9 at stack overflows | Recompile inner core |
 | **[CommandExitCodes](CommandExitCodes/README.md)** | Let commands return an exit code so that scripts can react to it | Recompile outer core |
 | **[CommandLineCompiler](CommandLineCompiler/README.md)**† | Run the Oberon compiler in a command line emulator | Patch emulator |
-| **[KernelDebugger](CommandLineCompiler/README.md)**† | Debug and inspect one RISC5 machine from another one via serial link | Apply ORStackInspect; recompile everything including inner core |
+| **[KernelDebugger](KernelDebugger/README.md)**† | Debug and inspect one RISC5 machine from another one via serial link | Apply ORStackInspect; recompile everything including inner core |
