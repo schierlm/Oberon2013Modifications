@@ -40,6 +40,9 @@ ORP.Compile ORInspect.Mod/s ~
 ORP.Compile FontsU.Mod/s TextsU.Mod/s ~
 ORP.Compile TextFramesU.Mod/s EditU.Mod/s ~
 
+ORP.Compile EmulatorCPU.Mod/s EmulatorCore.Mod/s ~
+ORP.Compile EmulatorFrames.Mod/s Emulator.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~

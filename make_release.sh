@@ -49,7 +49,7 @@ sed -i '1,2d' work/BootLoad.Mod.txt
 cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt ResourceMonitor/*.txt work
 cp DefragmentFreeSpace/DefragFiles.Mod.txt DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt work
-cp UTF8CharsetLite/*.txt work
+cp UTF8CharsetLite/*.txt InnerEmulator/*.txt work
 
 mkdir work/debug
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
