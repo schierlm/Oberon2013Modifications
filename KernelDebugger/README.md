@@ -21,7 +21,8 @@ RISC5 CPU.
 Due to memory constraints and no multitasking, running the debugger on the same machine as
 the debuggee is tricky. Therefore, we take a different approach here, which is also known
 from low-level driver development: The debuggee is running on one RISC5 machine, and the
-debugger on another one. Both are connected via a serial link.
+debugger on another one. Both run the same version of Oberon, have the same memory configuration
+and are connected via a serial link.
 
 A debug stub written in Assembly is invoked whenever a breakpoint is hit (and if you set a
 breakpoint on the trap handler, also when a trap occurs) and takes care to communicate the
@@ -99,7 +100,7 @@ Installation
 
       ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
       ORP.Compile DebugConstants.Mod/s DebugClient.Mod/s DebugServer.Mod/s ~
-      ORP.Compile DebugTools.Mod/s DebugInspect/s ~
+      ORP.Compile DebugTools.Mod/s DebugInspect.Mod/s ~
 
 - Clone the machine (or do the same on another machine), restart both clones.
 

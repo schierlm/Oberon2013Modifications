@@ -187,7 +187,7 @@ MODULE DebugInspect;
     VAR regs: DebugClient.Regs;
   BEGIN
     ASSERT(DebugClient.GetRegs(regs));
-    ORStackInspect.InspectBacktrace(regs[14], DebugClient.modroot, SymRoot, GetData, "DebugInspect.");
+    ORStackInspect.InspectBacktrace(regs[14], DebugClient.allocPtr, DebugClient.modroot, SymRoot, GetData, "DebugInspect.");
   END Backtrace;
 
   PROCEDURE Load*;

@@ -11,7 +11,7 @@ MODULE DebugClient;
       len, time: INTEGER
     END;
 
-  VAR modroot*: Modules.Module;
+  VAR modroot*: Modules.Module; allocPtr*: INTEGER;
 
   PROCEDURE Rec(VAR x: BYTE);
     VAR i: INTEGER;
@@ -41,6 +41,7 @@ MODULE DebugClient;
     IF x # DebugConstants.OK THEN
       result := FALSE
     ELSE
+      RS232.RecInt(allocPtr);
       run := TRUE; modroot := NIL; PF := NIL; NEW(PF2);
       WHILE run DO
         NEW(M);

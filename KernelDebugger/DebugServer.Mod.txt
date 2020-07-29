@@ -97,6 +97,7 @@ MODULE DebugServer;
       ELSIF code = DebugConstants.GetLoadedModuleInfo THEN
         LED(10H);
         RS232.Send(DebugConstants.OK);
+        RS232.SendIntRaw(Modules.AllocPtr);
         M := Modules.root;
         WHILE M # NIL DO
           FOR i := 0 TO SYSTEM.SIZE(Modules.ModDesc) - 1 DO

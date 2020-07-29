@@ -29,7 +29,7 @@ MODULE ORStackInspect;
     END
   END InspectStackFrame;
 
-  PROCEDURE InspectBacktrace*(sp: INTEGER; root: Modules.Module; symroot: SymbolFile; Get: ORInspect.GetDataCallback; commandPrefix: ARRAY OF CHAR);
+  PROCEDURE InspectBacktrace*(sp, AllocPtr: INTEGER; root: Modules.Module; symroot: SymbolFile; Get: ORInspect.GetDataCallback; commandPrefix: ARRAY OF CHAR);
   VAR adr, v, cnt, len: INTEGER;
     mod: Modules.Module;
     prevName: Modules.ModuleName;
@@ -64,7 +64,7 @@ MODULE ORStackInspect;
       IF v MOD 2 = 1 THEN
         Get(sp+4, 4, adr);
         DEC(adr, 4);
-        IF (adr MOD 4 = 0) & (adr >= 100H) & (adr < Modules.AllocPtr) THEN
+        IF (adr MOD 4 = 0) & (adr >= 100H) & (adr < AllocPtr) THEN
           Get(adr, 4, v);
           IF (v DIV 10000000H MOD 10H = 0DH) OR (v DIV 10000000H MOD 10H = 0FH) THEN (* BL or BLR instruction *)
             IF (v DIV 10000000H MOD 10H = 0FH) THEN (* BL instruction *)
@@ -144,7 +144,7 @@ MODULE ORStackInspect;
   END LoadModule;
 
   PROCEDURE Backtrace*;
-  BEGIN InspectBacktrace(SYSTEM.REG(14), Modules.root, SymRoot, ORInspect.GetData, "ORInspect.");
+  BEGIN InspectBacktrace(SYSTEM.REG(14), Modules.AllocPtr, Modules.root, SymRoot, ORInspect.GetData, "ORInspect.");
   END Backtrace;
 
   PROCEDURE Load*;
