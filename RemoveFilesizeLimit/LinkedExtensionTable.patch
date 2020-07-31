@@ -17,24 +17,30 @@
          sec*: SectorTable;
          fill: ARRAY SectorSize - HeaderSize OF BYTE;
        END ;
-@@ -320,8 +321,15 @@
+@@ -319,10 +320,21 @@
+         ELSE j := SecTabSize;
            REPEAT DEC(j); Kernel.MarkSector(hd.sec[j]) UNTIL j = 0;
            n := (hd.aleng - SecTabSize) DIV 256; i := 0;
++          IF n >= ExTabSize THEN
++            n := ExTabSize + (hd.aleng - SecTabSize - ExTabSize * 256) DIV 255
++          END;
            WHILE i <= n DO
 -            Kernel.MarkSector(hd.ext[i]);
 -            Kernel.GetSector(hd.ext[i], B); (*index sector*)
-+            IF n < ExTabSize THEN
++            IF i < ExTabSize THEN
 +              Kernel.MarkSector(hd.ext[i]);
 +              Kernel.GetSector(hd.ext[i], B) (*index sector*)
-+            ELSIF n = ExTabSize THEN
++            ELSIF i = ExTabSize THEN
 +              Kernel.MarkSector(hd.lext);
 +              Kernel.GetSector(hd.lext, B); (*linked index sector*)
 +            ELSE
 +              Kernel.GetSector(B[255], B)
 +            END;
              IF i < n THEN j := 256 ELSE j := (hd.aleng - SecTabSize) MOD 256 + 1 END ;
++            IF (i = n) & (n >= ExTabSize) THEN j := (hd.aleng - SecTabSize - ExTabSize * 256) MOD 255 + 1 END;
              REPEAT DEC(j); Kernel.MarkSector(B[j]) UNTIL j = 0;
              INC(i)
+           END
 --- 1/Files.Mod.txt
 +++ 2/Files.Mod.txt
 @@ -16,6 +16,7 @@
