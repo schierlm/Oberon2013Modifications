@@ -12,6 +12,7 @@ patch -d work <BugFixes/CheckGlobalsSize.patch
 patch -d work <BugFixes/InitializeGraphicFramesTbuf.patch
 patch -d work <BugFixes/NoMemoryCorruptionAfterMemoryAllocationFailure.patch
 patch -d work <BugFixes/IllegalAccessInGC.patch
+patch -d work <BugFixes/CompileSetLiterals.patch
 patch -d work <ConvertEOL/ConvertEOL.patch
 patch -d work <DrawAddons/MoreClasses.patch
 patch -d work <DefragmentFreeSpace/DefragSupport.patch

@@ -1,0 +1,10 @@
+--- 1/ORG.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -528,6 +528,7 @@
+         x.mode := Reg; x.r := RH-1
+       ELSE DEC(RH); Put0(Ann, RH-1, x.r, y.r)
+       END
++      ; x.r := RH-1
+     END
+   END Set;
+ 

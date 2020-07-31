@@ -36,6 +36,25 @@ will read from IO address -4 when it encounters a NIL pointer and tries to read 
 preceding the pointer. By default, IO address -4 is unused and will return 0, but better
 to avoid these accesses if possible.
 
+Fix 5: Fix register index for non-constant set literals
+-------------------------------------------------------
+
+When compiling code like the following, which contains a set literal where the bounds are
+not constant, the compiler emitted correct code to calculate the set literal, but remembered
+the wrong register index, so the value was not correctly used.
+
+```
+MODULE Test;
+
+  PROCEDURE Mask(a: SET; b: INTEGER): SET;
+  RETURN a - {b .. b+7}
+  END Mask;
+
+BEGIN
+  ASSERT( Mask( {0..31}, 8 ) = {0..7, 16..31} )
+END Test.
+```
+
 Installation
 ------------
 
@@ -46,6 +65,8 @@ Installation
 - Apply [`NoMemoryCorruptionAfterMemoryAllocationFailure.patch`](NoMemoryCorruptionAfterMemoryAllocationFailure.patch) to `Kernel.Mod`
 
 - Apply [`IllegalAccessInGC.patch`](IllegalAccessInGC.patch) to `Kernel.Mod`
+
+- Apply [`CompileSetLiterals.patch`](CompileSetLiterals.patch) to `ORG.Mod`
 
 - Recompile the changed modules and rebuild the inner core:
 
