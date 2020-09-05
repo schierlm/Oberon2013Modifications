@@ -1,0 +1,33 @@
+--- 1/Display.Mod.txt
++++ 2/Display.Mod.txt
+@@ -71,12 +71,16 @@
+   END ReplConst;
+ 
+   PROCEDURE CopyPattern*(col, patadr, x, y, mode: INTEGER);  (*only for modes = paint, invert*)
+-    VAR a, a0, pwd: INTEGER;
+-      w, h, pbt: BYTE; pix, mask: SET;
+-  BEGIN SYSTEM.GET(patadr, w); SYSTEM.GET(patadr+1, h); INC(patadr, 2);
++    VAR a, a0, a1, pwd: INTEGER;
++      w, h, w1, w2, pbt: BYTE; pix, mask: SET;
++  BEGIN SYSTEM.GET(patadr, w1); SYSTEM.GET(patadr+1, h); INC(patadr, 2);
+     a := base + (x DIV 32)*4 + y*128; x := x MOD 32; mask := SYSTEM.VAL(SET, ASR(7FFFFFFFH, 31-x));
+-    FOR a0 := a TO a + (h-1)*128 BY 128 DO
+-      (*build pattern line; w <= 32*)
++    FOR a1 := a TO a + (h-1)*128 BY 128 DO
++      a0 := a1;
++      FOR w2 := 0 TO w1 DIV 32 * 32 BY 32 DO
++       w := w1 - w2;
++       IF w > 32 THEN w := 32 END;
++      (*build pattern line segment of width w, w <= 32*)
+       SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt;
+       IF w > 8 THEN SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt*100H + pwd;
+         IF w > 16 THEN SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt*10000H + pwd;
+@@ -92,6 +96,8 @@
+         IF mode = invert THEN SYSTEM.PUT(a0+4, SYSTEM.VAL(SET, ASR(pwd, -x)) * mask/ pix)
+         ELSE SYSTEM.PUT(a0+4, SYSTEM.VAL(SET, ASR(pwd, -x)) * mask+ pix)
+         END
++      END
++       ;INC(a0, 4)
+       END
+     END
+   END CopyPattern;

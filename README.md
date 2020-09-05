@@ -61,3 +61,4 @@ a high performance or binary size overhead, and are therefore undesirable in nor
 | **[KernelDebugger](KernelDebugger/README.md)**‡ | Debug and inspect one RISC5 machine from another one via serial link | Apply ORStackInspect; recompile everything including inner core |
 | **[InnerEmulator](InnerEmulator/README.md)** | Emulate a RISC processor on the Oberon system | None (except patience when starting it up) |
 | **[ReproducibleBuild](ReproducibleBuild/README.md)**† | How to build Oberon disk images that are bit-for-bit identical | Recompile everything |
+| **[FontConversion](FontConversion/README.md)** | Conversions to and between Oberon .Scn.Fnt files | Optionally patch Display.Mod |

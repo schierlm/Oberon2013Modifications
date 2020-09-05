@@ -43,6 +43,11 @@ ORP.Compile TextFramesU.Mod/s EditU.Mod/s ~
 ORP.Compile EmulatorCPU.Mod/s EmulatorCore.Mod/s ~
 ORP.Compile EmulatorFrames.Mod/s Emulator.Mod/s ~
 
+ORP.Compile GrowFont.Mod/s ~
+ORP.Compile ConvertPCFFont.Mod/s ~
+ORP.Compile OptimizeFont.Mod/s ~
+ORP.Compile FontSubsetBuilder.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
