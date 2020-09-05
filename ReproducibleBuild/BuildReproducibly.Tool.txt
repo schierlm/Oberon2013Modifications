@@ -1,0 +1,54 @@
+ORP.Compile ORS.Mod/s ORB.Mod/s ~
+ORP.Compile ORG.Mod/s ORP.Mod/s ~
+ORP.Compile ORL.Mod/s ~
+System.Free ORL ORP ORG ORB ORS ~
+
+ORP.Compile Kernel.Mod/s FileDir.Mod/s Files.Mod/s Modules.Mod/s ~
+ORL.Link Modules ~
+ORL.Load Modules.bin ~
+
+ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
+ORP.Compile Fonts.Mod/s Texts.Mod/s ~
+ORP.Compile Oberon.Mod/s ~
+ORP.Compile MenuViewers.Mod/s ~
+ORP.Compile TextFrames.Mod/s ~
+ORP.Compile System.Mod/s ~
+ORP.Compile Edit.Mod/s ~
+ORP.Compile PCLink1.Mod/s ~
+ORP.Compile ORS.Mod/s ORB.Mod/s ~
+ORP.Compile ORG.Mod/s ORP.Mod/s ~
+
+ORP.Compile DefragFiles.Mod/s Defragger.Mod/s BuildTools.Mod/s ~
+
+Restart.
+
+BuildTools.KeepFiles
+  System.Tool Oberon10.Scn.Fnt
+  DefragFiles.rsc Defragger.rsc BuildReproducibly.Tool
+  Kernel.Mod Kernel.smb
+  FileDir.Mod FileDir.smb
+  Files.Mod Files.smb
+  Modules.Mod Modules.smb
+  Input.Mod Input.rsc Input.smb
+  Display.Mod Display.rsc Display.smb
+  Viewers.Mod Viewers.rsc Viewers.smb
+  Fonts.Mod Fonts.rsc Fonts.smb
+  Texts.Mod Texts.rsc Texts.smb
+  Oberon.Mod Oberon.rsc Oberon.smb
+  MenuViewers.Mod MenuViewers.rsc MenuViewers.smb
+  TextFrames.Mod TextFrames.rsc TextFrames.smb
+  System.Mod System.rsc System.smb
+  Edit.Mod Edit.rsc Edit.smb
+  PCLink1.Mod PCLink1.rsc PCLink1.smb
+  ORS.Mod ORS.rsc ORS.smb
+  ORB.Mod ORB.rsc ORB.smb
+  ORG.Mod ORG.rsc ORG.smb
+  ORP.Mod ORP.rsc ORP.smb ~
+
+Restart.
+
+Defragger.Load
+
+System.DeleteFiles DefragFiles.rsc Defragger.rsc BuildReproducibly.Tool ~
+
+Defragger.Defrag

@@ -1,0 +1,67 @@
+MODULE BuildTools;
+  IMPORT Kernel, FileDir, Files, Display, Texts, TextFrames, Viewers, Oberon;
+
+  TYPE
+    FileList = POINTER TO FileListDesc;
+
+    FileListDesc = RECORD
+      name: FileDir.FileName;
+      next: FileList;
+    END;
+
+  VAR
+    W: Texts.Writer;
+    fl: FileList;
+
+  PROCEDURE AddFileToList(name: FileDir.FileName; adr: INTEGER; VAR cont: BOOLEAN);
+    VAR f: FileList;
+  BEGIN
+    NEW(f);
+    f.next := fl;
+    f.name := name;
+    fl := f
+  END AddFileToList;
+
+  PROCEDURE KeepFiles*;
+  VAR
+    S: Texts.Scanner;
+    L: FileList;
+    T: Texts.Text; beg, end, time: INTEGER;
+    res: INTEGER;
+    ch: CHAR;
+  BEGIN
+    Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF (S.class = Texts.Char) & (S.c = "^") THEN
+      Oberon.GetSelection(T, beg, end, time);
+      IF time >= 0 THEN Texts.OpenScanner(S, T, beg); Texts.Scan(S) END
+    END;
+    fl := NIL;
+    FileDir.Enumerate("", AddFileToList);
+    WHILE S.class = Texts.Name DO
+      IF fl.name = S.s THEN
+        fl := fl.next
+      ELSE
+        L := fl;
+        WHILE L.next # NIL DO
+          IF L.next.name = S.s THEN
+            L.next := L.next.next
+          ELSE
+            L := L.next
+          END
+        END
+      END;
+      Texts.Scan(S)
+    END;
+    WHILE fl # NIL DO
+      Texts.WriteString(W, fl.name); Texts.WriteString(W, " deleting");
+      Files.Delete(fl.name, res);
+      IF res # 0 THEN Texts.WriteString(W, " failed") END;
+      Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf); fl := fl.next;
+    END;
+    Texts.WriteString(W, "done.");
+    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+  END KeepFiles;
+
+BEGIN
+  Texts.OpenWriter(W);
+END BuildTools.

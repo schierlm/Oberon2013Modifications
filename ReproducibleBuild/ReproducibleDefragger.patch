@@ -1,0 +1,113 @@
+--- 1/DefragFiles.Mod.txt
++++ 2/DefragFiles.Mod.txt
+@@ -153,7 +153,10 @@
+   BEGIN ASSERT(fileOpen);
+     IF onlyBuf.apos # pos THEN
+       IF onlyBuf.mod THEN WriteBuf() END;
+-      IF pos <= onlyFile.aleng THEN ReadBuf(pos) ELSE onlyBuf.apos := pos; onlyBuf.lim := 0; onlyBuf.mod := FALSE END
++      IF pos <= onlyFile.aleng THEN ReadBuf(pos) ELSE
++        onlyBuf.apos := pos; onlyBuf.lim := SS; onlyBuf.mod := FALSE;
++        WHILE onlyBuf.lim > 0 DO DEC(onlyBuf.lim); onlyBuf.data[onlyBuf.lim] := 0 END
++      END
+     END
+   END GetBuf;
+ 
+@@ -228,7 +231,8 @@
+         INC(onlyBuf.lim); INC(onlyFile.bleng); onlyFile.modH := TRUE
+       ELSE WriteBuf(); INC(r.apos);
+         IF r.apos <= onlyFile.aleng THEN ReadBuf(r.apos)
+-        ELSE onlyBuf.apos := r.apos; onlyBuf.lim := 1; INC(onlyFile.aleng); onlyFile.bleng := 1; onlyFile.modH := TRUE;
++        ELSE onlyBuf.apos := r.apos; onlyBuf.lim := SS; INC(onlyFile.aleng); onlyFile.bleng := 1; onlyFile.modH := TRUE;
++          WHILE onlyBuf.lim > 1 DO DEC(onlyBuf.lim); onlyBuf.data[onlyBuf.lim] := 0 END;
+           IF (onlyFile.aleng - STS) MOD XS = 0 THEN NewExt() END
+         END;
+         r.bpos := 0
+--- 1/Defragger.Mod.txt
++++ 2/Defragger.Mod.txt
+@@ -12,6 +12,51 @@
+ 
+   VAR fileInfo: FileInfoSector;
+ 
++  PROCEDURE LastUsedSector(): INTEGER;
++  VAR
++    n, hint, sec: INTEGER;
++  BEGIN
++    n := Kernel.NofSectors - 1; hint := 64 * 29;
++    WHILE n > 0 DO
++      Kernel.AllocSector(hint-29, sec); Kernel.FreeSector(sec);
++      IF hint # sec THEN DEC(n) END;
++      IF n > 0 THEN INC(hint, 29) END
++    END;
++  RETURN hint
++  END LastUsedSector;
++
++  PROCEDURE TrimAllSectorsAfter(sec: INTEGER);
++  VAR i: INTEGER; magicSector: Kernel.Sector;
++  BEGIN
++    magicSector[0] := ORD("!"); magicSector[504] := ORD("!");
++    magicSector[1] := ORD("!"); magicSector[505] := ORD("!");
++    magicSector[2] := ORD("T"); magicSector[506] := ORD("T");
++    magicSector[3] := ORD("R"); magicSector[507] := ORD("R");
++    magicSector[4] := ORD("I"); magicSector[508] := ORD("I");
++    magicSector[5] := ORD("M"); magicSector[509] := ORD("M");
++    magicSector[6] := ORD("!"); magicSector[510] := ORD("!");
++    magicSector[7] := ORD("!"); magicSector[511] := ORD("!");
++    FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
++    FOR i := 0 TO 511 DO magicSector[512+i] := magicSector[i] END;
++    Kernel.PutSector(sec+29, magicSector);
++  END TrimAllSectorsAfter;
++
++  PROCEDURE CleanDirPages(page: INTEGER);
++    VAR i: INTEGER;
++      EmptyEntry: FileDir.DirEntry;
++      a: FileDir.DirPage;
++  BEGIN
++    Kernel.GetSector(page, a); ASSERT(a.mark = FileDir.DirMark);
++    FOR i := 0 TO FileDir.FnLength - 1 DO EmptyEntry.name[i] := 0X END;
++    EmptyEntry.adr := 0; EmptyEntry.p := 0;
++    FOR i := a.m TO FileDir.DirPgSize - 1 DO a.e[i] := EmptyEntry END;
++    Kernel.PutSector(page, a);
++    IF a.p0 # 0 THEN CleanDirPages(a.p0) END;
++    FOR i := 0 TO a.m - 1 DO
++      IF a.e[i].p # 0 THEN CleanDirPages(a.e[i].p) END
++    END
++  END CleanDirPages;
++
+   PROCEDURE DrawText(text: ARRAY OF CHAR; x, y: INTEGER);
+   VAR
+     dx, xx, yy, t1, t2, patAdr, i: INTEGER;
+@@ -35,7 +80,7 @@
+   END ShowRestartMessage;
+ 
+   PROCEDURE Trim*;
+-  BEGIN Kernel.TrimAllSectorsAfter(Kernel.LastUsedSector())
++  BEGIN CleanDirPages(FileDir.DirRootAdr); TrimAllSectorsAfter(LastUsedSector())
+   END Trim;
+ 
+   PROCEDURE EnumAll(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+@@ -59,7 +104,7 @@
+     buf: FileDir.DataSector;
+     lastUsedSector, currSector, pos, len, fileno: INTEGER;
+   BEGIN
+-    fileInfo.firstSector := Kernel.LastUsedSector() + 29; fileInfo.count := 0;
++    fileInfo.firstSector := LastUsedSector() + 29; fileInfo.count := 0;
+     fileInfo.sector := fileInfo.firstSector;
+     FileDir.Enumerate("", EnumAll);
+     Kernel.PutSector(fileInfo.sector, fileInfo);
+@@ -94,10 +139,16 @@
+     END;
+     FOR pos := 0 TO FileDir.SectorSize - 1 DO buf[pos] := 0 END;
+     Kernel.PutSector(FileDir.DirRootAdr, buf);
++    currSector := LastUsedSector();
++    WHILE currSector >= 64 * 29 DO
++      Kernel.PutSector(currSector, buf);
++      DEC(currSector, 29)
++    END;
+     Kernel.GetSector(FileDir.DirRootAdr, dp);
+     dp.mark := FileDir.DirMark;
+     Kernel.PutSector(FileDir.DirRootAdr, dp);
+     Kernel.InitSecMap;
++    Kernel.MarkSector(FileDir.DirRootAdr);
+     currSector := lastUsedSector + 29; fileno := 0; pos := 0;
+     Kernel.GetSector(fileInfo.firstSector, fileInfo);
+     Kernel.GetSector(currSector, buf); INC(currSector, 29);
