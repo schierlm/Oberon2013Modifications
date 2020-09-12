@@ -21,7 +21,7 @@ cd work
 for i in *.txt; do unix2mac $i; mv $i ${i%.txt}; done
 tar --sort=name --mode="ugo-rwx" --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner -cf oberon-reproducible.tar *.Mod *.Tool
 
-echo 'c44c79412479f8464c40a1a8634ec011ec733da987e209af135d331aad096af2 *oberon-reproducible.tar' | sha256sum -c
+echo '89b3e6cbd34a155fee84439e465da2d29adaeae78edcedd7c8eaa8cf3aa6ca25 *oberon-reproducible.tar' | sha256sum -c
 
 cd ..
 
