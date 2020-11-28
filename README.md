@@ -62,3 +62,4 @@ a high performance or binary size overhead, and are therefore undesirable in nor
 | **[InnerEmulator](InnerEmulator/README.md)** | Emulate a RISC processor on the Oberon system | None (except patience when starting it up) |
 | **[ReproducibleBuild](ReproducibleBuild/README.md)**† | How to build Oberon disk images that are bit-for-bit identical | Recompile everything |
 | **[FontConversion](FontConversion/README.md)** | Conversions to and between Oberon .Scn.Fnt files | Optionally patch Display.Mod |
+| **[DynamicMemorySplit](DynamicMemorySplit/README.md)** | Move the address that separates heap from stack and modules | Rebuild inner core |

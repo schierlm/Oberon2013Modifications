@@ -1,0 +1,67 @@
+--- 1/Modules.Mod.txt
++++ 2/Modules.Mod.txt
+@@ -1,6 +1,6 @@
+ MODULE Modules;  (*Link and load on RISC; NW 20.10.2013 / 8.1.2019*)
+   IMPORT SYSTEM, Files;
+-  CONST versionkey = 1X; MT = 12; DescSize = 80;
++  CONST versionkey = 1X; SP = 14; MT = 12; DescSize = 80;
+ 
+   TYPE Module* = POINTER TO ModDesc;
+     Command* = PROCEDURE;
+@@ -219,7 +219,20 @@
+   BEGIN Files.Init; MTOrg := SYSTEM.REG(MT);
+     SYSTEM.GET(16, AllocPtr); SYSTEM.GET(20, root); SYSTEM.GET(24, limit); DEC(limit, 8000H)
+   END Init;
++
++  PROCEDURE MoveSplit;
++    VAR desiredSplit, currentSplit, memLimit: INTEGER;
++  BEGIN
++    SYSTEM.GET(4, desiredSplit); SYSTEM.GET(24, currentSplit); SYSTEM.GET(12, memLimit);
++    IF (desiredSplit < currentSplit) & (desiredSplit < 30000H) THEN
++      desiredSplit := currentSplit
++    END;
++    IF (desiredSplit > currentSplit) & (desiredSplit > memLimit - 40000H) THEN
++      desiredSplit := currentSplit
++    END;
++    SYSTEM.PUT(24, desiredSplit); MTOrg := desiredSplit;
++  END MoveSplit;
+ 
+-BEGIN Init; Load("Oberon", M);
++BEGIN MoveSplit; SYSTEM.LDREG(SP, MTOrg); Init; Load("Oberon", M);
+     LED(res); REPEAT UNTIL FALSE  (*only if load fails*)
+ END Modules.
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -7,6 +7,7 @@
+     LogMenu = "Edit.Locate Edit.Search System.Copy System.Grow System.Clear";
+ 
+   VAR W: Texts.Writer;
++    AbortTrampoline: ARRAY 6 OF INTEGER;
+     pat: ARRAY 32 OF CHAR;
+ 
+   PROCEDURE GetArg(VAR S: Texts.Scanner);
+@@ -326,6 +327,15 @@
+     Texts.Append(T, W.buf)
+   END ShowModules;
+ 
++  PROCEDURE MakeAbortTrampoline;
++  BEGIN ASSERT(SYSTEM.ADR(Kernel.stackOrg) < 80000H);
++    AbortTrampoline[0] := 040000000H;                                (* MOV  R0, 0                       *)
++    AbortTrampoline[1] := 080000000H + SYSTEM.ADR(Kernel.stackOrg);  (* LDR  R0, [R0 + Kernel.stackOrg]  *)
++    AbortTrampoline[2] := 001E90000H;                                (* SUB  R1, SP, R0                  *)
++    AbortTrampoline[3] := 0E6000001H;                                (* BLE  +1                          *)
++    AbortTrampoline[4] := 0E0000000H;                                (* MOV  SP, R0                      *)
++  END MakeAbortTrampoline;
++
+   PROCEDURE ShowCommands*;
+     VAR M: Modules.Module;
+       comadr: LONGINT; ch: CHAR;
+@@ -414,5 +424,7 @@
+   
+ BEGIN Texts.OpenWriter(W);
+   Oberon.OpenLog(TextFrames.Text("")); OpenViewers;
+-  Kernel.Install(SYSTEM.ADR(Trap), 20H); Kernel.Install(SYSTEM.ADR(Abort), 0);
++  Kernel.Install(SYSTEM.ADR(Trap), 20H); MakeAbortTrampoline;
++  Kernel.Install(SYSTEM.ADR(Abort), SYSTEM.ADR(AbortTrampoline[5]));
++  Kernel.Install(SYSTEM.ADR(AbortTrampoline[0]), 0);
+ END System.

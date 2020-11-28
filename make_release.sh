@@ -18,6 +18,7 @@ patch -d work <DrawAddons/MoreClasses.patch
 patch -d work <DefragmentFreeSpace/DefragSupport.patch
 patch -d work <RemoveFilesizeLimit/LinkedExtensionTable.patch
 patch -d work <RealTimeClock/RealTimeClock.patch
+patch -d work <DynamicMemorySplit/DynamicMemorySplit.patch
 patch -d work <DoubleTrap/DoubleTrap.patch
 patch -d work <OnScreenKeyboard/InjectInput.patch
 patch -d work <WeakReferences/WeakReferences.patch
@@ -26,7 +27,9 @@ patch -d work <TrapBacktrace/TrapBacktrace.patch
 patch -d work <TrapBacktrace/POSTPATCH_after_DoubleTrap.patch
 patch -d work <ZeroLocalVariables/ZeroLocalVariables.patch
 patch -d work <ORInspect/InspectSymbols.patch
+patch -d work <StackOverflowProtector/PREPATCH_after_DynamicMemorySplit.patch
 patch -d work <StackOverflowProtector/StackOverflowProtector.patch
+patch -d work <StackOverflowProtector/POSTPATCH_after_DynamicMemorySplit.patch
 patch -d work <CommandExitCodes/CommandExitCodes.patch
 patch -d work <FontConversion/RemoveGlyphWidthLimit.patch
 
@@ -51,7 +54,7 @@ sed -i '1,2d' work/BootLoad.Mod.txt
 cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt ResourceMonitor/*.txt work
 cp DefragmentFreeSpace/DefragFiles.Mod.txt DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt work
-cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt work
+cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 
 mkdir work/debug
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug

@@ -1,0 +1,10 @@
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -472,4 +472,7 @@
+   Kernel.Install(SYSTEM.ADR(Trap), 20H); MakeAbortTrampoline;
+   Kernel.Install(SYSTEM.ADR(Abort), SYSTEM.ADR(AbortTrampoline[5]));
+   Kernel.Install(SYSTEM.ADR(AbortTrampoline[0]), 0);
++  ***PREPATCH APPLIED***
++  Oberon.OpenLog(TextFrames.Text("")); OpenViewers;
++  Kernel.Install(SYSTEM.ADR(Trap), 20H); Kernel.Install(SYSTEM.ADR(Abort), 0);
+ END System.
