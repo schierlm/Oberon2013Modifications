@@ -48,7 +48,7 @@ ORP.Compile ConvertPCFFont.Mod/s ~
 ORP.Compile OptimizeFont.Mod/s ~
 ORP.Compile FontSubsetBuilder.Mod/s ~
 
-ORP.Compile MemorySplit.Mod/s ~
+ORP.Compile MemorySplit.Mod/s Clock.Mod/s ~
 
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~

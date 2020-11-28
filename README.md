@@ -63,3 +63,4 @@ a high performance or binary size overhead, and are therefore undesirable in nor
 | **[ReproducibleBuild](ReproducibleBuild/README.md)**† | How to build Oberon disk images that are bit-for-bit identical | Recompile everything |
 | **[FontConversion](FontConversion/README.md)** | Conversions to and between Oberon .Scn.Fnt files | Optionally patch Display.Mod |
 | **[DynamicMemorySplit](DynamicMemorySplit/README.md)** | Move the address that separates heap from stack and modules | Rebuild inner core |
+| **[Clock](Clock/README.md)** | Show a clock in the lower right corner | None |
