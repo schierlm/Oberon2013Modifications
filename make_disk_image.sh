@@ -25,7 +25,9 @@ cp base.dsk mods.dsk
 : > .cmds
 for i in *.Mod *.Text *.Tool; do echo +$i >> .cmds; done
 ./risc mods.dsk < .cmds
-head -n -6 ../BuildModifications.Tool.txt > .cmds
+head -n 4 ../BuildModifications.Tool.txt > .cmds
+./risc mods.dsk < .cmds
+head -n -6 ../BuildModifications.Tool.txt | tail -n +6 > .cmds
 echo 'ORP.Compile CommandLineSystem.Mod OberonX.Mod ~' >> .cmds
 ./risc mods.dsk < .cmds
 echo 'ORP.Compile DefraggerX.Mod/s ~' > .cmds
@@ -42,7 +44,9 @@ cp base.dsk dbgmods.dsk
 : > .cmds
 for i in *.Mod *.Text *.Tool; do echo +$i >> .cmds; done
 ./risc dbgmods.dsk < .cmds
-grep -v 'DEBUG VERSION ONLY' ../BuildModifications.Tool.txt | sed '5,$s#/s#/s/d#g' > .cmds
+head -n 4 ../BuildModifications.Tool.txt > .cmds
+./risc dbgmods.dsk < .cmds
+grep -v 'DEBUG VERSION ONLY' ../BuildModifications.Tool.txt | tail -n +6 | sed 's#/s#/s/d#g' > .cmds
 echo 'ORP.Compile CommandLineSystem.Mod/s/d OberonX.Mod ~' >> .cmds
 ./risc dbgmods.dsk < .cmds
 echo 'ORP.Compile DefraggerX.Mod/s ~' > .cmds
