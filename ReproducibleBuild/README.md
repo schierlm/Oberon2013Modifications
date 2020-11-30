@@ -31,7 +31,7 @@ Current hashes
 
 When taking the source from [commit b9649d3 of the Wirth-Personal mirror
 repo](https://github.com/Spirit-of-Oberon/wirth-personal/tree/b9649d310e668c31b09e44ec38d0b517765be0a2/people.inf.ethz.ch/wirth/ProjectOberon/Sources),
-the resulting tar file (without metadata) has a sha256sum of `89b3e6cbd34a155fee84439e465da2d29adaeae78edcedd7c8eaa8cf3aa6ca25`,
+the resulting tar file (without metadata) has a sha256sum of `de6837b84320e37fc2025fde8060b17aa0f688da266651e7b6976d8cb3875d50`,
 and the final disk image has a hash sha256sum of `6c4d6e7dec9ee9b096a5d744e3a48757fd4dbb1545f81d31f4f6741c7430d1c6`.
 
 

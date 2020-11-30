@@ -1,6 +1,6 @@
 --- 1/ORL.Mod.txt
 +++ 2/ORL.Mod.txt
-@@ -97,6 +97,7 @@
+@@ -100,6 +100,7 @@
          INC(size, DescSize);
          IF AllocPtr + size < limit THEN (*allocate*)
            p := AllocPtr; mod := SYSTEM.VAL(Module, p);
@@ -8,28 +8,30 @@
            AllocPtr := (p + size + 3) DIV 4 * 4; mod.size := AllocPtr - p;
            IF root = NIL THEN mod.num := 1 ELSE mod.num := root.num + 1 END ;
            mod.next := root; root := mod
-@@ -106,6 +107,7 @@
-       IF res = noerr THEN (*read file*)
+@@ -110,6 +111,7 @@
          INC(p, DescSize); (*allocate descriptor*)
+         FOR i := 0 TO MnLength-1 DO mod.name[i] := 0X END ;
          mod.name := name; mod.key := key; mod.refcnt := 0;
 +        FOR i := 0 TO MnLength - 2 DO IF mod.name[i] = 0X THEN mod.name[i+1] := 0X END END;
          mod.data := p;  (*data*)
          SYSTEM.PUT(mod.num * 4 + MTOrg, p);  (*module table entry*)
          Files.ReadInt(R, n);
-@@ -222,10 +224,10 @@
-         END ;
-         SYSTEM.GET(Start, x);
-         SYSTEM.PUT(Start, 0E7H * 1000000H + (x DIV 4) - 1);  (*branch instruction to the initialization body of the top module*)
--        SYSTEM.PUT(Start + 12, Kernel.MemLim);  (*limit of available memory; typically overwritten by the boot loader*)
-+        SYSTEM.PUT(Start + 12, 0);  (*limit of available memory; typically overwritten by the boot loader*)
-         SYSTEM.PUT(Start + 16, AllocPtr - Start);  (*address of the end of the module space loaded*)
-         SYSTEM.PUT(Start + 20, SYSTEM.VAL(INTEGER, root) - Start);  (*current root of the links of loaded modules*)
--        SYSTEM.PUT(Start + 24, Kernel.stackOrg);  (*current limit of the module area; typically overwritten by the boot loader*)
-+        SYSTEM.PUT(Start + 24, 0);  (*current limit of the module area; typically overwritten by the boot loader*)
-         SYSTEM.PUT(Start + 252, 12345678H);  (*fingerprint*)
+@@ -227,11 +229,11 @@
+         SYSTEM.GET(Start, x);  (*address of initialization body of the top module relative to Start*)
+         SYSTEM.PUT(Start, BC + (x DIV 4) - 1);  (*branch instruction to the initialization body of the top module*)
+         SYSTEM.PUT(Start + DestAdr, 0);  (*destination address of the prelinked, executable binary*)
+-        SYSTEM.PUT(Start + MemAdr, Kernel.MemLim);  (*limit of available memory, typically overwritten by the boot loader*)
++        SYSTEM.PUT(Start + MemAdr, 0);  (*limit of available memory, typically overwritten by the boot loader*)
+         SYSTEM.PUT(Start + AllocAdr, AllocPtr - Start);  (*address of the end of the module space loaded*)
+         SYSTEM.PUT(Start + RootAdr, SYSTEM.VAL(INTEGER, root) - Start);  (*current root of the links of loaded modules*)
+-        SYSTEM.PUT(Start + StackAdr, Kernel.stackOrg);  (*current limit of the module area, typically overwritten by the boot loader*)
+-        SYSTEM.PUT(Start + FPrintAdr, FPrint);  (*fingerprint*)
++        SYSTEM.PUT(Start + StackAdr, 0);  (*current limit of the module area, typically overwritten by the boot loader*)
++        SYSTEM.PUT(Start + 252, FPrint);  (*fingerprint*)
          MakeFileName(name, S.s, ".bin"); F := Files.New(name); Files.Set(R, F, 0); i := Start;
          WHILE i < AllocPtr DO SYSTEM.GET(i, x); Files.WriteInt(R, x); INC(i, 4) END ;
-@@ -260,6 +262,10 @@
+         Texts.WriteInt(W, AllocPtr - Start, 7); Files.Register(F)
+@@ -266,6 +268,10 @@
          END ;
          IF i > 0 THEN
            WHILE i < Kernel.SectorLength DO buf[i] := 0; INC(i) END ;
