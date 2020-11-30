@@ -1,0 +1,11 @@
+--- 1/ORB.Mod.txt
++++ 2/ORB.Mod.txt
+@@ -477,7 +477,7 @@
+     Files.WriteInt(R, -2);
+     Files.Register(F);
+ 
+-    MakeFileName(filename, modid, ".ssy"); F := Files.New(filename); Files.Set(R, F, 0);
++    MakeFileName(filename, modid, ".ssy", cross); F := Files.New(filename); Files.Set(R, F, 0);
+     Files.WriteInt(R, ssymCount); ptrpos := 4;
+     FOR i := 0 TO ssymCount - 1 DO Files.WriteInt(R, 0) (* placeholder *) END;
+     FOR i := 0 TO ssymCount - 1 DO

@@ -27,6 +27,7 @@ patch -d work <TrapBacktrace/TrapBacktrace.patch
 patch -d work <TrapBacktrace/POSTPATCH_after_DoubleTrap.patch
 patch -d work <ZeroLocalVariables/ZeroLocalVariables.patch
 patch -d work <ORInspect/InspectSymbols.patch
+patch -d work <CrossCompiler/CrossCompiler.patch
 patch -d work <StackOverflowProtector/PREPATCH_after_DynamicMemorySplit.patch
 patch -d work <StackOverflowProtector/StackOverflowProtector.patch
 patch -d work <StackOverflowProtector/POSTPATCH_after_DynamicMemorySplit.patch
@@ -63,6 +64,7 @@ mv work/RS232.Mod.txt work/debug
 sed -i 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
+patch -d work/debug <CrossCompiler/POSTPATCH_after_StackSymbols.patch
 patch -d work/debug <KernelDebugger/RS232.patch
 patch -d work/debug <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch
 patch -d work/debug <KernelDebugger/ReserveRegisters.patch

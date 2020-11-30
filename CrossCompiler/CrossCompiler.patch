@@ -1,0 +1,136 @@
+--- 1/ORB.Mod.txt
++++ 2/ORB.Mod.txt
+@@ -121,11 +121,12 @@
+ 
+   (*------------------------------- Import ---------------------------------*)
+ 
+-  PROCEDURE MakeFileName*(VAR FName: ORS.Ident; name, ext: ARRAY OF CHAR);
++  PROCEDURE MakeFileName*(VAR FName: ORS.Ident; name, ext: ARRAY OF CHAR; cross: BOOLEAN);
+     VAR i, j: INTEGER;
+   BEGIN i := 0; j := 0;  (*assume name suffix less than 4 characters*)
+     WHILE (i < ORS.IdLen-5) & (name[i] > 0X) DO FName[i] := name[i]; INC(i) END ;
+     REPEAT FName[i]:= ext[j]; INC(i); INC(j) UNTIL ext[j] = 0X;
++    IF cross THEN FName[i] := "."; FName[i+1] := "X"; INC(i, 2) END;
+     FName[i] := 0X
+   END MakeFileName;
+   
+@@ -211,7 +212,7 @@
+     END
+   END InType;
+   
+-  PROCEDURE Import*(VAR modid, modid1: ORS.Ident);
++  PROCEDURE Import*(VAR modid, modid1: ORS.Ident; cross: BOOLEAN);
+     VAR key: LONGINT; class, k: INTEGER;
+       obj: Object;  t: Type;
+       thismod: Object;
+@@ -221,7 +222,7 @@
+     IF modid1 = "SYSTEM" THEN
+       thismod := ThisModule(modid, modid1, TRUE,  key); DEC(nofmod);
+       thismod.lev := 0; thismod.dsc := system; thismod.rdo := TRUE
+-    ELSE MakeFileName(fname, modid1, ".smb"); F := Files.Old(fname);
++    ELSE MakeFileName(fname, modid1, ".smb", cross); F := Files.Old(fname);
+       IF F # NIL THEN
+         Files.Set(R, F, 0); Files.ReadInt(R, key); Files.ReadInt(R, key); Files.ReadString(R, modname);
+         thismod := ThisModule(modid, modid1, TRUE, key); thismod.rdo := TRUE;
+@@ -388,7 +389,7 @@
+     IF size # T.size THEN ORS.Mark("ISy variable size mismatch") END
+   END WriteISyVar;
+ 
+-  PROCEDURE WriteInspectSymbolFile*(VAR modid: ORS.Ident);
++  PROCEDURE WriteInspectSymbolFile*(VAR modid: ORS.Ident; cross: BOOLEAN);
+     VAR pos, bufpos, ptrpos, size: INTEGER;
+       F: Files.File;
+       filename: ORS.Ident;
+@@ -397,7 +398,7 @@
+       buffer: ARRAY 100 OF CHAR;
+   BEGIN pos := 0;
+     obj := topScope;
+-    MakeFileName(filename, modid, ".isy"); F := Files.New(filename); Files.Set(R, F, 0);
++    MakeFileName(filename, modid, ".isy", cross); F := Files.New(filename); Files.Set(R, F, 0);
+     Files.WriteInt(R, 0); (* placeholder *)
+     WHILE obj # NIL DO
+       IF (obj.class = Typ) & (obj.type.form = Record) THEN
+@@ -545,12 +546,12 @@
+     END
+   END OutType;
+ 
+-  PROCEDURE Export*(VAR modid: ORS.Ident; VAR newSF: BOOLEAN; VAR key: LONGINT);
++  PROCEDURE Export*(VAR modid: ORS.Ident; VAR newSF: BOOLEAN; VAR key: LONGINT; cross: BOOLEAN);
+     VAR x, sum, oldkey: LONGINT;
+       obj, obj0: Object;
+       filename: ORS.Ident;
+       F, F1: Files.File; R, R1: Files.Rider;
+-  BEGIN Ref := Record + 1; MakeFileName(filename, modid, ".smb");
++  BEGIN Ref := Record + 1; MakeFileName(filename, modid, ".smb", cross);
+     F := Files.New(filename); Files.Set(R, F, 0);
+     Files.WriteInt(R, 0); (*placeholder*)
+     Files.WriteInt(R, 0); (*placeholder for key to be inserted at the end*)
+--- 1/ORG0.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -1043,7 +1043,7 @@
+     END
+   END FindPtrs;
+ 
+-  PROCEDURE Close*(VAR modid: ORS.Ident; key, nofent: LONGINT);
++  PROCEDURE Close*(VAR modid: ORS.Ident; key, nofent: LONGINT; cross: BOOLEAN);
+     VAR obj: ORB.Object;
+       i, comsize, nofimps, nofptrs, size: LONGINT;
+       name: ORS.Ident;
+@@ -1065,7 +1065,7 @@
+     END ;
+     size := varsize + strx + comsize + (pc + nofimps + nofent + nofptrs + 1)*4;  (*varsize includes type descriptors*)
+     
+-    ORB.MakeFileName(name, modid, ".rsc"); (*write code file*)
++    ORB.MakeFileName(name, modid, ".rsc", cross); (*write code file*)
+     F := Files.New(name); Files.Set(R, F, 0); Files.WriteString(R, modid); Files.WriteInt(R, key); Files.Write(R, CHR(version));
+     Files.WriteInt(R, size);
+     obj := ORB.topScope.next;
+--- 1/ORP.Mod.txt
++++ 2/ORP.Mod.txt
+@@ -14,7 +14,7 @@
+   VAR sym: INTEGER;   (*last symbol read*)
+     dc: LONGINT;    (*data counter*)
+     level, exno, version: INTEGER;
+-    newSF, debug: BOOLEAN;  (*option flag*)
++    newSF, cross, debug: BOOLEAN;  (*option flag*)
+     expression: PROCEDURE (VAR x: ORG.Item);  (*to avoid forward reference*)
+     Type: PROCEDURE (VAR type: ORB.Type);
+     FormalType: PROCEDURE (VAR typ: ORB.Type; dim: INTEGER);
+@@ -905,7 +905,7 @@
+         END
+       ELSE impid1 := impid
+       END ;
+-      ORB.Import(impid, impid1)
++      ORB.Import(impid, impid1, cross)
+     ELSE ORS.Mark("id expected")
+     END
+   END Import;
+@@ -940,12 +940,12 @@
+       END ;
+       IF sym # ORS.period THEN ORS.Mark("period missing") END ;
+       IF (ORS.errcnt = 0) & (version # 0) THEN
+-        ORB.Export(modid, newSF, key);
+-        IF (ORS.errcnt = 0) & debug THEN ORB.WriteInspectSymbolFile(modid) END;
++        ORB.Export(modid, newSF, key, cross);
++        IF (ORS.errcnt = 0) & debug THEN ORB.WriteInspectSymbolFile(modid, cross) END;
+         IF newSF THEN Texts.WriteString(W, " new symbol file") END
+       END ;
+       IF ORS.errcnt = 0 THEN
+-        ORG.Close(modid, key, exno);
++        ORG.Close(modid, key, exno, cross);
+         Texts.WriteInt(W, ORG.pc, 6); Texts.WriteInt(W, dc, 6); Texts.WriteHex(W, key)
+       ELSE Texts.WriteLn(W); Texts.WriteString(W, "compilation FAILED")
+       END ;
+@@ -956,10 +956,11 @@
+   END Module;
+ 
+   PROCEDURE Option(VAR S: Texts.Scanner);
+-  BEGIN newSF := FALSE; debug := FALSE;
++  BEGIN newSF := FALSE; cross := FALSE; debug := FALSE;
+     WHILE S.nextCh = "/" DO
+       Texts.Scan(S); Texts.Scan(S); 
+       IF (S.class = Texts.Name) & (S.s[0] = "d") THEN debug := TRUE END;
++      IF (S.class = Texts.Name) & (S.s[0] = "x") THEN cross := TRUE END;
+       IF (S.class = Texts.Name) & (S.s[0] = "s") THEN newSF := TRUE END
+     END
+   END Option;

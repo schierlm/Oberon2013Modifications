@@ -64,3 +64,4 @@ a high performance or binary size overhead, and are therefore undesirable in nor
 | **[FontConversion](FontConversion/README.md)** | Conversions to and between Oberon .Scn.Fnt files | Optionally patch Display.Mod |
 | **[DynamicMemorySplit](DynamicMemorySplit/README.md)** | Move the address that separates heap from stack and modules | Rebuild inner core |
 | **[Clock](Clock/README.md)** | Show a clock in the lower right corner | None |
+| **[CrossCompiler](CrossCompiler/README.md)** | Compile a second set of modules without affecting the current system | Recompile compiler |

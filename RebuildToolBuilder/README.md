@@ -11,6 +11,10 @@ In case there are any missing modules (`.rsc` but not `.Mod`) or uncompiled modu
 (`.Mod` but not `.rsc`), these are listed. Only if they are corrected (by compiling
 the modules or deleting the `.rsc` files), the module list will be built.
 
+As other modifications introduce other switches than `/s`, it is possible to pass
+arbitrary switches to the RebuildToolBuilder.Build` command and they will be
+reproduced on every command line.
+
 Each entry of the list consists of a compile command, followed by a flag character
 how important it is to rebuild the module. Note that this information is only reliable
 if your Oberon system has a reliable real-time clock. If not, you can only start from

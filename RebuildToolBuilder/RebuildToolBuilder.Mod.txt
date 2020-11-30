@@ -64,10 +64,18 @@ MODULE RebuildToolBuilder;
   PROCEDURE Build*;
     VAR x, y: INTEGER;
       T: Texts.Text;
+      S: Texts.Scanner;
       V: Viewers.Viewer;
       mi, mi2, mi3, done: ModInfo;
+      opts: ARRAY 9 OF CHAR;
       missing: BOOLEAN;
   BEGIN
+    Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S); x := 0;
+    WHILE (S.class = Texts.Char) & (S.c = "/") DO
+      opts[x] := S.c; Texts.Scan(S); INC(x);
+      IF S.class = Texts.Name THEN opts[x] := S.s[0]; INC(x); Texts.Scan(S) END
+    END;
+    opts[x] := 0X;
     root := NIL; done := NIL; missing := FALSE;
     Oberon.AllocateUserViewer(Oberon.Par.vwr.X, x, y); T := TextFrames.Text("");
     V := MenuViewers.New(
@@ -87,7 +95,9 @@ MODULE RebuildToolBuilder;
         Texts.WriteString(W, mi.name);
         Texts.WriteString(W, ".rsc: ORP.Compile ");
         Texts.WriteString(W, mi.name);
-        Texts.WriteString(W, ".Mod/s ~");
+        Texts.WriteString(W, ".Mod/s");
+        Texts.WriteString(W, opts);
+        Texts.WriteString(W, " ~");
         Texts.WriteLn(W);
         missing := TRUE;
       ELSIF mi.rscDate = mi.modDate THEN
@@ -117,7 +127,9 @@ MODULE RebuildToolBuilder;
         IF ~missing THEN
           Texts.WriteString(W, "ORP.Compile ");
           Texts.WriteString(W, mi.next.name);
-          Texts.WriteString(W, ".Mod/s ~ [");
+          Texts.WriteString(W, ".Mod/s");
+          Texts.WriteString(W, opts);
+          Texts.WriteString(W, " ~ [");
           Texts.Write(W, mi.next.changeFlag);
           Texts.Write(W, "]");
           Texts.WriteLn(W);
