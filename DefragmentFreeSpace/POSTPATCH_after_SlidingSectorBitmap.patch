@@ -1,0 +1,18 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -207,14 +207,8 @@
+   END InitSecMap;
+ 
+   PROCEDURE LastUsedSector*(): INTEGER;
+-  VAR i, j, secno: INTEGER;
+   BEGIN
+-    i := mapsize DIV 32 - 1;
+-    WHILE sectorMap[i] = {} DO DEC(i) END;
+-    FOR j := 0 TO 31 DO
+-      IF j IN sectorMap[i] THEN secno := i * 32 + j END;
+-    END;
+-  RETURN secno * 29
++  RETURN lastUsedSector * 29
+   END LastUsedSector;
+ 
+   PROCEDURE MarkSector*(sec: INTEGER);

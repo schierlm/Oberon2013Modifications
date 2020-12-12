@@ -1,0 +1,256 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -14,6 +14,7 @@
+     clock: INTEGER;
+     list0, list1, list2, list3: INTEGER;  (*lists of free blocks of size n*256, 128, 64, 32 bytes*)
+     data: INTEGER; (*SPI data in*)
++    sectorMapStart*, lastUsedSector: INTEGER;
+     sectorMap: ARRAY mapsize DIV 32 OF SET;
+     
+ (* ---------- New: heap allocation ----------*)
+@@ -194,30 +195,51 @@
+     ASSERT(data MOD 32 = 5); SPIIdle(1) (*deselect card*)
+   END WriteSD;
+ 
+-  PROCEDURE InitSecMap*;
++  PROCEDURE InitSlidingSecMap*(start: INTEGER);
+     VAR i: INTEGER;
+   BEGIN NofSectors := 0; sectorMap[0] := {0 .. 31}; sectorMap[1] := {0 .. 31};
++    sectorMapStart := start; lastUsedSector := 0;
+     FOR i := 2 TO mapsize DIV 32 - 1 DO sectorMap[i] := {} END
++  END InitSlidingSecMap;
++
++  PROCEDURE InitSecMap*;
++  BEGIN InitSlidingSecMap(0)
+   END InitSecMap;
+ 
+   PROCEDURE MarkSector*(sec: INTEGER);
+   BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+-    INCL(sectorMap[sec DIV 32], sec MOD 32); INC(NofSectors)
++    IF sec > lastUsedSector THEN lastUsedSector := sec END;
++    sec := sec - sectorMapStart * mapsize;
++    IF (sec >= 0) & (sec < mapsize) THEN
++      INCL(sectorMap[sec DIV 32], sec MOD 32)
++    END;
++    INC(NofSectors)
+   END MarkSector;
+ 
+   PROCEDURE FreeSector*(sec: INTEGER);
+   BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+-    EXCL(sectorMap[sec DIV 32], sec MOD 32); DEC(NofSectors)
++    sec := sec - sectorMapStart * mapsize;
++    IF (sec >= 0) & (sec < mapsize) THEN
++      EXCL(sectorMap[sec DIV 32], sec MOD 32);
++    END;
++    DEC(NofSectors)
+   END FreeSector;
+ 
+-  PROCEDURE AllocSector*(hint: INTEGER; VAR sec: INTEGER);
+-    VAR s: INTEGER;
++  PROCEDURE AllocSector*(hint: INTEGER; VAR sec: INTEGER; VAR mapFull: BOOLEAN);
++    VAR s, i: INTEGER;
+   BEGIN (*find free sector, starting after hint*)
+-    hint := hint DIV 29; ASSERT(SYSTEM.H(0) = 0); s := hint;
++    hint := hint DIV 29; ASSERT(SYSTEM.H(0) = 0); i := 0;
++    s := hint - sectorMapStart * mapsize;
++    IF s < 0 THEN s := 0 END;
+     REPEAT INC(s);
+-      IF s = mapsize THEN s := 1 END ;
+-    UNTIL ~(s MOD 32 IN sectorMap[s DIV 32]);
+-    INCL(sectorMap[s DIV 32], s MOD 32); INC(NofSectors); sec := s * 29
++      IF s >= mapsize THEN INC(i); s := 1 END ;
++    UNTIL (i >= 2) OR ~(s MOD 32 IN sectorMap[s DIV 32]);
++    IF i >= 2 THEN
++      mapFull := TRUE
++    ELSE
++      sec := (s + sectorMapStart * mapsize) * 29;
++      MarkSector(sec)
++    END
+   END AllocSector;
+ 
+   PROCEDURE GetSector*(src: INTEGER; VAR dst: Sector);
+--- 1/FileDir.Mod.txt
++++ 2/FileDir.Mod.txt
+@@ -22,6 +22,7 @@
+     SectorTable*    = ARRAY SecTabSize OF DiskAdr;
+     ExtensionTable* = ARRAY ExTabSize OF DiskAdr;
+     EntryHandler*   = PROCEDURE (name: FileName; sec: DiskAdr; VAR continue: BOOLEAN);
++    InitHandler     = PROCEDURE;
+ 
+     FileHeader* =
+       RECORD (*first page of each file on disk*)
+@@ -52,6 +53,20 @@
+         fill:  ARRAY FillerSize OF BYTE;
+         e*:  ARRAY DirPgSize OF DirEntry
+       END ;
++
++  VAR initFS: InitHandler;
++
++  PROCEDURE AllocSector*(hint: INTEGER; VAR sec: INTEGER);
++    VAR mapFull: BOOLEAN;
++  BEGIN mapFull := FALSE;
++    Kernel.AllocSector(hint, sec, mapFull);
++    WHILE mapFull DO
++      mapFull := FALSE;
++      Kernel.InitSlidingSecMap(Kernel.sectorMapStart + 1);
++      initFS();
++      Kernel.AllocSector(hint, sec, mapFull)
++    END
++  END AllocSector;
+ 
+   (*Exported procedures: Search, Insert, Delete, Enumerate, Init*)
+ 
+@@ -113,11 +128,11 @@
+             v := a.e[N-1]; i := N-1;
+             WHILE i > R DO DEC(i); a.e[i+1] := a.e[i] END ;
+             a.e[R] := u; Kernel.PutSector(dpg0, a);
+-            Kernel.AllocSector(dpg0, dpg0); i := 0;
++            AllocSector(dpg0, dpg0); i := 0;
+             WHILE i < N DO a.e[i] := a.e[i+N]; INC(i) END
+           ELSE (*insert in right half*)
+             Kernel.PutSector(dpg0, a);
+-            Kernel.AllocSector(dpg0, dpg0); DEC(R, N); i := 0;
++            AllocSector(dpg0, dpg0); DEC(R, N); i := 0;
+             IF R = 0 THEN v := u
+             ELSE v := a.e[N];
+               WHILE i < R-1 DO a.e[i] := a.e[N+1+i]; INC(i) END ;
+@@ -140,7 +155,7 @@
+     insert(name, DirRootAdr, h, U, fad);
+     IF h THEN (*root overflow*)
+       Kernel.GetSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
+-      Kernel.AllocSector(DirRootAdr, oldroot); Kernel.PutSector(oldroot, a);
++      AllocSector(DirRootAdr, oldroot); Kernel.PutSector(oldroot, a);
+       a.mark := DirMark; a.m := 1; a.p0 := oldroot; a.e[0] := U;
+       Kernel.PutSector(DirRootAdr, a)
+     END
+@@ -289,7 +304,7 @@
+ 
+ (* ----- initialization ----- *)
+ 
+-PROCEDURE Init*;
++PROCEDURE InitFS;
+     VAR k: INTEGER;
+         A: ARRAY 2000 OF DiskAdr;
+ 
+@@ -359,6 +374,11 @@
+     END TraverseDir;
+ 
+   BEGIN k := 0; TraverseDir(A, k, DirRootAdr); MarkSectors(A, k)
+-  END Init; 
++  END InitFS;
++
++  PROCEDURE Init*;
++  BEGIN initFS := InitFS;
++    InitFS();
++  END Init;
+   
+ END FileDir.
+--- 1/Files.Mod.txt
++++ 2/Files.Mod.txt
+@@ -190,7 +190,7 @@
+     IF buf.apos < STS THEN
+       secadr := f.sec[buf.apos];
+       IF secadr = 0 THEN
+-        Kernel.AllocSector(f.sechint, secadr);
++        FileDir.AllocSector(f.sechint, secadr);
+         f.modH := TRUE; f.sec[buf.apos] := secadr; f.sechint := secadr
+       END ;
+       IF buf.apos = 0 THEN
+@@ -204,7 +204,7 @@
+       END ;
+       k := (buf.apos - STS) MOD XS; secadr := inx.sec[k];
+       IF secadr = 0 THEN
+-        Kernel.AllocSector(f.sechint, secadr);
++        FileDir.AllocSector(f.sechint, secadr);
+         f.modH := TRUE; inx.mod := TRUE; inx.sec[k] := secadr; f.sechint := secadr
+       END
+      ELSE
+@@ -221,7 +221,7 @@
+       END;
+       secadr := linx.sec[k];
+       IF secadr = 0 THEN
+-        Kernel.AllocSector(f.sechint, secadr);
++        FileDir.AllocSector(f.sechint, secadr);
+         f.modH := TRUE; linx.mod := TRUE; linx.sec[k] := secadr; f.sechint := secadr
+       END
+      END
+@@ -271,7 +271,7 @@
+       inx := f.ext[i]; INC(i);
+       IF inx.mod THEN
+         IF inx.adr = 0 THEN
+-          Kernel.AllocSector(f.sechint, inx.adr); f.sechint := inx.adr; f.modH := TRUE
++          FileDir.AllocSector(f.sechint, inx.adr); f.sechint := inx.adr; f.modH := TRUE
+         END ;
+         Kernel.PutSector(inx.adr, inx.sec); inx.mod := FALSE
+       END
+@@ -281,7 +281,7 @@
+       linx2 := linx;
+       IF linx = NIL THEN linx := f.lext ELSE linx := linx.next END; INC(i);
+       IF linx.mod & (linx.adr = 0) THEN
+-        Kernel.AllocSector(f.sechint, linx.adr); f.sechint := linx.adr;
++        FileDir.AllocSector(f.sechint, linx.adr); f.sechint := linx.adr;
+         IF linx2 # NIL THEN linx2.sec[XS - 1] := linx.adr END
+       END
+     END;
+--- 1/DefragFiles.Mod.txt
++++ 2/DefragFiles.Mod.txt
+@@ -156,7 +156,7 @@
+     IF onlyBuf.apos < STS THEN
+       secadr := onlyFile.sec[onlyBuf.apos];
+       IF secadr = 0 THEN
+-        Kernel.AllocSector(onlyFile.sechint, secadr);
++        FileDir.AllocSector(onlyFile.sechint, secadr);
+         onlyFile.modH := TRUE; onlyFile.sec[onlyBuf.apos] := secadr; onlyFile.sechint := secadr
+       END;
+       IF onlyBuf.apos = 0 THEN
+@@ -169,7 +169,7 @@
+       END;
+       k := (onlyBuf.apos - STS) MOD XS; secadr := onlyFile.ext[i].sec[k];
+       IF secadr = 0 THEN
+-        Kernel.AllocSector(onlyFile.sechint, secadr);
++        FileDir.AllocSector(onlyFile.sechint, secadr);
+         onlyFile.modH := TRUE; onlyFile.ext[i].mod := TRUE; onlyFile.ext[i].sec[k] := secadr; onlyFile.sechint := secadr
+       END
+      ELSE
+@@ -178,12 +178,12 @@
+         ASSERT(onlyFile.lextIdx = -1);
+         onlyFile.lext.nil := FALSE; onlyFile.lextIdx := 0;
+         FOR m := 0 TO XS - 1 DO onlyFile.lext.sec[m] := 0 END;
+-        Kernel.AllocSector(onlyFile.sechint, secadr); onlyFile.sechint := secadr;
++        FileDir.AllocSector(onlyFile.sechint, secadr); onlyFile.sechint := secadr;
+         onlyFile.lext.adr := secadr; onlyFile.lext.mod := TRUE; onlyFile.modH := TRUE
+       END;
+       l := k DIV (XS - 1); k := k MOD (XS - 1);
+       IF l = onlyFile.lextIdx + 1 THEN
+-        Kernel.AllocSector(onlyFile.sechint, secadr); onlyFile.sechint := secadr;
++        FileDir.AllocSector(onlyFile.sechint, secadr); onlyFile.sechint := secadr;
+         onlyFile.lext.sec[XS - 1] := secadr;
+         Kernel.PutSector(onlyFile.lext.adr, onlyFile.lext.sec);
+         IF onlyFile.lextIdx = 0 THEN
+@@ -197,7 +197,7 @@
+       END; ASSERT(l = onlyFile.lextIdx);
+       secadr := onlyFile.lext.sec[k];
+       IF secadr = 0 THEN
+-        Kernel.AllocSector(onlyFile.sechint, secadr);
++        FileDir.AllocSector(onlyFile.sechint, secadr);
+         onlyFile.modH := TRUE; onlyFile.lext.mod := TRUE; onlyFile.lext.sec[k] := secadr; onlyFile.sechint := secadr
+       END
+      END
+@@ -225,7 +225,7 @@
+     WHILE (i < k) & (i < FileDir.ExTabSize) DO
+       IF onlyFile.ext[i].mod THEN
+         IF onlyFile.ext[i].adr = 0 THEN
+-          Kernel.AllocSector(onlyFile.sechint, onlyFile.ext[i].adr); onlyFile.sechint := onlyFile.ext[i].adr; onlyFile.modH := TRUE
++          FileDir.AllocSector(onlyFile.sechint, onlyFile.ext[i].adr); onlyFile.sechint := onlyFile.ext[i].adr; onlyFile.modH := TRUE
+         END;
+         Kernel.PutSector(onlyFile.ext[i].adr, onlyFile.ext[i].sec); onlyFile.ext[i].mod := FALSE
+       END; INC(i)
+@@ -284,7 +284,7 @@
+     REPEAT DEC(i); onlyFile.ext[k].sec[i] := 0 UNTIL i = 0
+    ELSIF (onlyFile.aleng >= STS + FileDir.ExTabSize * XS) & ((onlyFile.aleng - STS - FileDir.ExTabSize * XS) MOD (XS - 1) = 0) THEN
+     k := (onlyFile.aleng - STS - FileDir.ExTabSize * XS) DIV (XS - 1);
+-    Kernel.AllocSector(onlyFile.sechint, secadr); onlyFile.sechint := secadr;
++    FileDir.AllocSector(onlyFile.sechint, secadr); onlyFile.sechint := secadr;
+     IF k = 0 THEN
+       onlyFile.lext.nil := FALSE; onlyFile.modH := TRUE
+     ELSE

@@ -19,12 +19,25 @@ files can grow arbitrarily large (up to the filesystem size limit of 64 MB), and
 filesystems that do not include files larger than 2880 sectors (2.88 MB) are 100%
 compatible between these two formats.
 
+The filesystem size limit of 64 MB is caused by a sector bitmap which is stored
+in RAM (in the Kernel module). The easiest way to overcome this limitation (without
+requiring an on-disk bitmap or increasing the RAM usage) is to notice that a sector
+that has been used will not be freed until the next reboot. Therefore it is
+sufficient to keep a "sliding window" of the sector bitmap in the RAM; once all
+sectors in this sliding window are used, rescan the filesystem to generate the next
+window. For performance reasons, and to enable features like the Defragger, the
+last used sector number is also kept available all the time, even when it is outside
+the current sliding window.
+
 
 Installation
 ------------
 
 - Apply [`LinkedExtensionTable.patch`](LinkedExtensionTable.patch) to `FileDir.Mod`
-  and `Files.Mod`.
+  and `Files.Mod` (and optionally `DefragFiles.Mod` if you want to use the defragger).
+
+- Optionally apply [`SlidingSectorBitmap.patch`](SlidingSectorBitmap.patch) to `Kernel.Mod`,
+  `FileDir.Mod` and `Files.Mod` (and optionally `DefragFiles.Mod` if you want to use the defragger).
 
 - Push the new modules.
 
