@@ -61,10 +61,11 @@ cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 
-mkdir work/debug
+mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
 cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/debug
 mv work/RS232.Mod.txt work/debug
+
 sed -i 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
@@ -76,6 +77,16 @@ patch -d work/debug -R <KernelDebugger/PREPATCH_after_StackOverflowProtector.pat
 patch -d work/debug <KernelDebugger/ReserveRegistersExtra.patch
 cp ORStackInspect/*.txt KernelDebugger/*.txt work/debug
 
-rm work/*.orig work/debug/*.orig
+for i in Kernel System.RS Modules.RS Oberon; do
+	cp work/${i%%.RS}.Mod.txt work/rescue/$i.Mod.txt
+	cp work/debug/${i%%.RS}.Mod.txt work/debugrescue/$i.Mod.txt 2>/dev/null || cp work/${i%%.RS}.Mod.txt work/debugrescue/$i.Mod.txt
+done
+cp RescueSystem/*.txt MinimalFonts/Fonts.Embedded.Mod.txt work/rescue
+
+patch -d work/rescue <RescueSystem/RescueSystem.patch -F 3
+patch -d work/rescue <RescueSystem/POSTPATCH_after_DefragSupport.patch
+patch -d work/debugrescue <RescueSystem/RescueSystem.patch -F 3
+
+rm work/*.orig work/debug/*.orig work/rescue/*.orig work/debugrescue/*.orig
 
 echo Done.

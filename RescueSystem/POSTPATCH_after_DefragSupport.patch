@@ -1,0 +1,19 @@
+--- 1/RescueSystemTool.Mod.txt
++++ 2/RescueSystemTool.Mod.txt
+@@ -7,15 +7,7 @@
+ VAR secno, i: INTEGER;
+   sec: Kernel.Sector;
+   used: BOOLEAN;
+-BEGIN secno := 0FFFFH * 29; used := FALSE;
+-  (* secno := Kernel.LastUsedSector(); *)
+-  WHILE (~used) & (secno > 0) DO
+-    Kernel.GetSector(secno, sec); i := 0;
+-    WHILE (~used) & (i < Kernel.SectorLength) DO
+-      IF sec[i] # 0 THEN used := TRUE ELSE INC(i) END
+-    END;
+-    IF (~used) THEN DEC(secno, 29) END
+-  END;
++BEGIN secno := Kernel.LastUsedSector()
+   RETURN secno
+ END LastUsedSector;
+ 

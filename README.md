@@ -28,6 +28,8 @@ The CommandLineCompiler is available as a separate release.
 Modifications marked with a ‡ are only included in the prebuilt "debug release". These modifications aid in debugging, but have
 a high performance or binary size overhead, and are therefore undesirable in normal builds.
 
+There are also two separate releases available that include the rescue system (the normal one and the "debug" one).
+
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
 | **[BugFixes](BugFixes/README.md)** | Fixes for what I consider to be bugs | Optionally recompile inner core |
