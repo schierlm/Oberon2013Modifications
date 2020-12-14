@@ -55,6 +55,12 @@ BEGIN
 END Test.
 ```
 
+Fix 5: Fix scroll cursor corrupting the IO memory area
+------------------------------------------------------
+
+When dragging the mouse pointer to the top of the screen while scrolling, the scroll cursor
+was drawn partially outside the screen and could corrupt the IO memory area.
+
 Installation
 ------------
 
@@ -68,12 +74,15 @@ Installation
 
 - Apply [`CompileSetLiterals.patch`](CompileSetLiterals.patch) to `ORG.Mod`
 
+- Apply [`FixScrollCursorCorruption.patch`](FixScrollCursorCorruption.patch) to `TextFrames.Mod`
+
 - Recompile the changed modules and rebuild the inner core:
 
       ORP.Compile Kernel.Mod ~
       ORL.Link Modules ~
       ORL.Load Modules.bin ~
 
+      ORP.Compile TextFrames.Mod ~
       ORP.Compile GraphicFrames.Mod ~
       ORP.Compile ORG.Mod ~
 

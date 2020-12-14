@@ -15,6 +15,7 @@ patch -d work <BugFixes/InitializeGraphicFramesTbuf.patch
 patch -d work <BugFixes/NoMemoryCorruptionAfterMemoryAllocationFailure.patch
 patch -d work <BugFixes/IllegalAccessInGC.patch
 patch -d work <BugFixes/CompileSetLiterals.patch
+patch -d work <BugFixes/FixScrollCursorCorruption.patch
 patch -d work <ConvertEOL/ConvertEOL.patch
 patch -d work <DrawAddons/MoreClasses.patch
 patch -d work <RemoveFilesizeLimit/LinkedExtensionTable.patch

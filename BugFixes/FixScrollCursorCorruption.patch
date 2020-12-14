@@ -1,0 +1,13 @@
+--- 1/TextFrames.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -74,8 +74,8 @@
+     ELSE
+       IF X < CL + 3 THEN X := CL + 4 ELSIF X > CL + DW - 4 THEN X := CL + DW - 4 END
+     END ;
+-    IF Y < 6 THEN Y := 6 ELSIF Y > DH - 6 THEN Y := DH - 6 END;
+-    Display.CopyPattern(Display.white, Display.updown, X-4, Y-4, Display.invert)
++    IF Y < 7 THEN Y := 7 ELSIF Y > DH - 7 THEN Y := DH - 7 END;
++    Display.CopyPattern(Display.white, Display.updown, X-4, Y-7, Display.invert)
+   END FlipSM;
+ 
+   PROCEDURE UpdateMark (F: Frame);  (*in scroll bar*)
