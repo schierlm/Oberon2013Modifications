@@ -16,6 +16,10 @@ patch -d work <BugFixes/NoMemoryCorruptionAfterMemoryAllocationFailure.patch
 patch -d work <BugFixes/IllegalAccessInGC.patch
 patch -d work <BugFixes/CompileSetLiterals.patch
 patch -d work <BugFixes/FixScrollCursorCorruption.patch
+for i in FileDir Files; do
+	cp work/$i.Mod.txt work/Image$i.Mod.txt
+done
+patch -d work <ImageBuilder/DeriveImageFiles.patch
 patch -d work <ConvertEOL/ConvertEOL.patch
 patch -d work <DrawAddons/MoreClasses.patch
 patch -d work <RemoveFilesizeLimit/LinkedExtensionTable.patch
@@ -58,7 +62,7 @@ sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
 sed -i '1,2d' work/BootLoad.Mod.txt
 
 cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt ResourceMonitor/*.txt work
-cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt work
+cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 

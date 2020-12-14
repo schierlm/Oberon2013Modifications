@@ -67,3 +67,4 @@ There are also two separate releases available that include the rescue system (t
 | **[DynamicMemorySplit](DynamicMemorySplit/README.md)** | Move the address that separates heap from stack and modules | Rebuild inner core |
 | **[Clock](Clock/README.md)** | Show a clock in the lower right corner | None |
 | **[CrossCompiler](CrossCompiler/README.md)** | Compile a second set of modules without affecting the current system | Recompile compiler |
+| **[ImageBuilder](ImageBuilder/README.md)** | Build disk images | None |

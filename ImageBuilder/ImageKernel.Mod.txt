@@ -1,0 +1,93 @@
+MODULE ImageKernel;
+  IMPORT SYSTEM, Kernel, Files, Display;
+
+  CONST SectorLength* = 1024;
+    FSoffset = -400H; (*256MB in 512-byte blocks*)
+    mapsize = 10000H; (*1K sectors, 64MB*)
+
+  TYPE Sector* = ARRAY SectorLength OF BYTE;
+    Ptr = PROCEDURE;
+
+  VAR NofSectors*: INTEGER;
+    sectorMap: ARRAY mapsize DIV 32 OF SET;
+    imageFile: Files.File;
+    realClock: BOOLEAN;
+
+  PROCEDURE InitSecMap*;
+    VAR i: INTEGER;
+  BEGIN NofSectors := 0; sectorMap[0] := {0 .. 31}; sectorMap[1] := {0 .. 31};
+    FOR i := 2 TO mapsize DIV 32 - 1 DO sectorMap[i] := {} END
+  END InitSecMap;
+
+  PROCEDURE MarkSector*(sec: INTEGER);
+  BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+    INCL(sectorMap[sec DIV 32], sec MOD 32); INC(NofSectors)
+  END MarkSector;
+
+  PROCEDURE FreeSector*(sec: INTEGER);
+  BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+    EXCL(sectorMap[sec DIV 32], sec MOD 32); DEC(NofSectors)
+  END FreeSector;
+
+  PROCEDURE AllocSector*(hint: INTEGER; VAR sec: INTEGER);
+    VAR s: INTEGER;
+  BEGIN (*find free sector, starting after hint*)
+    hint := hint DIV 29; ASSERT(SYSTEM.H(0) = 0); s := hint;
+    REPEAT INC(s);
+      IF s = mapsize THEN s := 1 END ;
+    UNTIL ~(s MOD 32 IN sectorMap[s DIV 32]);
+    INCL(sectorMap[s DIV 32], s MOD 32); INC(NofSectors); sec := s * 29
+  END AllocSector;
+
+  PROCEDURE GetSector*(src: INTEGER; VAR dst: Sector);
+  VAR r: Files.Rider; i: INTEGER;
+  BEGIN src := src DIV 29; ASSERT(SYSTEM.H(0) = 0);
+    Files.Set(r, imageFile, src * 1024 + FSoffset);
+    FOR i := 0 TO SectorLength - 1 DO dst[i] := 0 END;
+    Files.ReadBytes(r, dst, SectorLength);
+  END GetSector;
+
+  PROCEDURE PutSector*(dst: INTEGER; VAR src: Sector);
+  VAR r: Files.Rider; offs, flen: INTEGER; b: BYTE;
+  BEGIN dst := dst DIV 29; ASSERT(SYSTEM.H(0) =  0);
+    offs := dst * 1024 + FSoffset;
+    flen := Files.Length(imageFile);
+    IF flen < offs THEN
+      b := 0;
+      Files.Set(r, imageFile, flen);
+      WHILE flen < offs DO
+        Files.WriteByte(r, b);
+        INC(flen);
+      END;
+    END;
+    Files.Set(r, imageFile, offs);
+    Files.WriteBytes(r, src, SectorLength);
+  END PutSector;
+
+  PROCEDURE Clock*(): INTEGER;
+  VAR clock: INTEGER;
+  BEGIN IF realClock THEN clock := Kernel.Clock() ELSE clock := 0 END;
+  RETURN clock
+  END Clock;
+
+  PROCEDURE Init*;
+  BEGIN InitSecMap
+  END Init;
+
+  PROCEDURE InitImage*(name: ARRAY OF CHAR);
+  BEGIN realClock := TRUE;
+    imageFile := Files.New(name);
+    Init
+  END InitImage;
+
+  PROCEDURE FreezeClock*;
+  BEGIN realClock := FALSE
+  END FreezeClock;
+
+  PROCEDURE Close*;
+  BEGIN
+    Files.Register(imageFile);
+    imageFile := NIL;
+  END Close;
+
+END ImageKernel.
