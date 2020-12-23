@@ -53,6 +53,9 @@ ORP.Compile MemorySplit.Mod/s Clock.Mod/s ~
 ORP.Compile ImageKernel.Mod/s ImageFileDir.Mod/s ~
 ORP.Compile ImageFiles.Mod/s ImageTool.Mod/s ~
 
+ORP.Compile ScriptUtils.Mod/s Script.Mod/s ~
+ORP.Compile ScriptVars.Mod/s ScriptBlocks.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
