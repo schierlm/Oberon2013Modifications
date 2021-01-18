@@ -184,8 +184,8 @@ MODULE ScriptVars;
   PROCEDURE Insert*;
       VAR src, dst: Texts.Text; pos: INTEGER; S: Texts.Scanner;
   BEGIN ScanStart(S, FALSE, TRUE, dst); Texts.Scan(S); ScanText(S, TRUE, src); pos := ScanInt(S, TRUE, 999999);
-    IF pos < 0 THEN pos := pos + src.len + 1 END;
-    IF (src # NIL) & (dst # NIL) & (pos >= 0) & (pos <= src.len) THEN
+    IF pos < 0 THEN pos := pos + dst.len + 1 END;
+    IF (src # NIL) & (dst # NIL) & (pos >= 0) & (pos <= dst.len) THEN
       Texts.Save(src, 0, src.len, W.buf);
       Texts.Insert(dst, pos, W.buf);
     ELSE
