@@ -776,7 +776,12 @@
      loc.org := org; loc.pos := pos; loc.lin := L;
      loc.x := F.left + Width(R, pos - org); loc.y := cury
    END LocatePos;
-@@ -386,7 +386,7 @@
+@@ -382,11 +382,11 @@
+     IF F.trailer.next # F.trailer THEN
+       IF F.hasSel THEN FlipSelection(F, F.selbeg, F.selend) END;
+       LocateChar(F, X - F.X, Y - F.Y, loc);
+-      IF F.hasSel & (loc.pos = F.selbeg.pos) & (F.selend.pos = F.selbeg.pos + 1) THEN
++      IF F.hasSel & (loc.pos = F.selbeg.pos) & (F.selend.pos = F.selbeg.pos + Texts.UnicodeWidth(nextCodepoint)) THEN
          LocateChar(F, F.left, Y - F.Y, F.selbeg)
        ELSE F.selbeg := loc
        END;
