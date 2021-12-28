@@ -18,7 +18,7 @@ Unicode support in every text viewer.
 Instead, this modification introduces a TextFramesU module (with the accompanied
 EditU toolbox module), so you can view individual files in Unicode viewers on an
 otherwise almost unchanged system: The only module that needs patching (without
-chaning the symbol file) is `Fonts.Mod`, as fonts will first be loaded by the
+changing the symbol file) is `Fonts.Mod`, as fonts will first be loaded by the
 `Fonts` module, and then later again by the `FontsU` module in case they appear
 in Unicode viewers. Therefore, Unicode fonts may not TRAP the `Fonts` module.
 However, as the module by default only uses 8-bit glyph indices, and also tries

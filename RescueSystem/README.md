@@ -3,7 +3,7 @@ RescueSystem - Boot into secondary inner core in case main one is unable to boot
 Description
 -----------
 
-When you work on the Oberon system a log (including changing symbol files), it
+When you work on the Oberon system a lot (including changing symbol files), it
 happens from time to time that you either introduce a bug or forget to recompile a
 dependent module (e.g. the compiler) and therefore your system is unbootable or
 unusable. When working in an emulator and you have a recent copy of the filesystem
@@ -31,7 +31,7 @@ be booted again so you can check if you were able to fix your system, and if
 required enter the rescue system again.
 
 Note that setting up the rescue system does not only require compiling several
-new inner cores, it also requires that you mvoe the filesystem. This can be done
+new inner cores, it also requires that you move the filesystem. This can be done
 from within the system, but the chance of catastrophic data loss is high in case
 anything goes wrong.
 
@@ -181,7 +181,7 @@ Installation
 
 - Move the filesystem by 64KB to the end. After this move, both the "original" boot area
   (before the new Directory Root) and the new boot area will contain the same boot loader,
-  which is unchanged except the changed filesystem offset. Be patient, this may take a while;
+  which is unchanged except for the changed filesystem offset. Be patient, this may take a while;
   as it is hard to detect the end of the filesystem, we will assume the maximum size.
 
       RescueSystemTool.MoveFilesystem
