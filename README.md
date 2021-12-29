@@ -69,3 +69,4 @@ There are also two separate releases available that include the rescue system (t
 | **[CrossCompiler](CrossCompiler/README.md)** | Compile a second set of modules without affecting the current system | Recompile compiler |
 | **[ImageBuilder](ImageBuilder/README.md)** | Build disk images | None |
 | **[Scripting](Scripting/README.md)** | Run multiple commands and react on their outcome | Apply `CommandExitCodes` |
+| **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |

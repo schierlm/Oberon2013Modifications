@@ -3,7 +3,7 @@ set -e
 
 rm -rf work
 mkdir work
-for i in Kernel FileDir Files Modules Fonts Input Display Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad RS232; do
+for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad RS232; do
 	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
@@ -42,6 +42,7 @@ patch -d work <StackOverflowProtector/StackOverflowProtector.patch
 patch -d work <StackOverflowProtector/POSTPATCH_after_DynamicMemorySplit.patch
 patch -d work <CommandExitCodes/CommandExitCodes.patch
 patch -d work <FontConversion/RemoveGlyphWidthLimit.patch
+patch -d work <ChangeResolution/ChangeResolution.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite

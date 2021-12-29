@@ -1,0 +1,92 @@
+--- Display.Mod.txt
++++ Display.Mod.txt
+@@ -22,6 +22,10 @@
+     IF (F # NIL) & (F.handle # NIL) THEN F.handle(F, M) END
+   END Handle;
+ 
++  PROCEDURE SetSize*(w, h: INTEGER) : BOOLEAN;
++  RETURN FALSE
++  END SetSize;
++
+   (* raster ops *)
+     
+   PROCEDURE Dot*(col, x, y, mode: INTEGER);
+--- Viewers.Mod.txt
++++ Viewers.Mod.txt
+@@ -197,6 +197,38 @@
+     END
+   END Broadcast;
+ 
++  PROCEDURE AdjustSize(V: Display.Frame; ow, oh, nw, nh: INTEGER);
++    VAR oldX: INTEGER;
++  BEGIN oldX := V.X;
++    V.X := (((V.X * nw) DIV ow + nw DIV 16) DIV (nw DIV 8)) * (nw DIV 8);
++    IF V.W = inf - oldX THEN
++      V.W := inf - V.X
++    ELSIF V.W # inf THEN
++      V.W := (((V.W * nw) DIV ow + nw DIV 16) DIV (nw DIV 8)) * (nw DIV 8)
++    END;
++    V.Y := (V.Y * nh) DIV oh;
++    V.H := (V.H * nh) DIV oh;
++  END AdjustSize;
++
++  PROCEDURE UpdateScreenSize*(ow, oh, nw, nh: INTEGER);
++    VAR T, V: Display.Frame; M: ViewerMsg;
++  BEGIN
++    M.id := suspend;
++    Broadcast(M);
++    T := FillerTrack.next;
++    WHILE T # FillerTrack DO
++      AdjustSize(T, ow, oh, nw, nh);
++      V := T.dsc;
++      REPEAT V := V.next; AdjustSize(V, ow, oh, nw, nh) UNTIL V = T.dsc;
++      T := T.next
++    END;
++    DH := Display.Height;
++    FillerViewer.H := DH;
++    FillerTrack.H := DH;
++    M.id := restore;
++    Broadcast(M);
++  END UpdateScreenSize;
++
+ BEGIN backup := NIL; curW := 0; minH := 1; DH := Display.Height;
+   NEW(FillerViewer); FillerViewer.X := 0; FillerViewer.W := inf; FillerViewer.Y := 0; FillerViewer.H := DH;
+   FillerViewer.next := FillerViewer;
+--- Oberon.Mod.txt
++++ Oberon.Mod.txt
+@@ -349,6 +349,13 @@
+   BEGIN CurFnt := fnt
+   END SetFont;
+ 
++  PROCEDURE UpdateScreenSize*();
++  BEGIN
++    Viewers.UpdateScreenSize(DW, DH, Display.Width, Display.Height);
++    DW := Display.Width; DH := Display.Height;
++    Input.SetMouseLimits(DW, DH);
++  END UpdateScreenSize;
++
+   PROCEDURE SetColor* (col: INTEGER);
+   BEGIN CurCol := col
+   END SetColor;
+--- System.Mod.txt
++++ System.Mod.txt
+@@ -353,6 +353,19 @@
+     END
+   END ShowCommands;
+ 
++  PROCEDURE SetScreenSize*;
++    VAR S: Texts.Scanner;
++      w, h: INTEGER;
++  BEGIN GetArg(S);
++    IF S.class = Texts.Int THEN w := S.i; Texts.Scan(S) END;
++    IF S.class = Texts.Int THEN
++      h := S.i;
++      IF Display.SetSize(w, h) THEN
++        Oberon.UpdateScreenSize()
++      END
++    END
++  END SetScreenSize;
++
+   PROCEDURE ShowFonts*;
+     VAR fnt: Fonts.Font;
+   BEGIN Texts.WriteString(W, "System.ShowFonts"); Texts.WriteLn(W); fnt := Fonts.root;
