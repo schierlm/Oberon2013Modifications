@@ -3,9 +3,12 @@ set -e
 
 rm -rf work
 mkdir work
-for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORB ORG ORP BootLoad RS232; do
+for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORS ORB ORG ORP BootLoad RS232; do
 	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
+done
+for i in ORS ORB ORG ORP; do
+	cp work/$i.Mod.txt work/LSPh$i.Mod.txt
 done
 
 cp DefragmentFreeSpace/DefragFiles.Mod.txt work
@@ -43,6 +46,8 @@ patch -d work <StackOverflowProtector/POSTPATCH_after_DynamicMemorySplit.patch
 patch -d work <CommandExitCodes/CommandExitCodes.patch
 patch -d work <FontConversion/RemoveGlyphWidthLimit.patch
 patch -d work <ChangeResolution/ChangeResolution.patch
+patch -d work <LanguageServerProtocolHelper/LSPHelper.patch
+patch -d work <KernelDebugger/RS232.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite
@@ -66,17 +71,16 @@ cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt Res
 cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.txt Scripting/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
+cp LanguageServerProtocolHelper/*.txt work
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
 cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/debug
-mv work/RS232.Mod.txt work/debug
 
 sed -i 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
 patch -d work/debug <CrossCompiler/POSTPATCH_after_StackSymbols.patch
-patch -d work/debug <KernelDebugger/RS232.patch
 patch -d work/debug <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch
 patch -d work/debug <KernelDebugger/ReserveRegisters.patch
 patch -d work/debug -R <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch

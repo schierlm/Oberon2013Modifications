@@ -70,3 +70,4 @@ There are also two separate releases available that include the rescue system (t
 | **[ImageBuilder](ImageBuilder/README.md)** | Build disk images | None |
 | **[Scripting](Scripting/README.md)** | Run multiple commands and react on their outcome | Apply `CommandExitCodes` |
 | **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |
+| **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |

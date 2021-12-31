@@ -1,0 +1,75 @@
+(apply this prepatch, then extended oberon prepatch, then original patch, then retrocompiler postpatch)
+(ORB is taken from Extended Oberon)
+--- LSPhORS.Mod.txt
++++ LSPhORS.Mod.txt
+@@ -1,4 +1,4 @@
+-MODULE ORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 1.10.21 Extended Oberon with retro elements*)
++MODULE ORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 1.10.21 Extended Oberon*)
+   IMPORT SYSTEM, Texts, Oberon;
+ 
+ (* Oberon Scanner does lexical analysis. Input is Oberon-Text, output is
+--- LSPhORG.Mod.txt
++++ LSPhORG.Mod.txt
+@@ -1,4 +1,4 @@
+-MODULE ORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 1.10.21 Extended Oberon*)
++MODULE ORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 1.11.21 Extended Oberon*)
+   IMPORT SYSTEM, Files, ORS, ORB;
+   (*Code generator for Oberon compiler for RISC processor.
+      Procedural interface to Parser ORP; result in array "code".
+@@ -63,12 +63,12 @@
+   END incR;
+ 
+   PROCEDURE Put0(op, a, b, c: LONGINT);
+-  BEGIN (*emit format-0 instruction*)
++  BEGIN (*emit format-0 register instruction*)
+     code[pc] := ((a*C4 + b) * C4 + op) * C16 + c; INC(pc)
+   END Put0;
+ 
+   PROCEDURE Put1(op, a, b, im: LONGINT);
+-  BEGIN (*emit format-1 instruction, -C16 <= im < C16*)
++  BEGIN (*emit format-1 register instruction, -C16 <= im < C16*)
+     IF im < 0 THEN INC(op, V) END ;
+     code[pc] := (((a+C6) * C4 + b) * C4 + op) * C16 + im MOD C16; INC(pc)
+   END Put1;
+@@ -160,6 +160,41 @@
+     code[at] := code[at] DIV C24 * C24 + with MOD C24
+   END fix3;
+ 
++  (* BEGIN GARBAGE
++  BEGIN fix3(at, pc-at-1)
++  END FixOne;
++
++  PROCEDURE FixLinkWith(L, dst: LONGINT);
++    VAR L1: LONGINT;
++  BEGIN (*fix chain of branch instructions*)
++    WHILE L # 0 DO L1 := code[L] MOD C24; fix3(L, dst-L-1); L := L1 END
++  END FixLinkWith;
++
++  PROCEDURE FixLink*(L: LONGINT);
++  BEGIN FixLinkWith(L, pc)
++  END FixLink;
++
++  PROCEDURE FixLinkPair(L, adr: LONGINT);
++    VAR L1: LONGINT; p, q: INTEGER;
++  BEGIN (*fix chain of instruction pairs with an address that is spread across both instructions, 0 <= adr < C24*)
++    WHILE L # 0 DO p := code[L-1]; q := code[L];
++      L1 := p DIV C12 MOD C8 + q MOD C16;
++      code[L-1] := p DIV C20 * C20 + adr DIV C16 MOD C8 * C12 + p MOD C12;
++      code[L] := q DIV C16 * C16 + adr MOD C16;
++      L := L1
++    END
++  END FixLinkPair;
++
++  PROCEDURE merged(L0, L1: LONGINT): LONGINT;
++    VAR L2, L3: LONGINT;
++  BEGIN (*merge chains of the two operands of AND and OR*)
++    IF L0 # 0 THEN L3 := L0;
++      REPEAT L2 := L3; L3 := code[L2] MOD C16 UNTIL L3 = 0;
++      code[L2] := code[L2] + L1; L1 := L0
++    END ;
++    RETURN L1
++  END GARBAGE **)
++
+   PROCEDURE FixLinkWith(L, x: LONGINT); (*fixup with offset to x*)
+     VAR L1, format: LONGINT; p: INTEGER;
+   BEGIN (*fix chain of format-1 or format-3 instructions*)
