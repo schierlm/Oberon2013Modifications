@@ -286,7 +286,7 @@
 -        NofBoxes := 0; k := 0;
 +        NEW(F); NEW(F.block); F.name := name;
 +        ReadInt16(R, F.height); ReadInt16(R, F.minX); ReadInt16(R, F.maxX);
-+	RdInt16(R, minY); ReadInt16(R, F.maxY); ReadInt16(R, NofRuns);
++        RdInt16(R, minY); ReadInt16(R, F.maxY); ReadInt16(R, NofRuns);
 +        IF minY >= 80H THEN F.minY := minY - 100H ELSE F.minY := minY END;
 +        k := 0;
          WHILE k # NofRuns DO
@@ -320,19 +320,19 @@
 -            INC(j); INC(m)
 -          END;
 +          ReadInt16(R, beg); ReadInt16(R, end); i := beg;
-+	  WHILE i < end DO
-+	    i1 := i DIV 1000H;
-+	    i2 := i DIV 40H MOD 40H;
-+	    IF F.T1[i1] = 0 THEN
-+	      F.T1[i1] := FindSpace(F.block, 256, 4)
-+	    END;
-+	    SYSTEM.GET(F.T1[i1] + i2 * 4, a);
-+	    IF a = 0 THEN
-+	      a := 1;
-+	      SYSTEM.PUT(F.T1[i1] + i2 * 4, a)
-+	    END;
-+	    INC(i, 40H)
-+	  END;
++          WHILE i < end DO
++            i1 := i DIV 1000H;
++            i2 := i DIV 40H MOD 40H;
++            IF F.T1[i1] = 0 THEN
++              F.T1[i1] := FindSpace(F.block, 256, 4)
++            END;
++            SYSTEM.GET(F.T1[i1] + i2 * 4, a);
++            IF a = 0 THEN
++              a := 1;
++              SYSTEM.PUT(F.T1[i1] + i2 * 4, a)
++            END;
++            INC(i, 40H)
++          END;
            INC(k)
          END;
 -        WHILE m < 128 DO F.T[m] := a0; INC(m) END ;
@@ -850,8 +850,8 @@
 -        Texts.Delete(F.text, F.carloc.pos - 1, F.carloc.pos, DelBuf); SetCaret(F, F.carloc.pos - 1)
 +        charlen := 0;
 +        REPEAT INC(charlen);
-+	  Texts.OpenReader(R, F.text, F.carloc.pos-charlen);
-+	  Texts.Read(R, ch);
++          Texts.OpenReader(R, F.text, F.carloc.pos-charlen);
++          Texts.Read(R, ch);
 +        UNTIL (ch < 80X) OR (ch >= 0C0X); (* skip over continuation *)
 +        Texts.Delete(F.text, F.carloc.pos - charlen, F.carloc.pos, DelBuf); SetCaret(F, F.carloc.pos - charlen)
        END
