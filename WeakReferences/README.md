@@ -4,7 +4,7 @@ Description
 -----------
 
 The `Files.Mod` module uses an interesting technique (in cooperation with the
-garbage controller) to provide Files that will be garbage collected when they
+garbage collector) to provide Files that will be garbage collected when they
 are no longer (strongly) referenced, but stay available as long as they are
 referenced.
 
