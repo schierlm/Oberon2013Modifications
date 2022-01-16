@@ -250,7 +250,7 @@
 +      IF (h # 2) & (h # 0CH) & (h # 0EH) & (h # 0FH) THEN PatDot(x+5, 4); PatDot(x+5, 3) END;
 +      IF (h # 1) & (h # 4) & (h # 7) & (h # 0AH) & (h # 0FH) THEN PatDot(x+3, 2); PatDot(x+4, 2) END
 +    END;
-+    dx := 24; x := 0; y := fnt.minY; w := 23; h := 11;
++    dx := 24; x := 0; y := -2; w := 23; h := 11;
 +    patadr := SYSTEM.ADR(FallbackPat)
 +  END
 +END GetUniPat;
