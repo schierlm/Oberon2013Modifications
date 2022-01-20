@@ -1,0 +1,143 @@
+--- 1/ORS.Mod.txt
++++ 2/ORS.Mod.txt
+@@ -1,5 +1,5 @@
+ MODULE ORS; (* NW 19.9.93 / 15.3.2017  Scanner in Oberon-07*)
+-  IMPORT SYSTEM, Texts, Oberon;
++  IMPORT SYSTEM, Texts := ORTexts;
+ 
+ (* Oberon Scanner does lexical analysis. Input is Oberon-Text, output is
+   sequence of symbols, i.e identifiers, numbers, strings, and special symbols.
+@@ -31,6 +31,7 @@
+     var* = 65; procedure* = 66; begin* = 67; import* = 68; module* = 69; eot = 70;
+ 
+   TYPE Ident* = ARRAY IdLen OF CHAR;
++    MarkCallback* = PROCEDURE(pos: INTEGER; msg: ARRAY OF CHAR);
+ 
+   VAR ival*, slen*: LONGINT;  (*results of Get*)
+     rval*: REAL;
+@@ -41,7 +42,7 @@
+     ch: CHAR;  (*last character read*)
+     errpos: LONGINT;
+     R: Texts.Reader;
+-    W: Texts.Writer;
++    markCallback: MarkCallback;
+     k: INTEGER;
+     KWX: ARRAY 10 OF INTEGER;
+     keyTab: ARRAY NKW OF
+@@ -59,8 +60,7 @@
+     VAR p: LONGINT;
+   BEGIN p := Pos();
+     IF (p > errpos) & (errcnt < 25) THEN
+-      Texts.WriteLn(W); Texts.WriteString(W, "  pos "); Texts.WriteInt(W, p, 1); Texts.Write(W, " ");
+-      Texts.WriteString(W, msg); Texts.Append(Oberon.Log, W.buf)
++      markCallback(p, msg);
+     END ;
+     INC(errcnt); errpos := p + 4
+   END Mark;
+@@ -260,15 +260,15 @@
+     UNTIL sym # null
+   END Get;
+ 
+-  PROCEDURE Init*(T: Texts.Text; pos: LONGINT);
+-  BEGIN errpos := pos; errcnt := 0; Texts.OpenReader(R, T, pos); Texts.Read(R, ch)
++  PROCEDURE Init*(T: Texts.Text; cb: MarkCallback);
++  BEGIN errpos := 0; errcnt := 0; Texts.OpenReader(R, T, 0); Texts.Read(R, ch); markCallback := cb
+   END Init;
+ 
+   PROCEDURE EnterKW(sym: INTEGER; name: ARRAY OF CHAR);
+   BEGIN keyTab[k].id := name; keyTab[k].sym := sym; INC(k)
+   END EnterKW;
+ 
+-BEGIN Texts.OpenWriter(W); k := 0; KWX[0] := 0; KWX[1] := 0;
++BEGIN k := 0; KWX[0] := 0; KWX[1] := 0;
+   EnterKW(if, "IF");
+   EnterKW(do, "DO");
+   EnterKW(of, "OF");
+--- 1/ORP.Mod.txt
++++ 2/ORP.Mod.txt
+@@ -1,5 +1,5 @@
+ MODULE ORP; (*N. Wirth 1.7.97 / 8.3.2020  Oberon compiler for RISC in Oberon-07*)
+-  IMPORT Texts, Oberon, ORS, ORB, ORG;
++  IMPORT ORS, ORB, ORG;
+   (*Author: Niklaus Wirth, 2014.
+     Parser of Oberon-RISC compiler. Uses Scanner ORS to obtain symbols (tokens),
+     ORB for definition of data structures and for handling import and export, and
+@@ -10,18 +10,17 @@
+     PtrBaseDesc = RECORD  (*list of names of pointer base types*)
+       name: ORS.Ident; type: ORB.Type; next: PtrBase
+     END ;
++    LogCallback = PROCEDURE(msg: ARRAY OF CHAR; newline: BOOLEAN);
+   
+   VAR sym: INTEGER;   (*last symbol read*)
+     dc: LONGINT;    (*data counter*)
+     level, exno, version: INTEGER;
+-    newSF: BOOLEAN;  (*option flag*)
+     expression: PROCEDURE (VAR x: ORG.Item);  (*to avoid forward reference*)
+     Type: PROCEDURE (VAR type: ORB.Type);
+     FormalType: PROCEDURE (VAR typ: ORB.Type; dim: INTEGER);
+     modid: ORS.Ident;
+     pbsList: PtrBase;   (*list of names of pointer base types*)
+     dummy: ORB.Object;
+-    W: Texts.Writer;
+ 
+   PROCEDURE Check(s: INTEGER; msg: ARRAY OF CHAR);
+   BEGIN
+@@ -910,16 +909,16 @@
+     END
+   END Import;
+ 
+-  PROCEDURE Module;
++  PROCEDURE Module*(logCallback: LogCallback; newSF: BOOLEAN);
+     VAR key: LONGINT;
+-  BEGIN Texts.WriteString(W, "  compiling "); ORS.Get(sym);
++  BEGIN logCallback("  compiling ", FALSE); ORS.Get(sym);
+     IF sym = ORS.module THEN
+       ORS.Get(sym);
+-      IF sym = ORS.times THEN version := 0; dc := 8; Texts.Write(W, "*"); ORS.Get(sym) ELSE dc := 0; version := 1 END ;
++      IF sym = ORS.times THEN version := 0; dc := 8; logCallback("*", FALSE); ORS.Get(sym) ELSE dc := 0; version := 1 END ;
+       ORB.Init; ORB.OpenScope;
+       IF sym = ORS.ident THEN
+         ORS.CopyId(modid); ORS.Get(sym);
+-        Texts.WriteString(W, modid); Texts.Append(Oberon.Log, W.buf)
++        logCallback(modid, FALSE)
+       ELSE ORS.Mark("identifier expected")
+       END ;
+       Check(ORS.semicolon, "no ;"); level := 0; exno := 1; key := 0;
+@@ -941,20 +940,19 @@
+       IF sym # ORS.period THEN ORS.Mark("period missing") END ;
+       IF (ORS.errcnt = 0) & (version # 0) THEN
+         ORB.Export(modid, newSF, key);
+-        IF newSF THEN Texts.WriteString(W, " new symbol file") END
++        IF newSF THEN logCallback(" new symbol file", FALSE) END
+       END ;
+       IF ORS.errcnt = 0 THEN
+         ORG.Close(modid, key, exno);
+-        Texts.WriteInt(W, ORG.pc, 6); Texts.WriteInt(W, dc, 6); Texts.WriteHex(W, key)
+-      ELSE Texts.WriteLn(W); Texts.WriteString(W, "compilation FAILED")
++      ELSE logCallback("", TRUE); logCallback("compilation FAILED", FALSE)
+       END ;
+-      Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
++      logCallback("", TRUE);
+       ORB.CloseScope; pbsList := NIL
+     ELSE ORS.Mark("must start with MODULE")
+     END
+   END Module;
+ 
+-  PROCEDURE Option(VAR S: Texts.Scanner);
++  (*PROCEDURE Option(VAR S: Texts.Scanner);
+   BEGIN newSF := FALSE;
+     IF S.nextCh = "/" THEN
+       Texts.Scan(S); Texts.Scan(S); 
+@@ -992,10 +990,9 @@
+       END
+     END ;
+     Oberon.Collect(0)
+-  END Compile;
++  END Compile;*)
+ 
+-BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "OR Compiler  8.3.2020");
+-  Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
++BEGIN
+   NEW(dummy); dummy.class := ORB.Var; dummy.type := ORB.intType;
+   expression := expression0; Type := Type0; FormalType := FormalType0
+ END ORP.

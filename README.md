@@ -71,3 +71,4 @@ There are also two separate releases available that include the rescue system (t
 | **[Scripting](Scripting/README.md)** | Run multiple commands and react on their outcome | Apply `CommandExitCodes` |
 | **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |
 | **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |
+| **[EmbeddableCompiler](EmbeddableCompiler/README.md)**† | Version of the Oberon RISC Compiler that does not (directly) depend on Fonts/Texts/Oberon | None |
