@@ -25,7 +25,7 @@ but the field itself is not exported, the field name is not included in the (nor
 file and therefore cannot be added to the inspect symbol file. If this bothers you, a
 secondary patch is available which will change the symbol file format to include such fields;
 in the same format as exported fields, but prefixing the name with `-`. Pointer types
-will get erased, as the pointed type may not be exported, and they are not needed since
+will get erased, as the pointed to type may not be exported, and they are not needed since
 `ORInspect.HeapAddress` will look up the actual type from the type descriptor anyway.
 
 When following heap address references, it can happen that the objects get garbage collected
