@@ -48,6 +48,7 @@ patch -d work <FontConversion/RemoveGlyphWidthLimit.patch
 patch -d work <ChangeResolution/ChangeResolution.patch
 patch -d work <LanguageServerProtocolHelper/LSPHelper.patch
 patch -d work <KernelDebugger/RS232.patch
+patch -d work <EditImprovements/Edit.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite
