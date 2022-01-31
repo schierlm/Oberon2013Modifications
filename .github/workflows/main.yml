@@ -30,6 +30,30 @@ jobs:
     - name: Patch the release files
       run: ./make_release.sh
 
+    - name: Collect reject files in case of patch failure
+      if: ${{ failure() }}
+      run: |
+        mkdir -p rejectfiles/debug rejectfiles/rescue rejectfiles/debugrescue
+        cd work
+        for i in *.rej */*.rej; do
+          [ -f $i ] || continue
+          basefile=${i%%.rej}
+          cp $basefile ../rejectfiles
+          cp $basefile.rej ../rejectfiles
+          [ -f $basefile.orig ] && cp $basefile.orig ../rejectfiles
+        done
+        cd ..
+        touch rejectfiles/COMPLETE
+        # enforce failure
+        false
+
+    - name: Upload reject files in case of patch failure
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: RejectFiles
+        path: rejectfiles/
+
     - name: Upload PatchedModules artifact
       uses: actions/upload-artifact@v2
       with:
