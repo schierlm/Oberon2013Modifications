@@ -1,10 +1,9 @@
-#!/bin/sh
+#!/bin/sh -x
 set -e
 
-rm -rf work
-mkdir work
+rm -fr work/*
 for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORS ORB ORG ORP BootLoad RS232; do
-	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
+	cp -p Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
 for i in ORS ORB ORG ORP; do
@@ -42,13 +41,13 @@ patch -d work <ORInspect/InspectSymbols.patch
 patch -d work <CrossCompiler/CrossCompiler.patch
 patch -d work <StackOverflowProtector/PREPATCH_after_DynamicMemorySplit.patch
 patch -d work <StackOverflowProtector/StackOverflowProtector.patch
-patch -d work <StackOverflowProtector/POSTPATCH_after_DynamicMemorySplit.patch
+patch -d work <StackOverflowProtector/POSTPATCH_after_DynamicMemorySplit_1.patch
 patch -d work <CommandExitCodes/CommandExitCodes.patch
 patch -d work <FontConversion/RemoveGlyphWidthLimit.patch
 patch -d work <ChangeResolution/ChangeResolution.patch
 patch -d work <LanguageServerProtocolHelper/LSPHelper.patch
 patch -d work <KernelDebugger/RS232.patch
-patch -d work <EditImprovements/Edit.patch
+patch -d work <EditImprovements/work.1r.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite
@@ -57,16 +56,17 @@ mv work/utf8lite/Fonts.Mod.txt work/FontsU.Mod.txt
 mv work/utf8lite/TextFrames.Mod.txt work/TextFramesU.Mod.txt
 patch -d work <UTF8CharsetLite/UTF8CharsetLite.patch
 mv work/TextFramesU.Mod.txt work/utf8lite/TextFrames.Mod.txt
-sed 's/FontsU\.GetMappedUniPat/Fonts.GetUniPat/g;s/TextsU\.UnicodeWidth/Texts.UnicodeWidth/g;s/TextsU\.ReadUnicode/Texts.ReadUnicode/g' -i work/utf8lite/TextFrames.Mod.txt
+sed -i '' 's/FontsU\.GetMappedUniPat/Fonts.GetUniPat/g;s/TextsU\.UnicodeWidth/Texts.UnicodeWidth/g;s/TextsU\.ReadUnicode/Texts.ReadUnicode/g' work/utf8lite/TextFrames.Mod.txt
 patch -d work/utf8lite <VariableLinespace/VariableLineSpaceUTF8.patch
-sed 's/Fonts\.GetUniPat/FontsU.GetMappedUniPat/g;s/Texts\.UnicodeWidth/TextsU.UnicodeWidth/g;s/Texts\.ReadUnicode/TextsU.ReadUnicode/g' -i work/utf8lite/TextFrames.Mod.txt
+sed -i '' 's/Fonts\.GetUniPat/FontsU.GetMappedUniPat/g;s/Texts\.UnicodeWidth/TextsU.UnicodeWidth/g;s/Texts\.ReadUnicode/TextsU.ReadUnicode/g' work/utf8lite/TextFrames.Mod.txt
 mv work/utf8lite/TextFrames.Mod.txt work/TextFramesU.Mod.txt
+rm work/utf8lite/*.rej work/utf8lite/*.orig
 rmdir work/utf8lite
 
 patch -d work <VariableLinespace/VariableLineSpace.patch
 
-sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
-sed -i '1,2d' work/BootLoad.Mod.txt
+sed -i '' 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
+sed -i '' '1,2d' work/BootLoad.Mod.txt
 
 cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt ResourceMonitor/*.txt work
 cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.txt Scripting/*.txt work
@@ -78,7 +78,7 @@ mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
 cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/debug
 
-sed -i 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
+sed -i '' 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
 patch -d work/debug <CrossCompiler/POSTPATCH_after_StackSymbols.patch
