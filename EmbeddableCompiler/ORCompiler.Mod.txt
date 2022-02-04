@@ -1,0 +1,59 @@
+MODULE ORCompiler;
+  IMPORT Texts, ORTexts, Oberon, ORS, ORP;
+
+  VAR newSF: BOOLEAN;  (*option flag*)
+    W: Texts.Writer;
+
+  PROCEDURE MarkCallback(pos: INTEGER; msg: ARRAY OF CHAR);
+  BEGIN
+      Texts.WriteLn(W); Texts.WriteString(W, "  pos "); Texts.WriteInt(W, pos, 1); Texts.Write(W, " ");
+      Texts.WriteString(W, msg); Texts.Append(Oberon.Log, W.buf)
+  END MarkCallback;
+
+  PROCEDURE LogCallback(msg: ARRAY OF CHAR; newline: BOOLEAN);
+  BEGIN
+    IF msg[0] # 0X THEN Texts.WriteString(W, msg) END;
+    IF newline THEN Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf) END;
+  END LogCallback;
+
+  PROCEDURE Option(VAR S: Texts.Scanner);
+  BEGIN newSF := FALSE;
+    IF S.nextCh = "/" THEN
+      Texts.Scan(S); Texts.Scan(S);
+      IF (S.class = Texts.Name) & (S.s[0] = "s") THEN newSF := TRUE END
+    END
+  END Option;
+
+  PROCEDURE Compile*;
+    VAR beg, end, time: LONGINT;
+      T: Texts.Text;
+      OT: ORTexts.Text;
+      S: Texts.Scanner;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF S.class = Texts.Char THEN
+      IF S.c = "^" THEN
+        Option(S); Oberon.GetSelection(T, beg, end, time);
+        IF time >= 0 THEN
+          Texts.OpenScanner(S, T, beg); Texts.Scan(S);
+          IF S.class = Texts.Name THEN
+            Texts.WriteString(W, S.s); NEW(OT); ORTexts.Open(OT, S.s);
+            IF T.len > 0 THEN ORS.Init(OT, MarkCallback); ORP.Module(LogCallback, newSF) END
+          END
+        END
+      END
+    ELSE
+      WHILE S.class = Texts.Name DO
+        NEW(OT); ORTexts.Open(OT, S.s);
+        IF T.len > 0 THEN Option(S); ORS.Init(OT, MarkCallback); ORP.Module(LogCallback, newSF)
+        ELSE Texts.WriteString(W, S.s); Texts.WriteString(W, " not found");
+          Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+        END ;
+        IF (T.len # 0) & (ORS.errcnt = 0) THEN Texts.Scan(S) ELSE S.class := 0 END
+      END
+    END ;
+    Oberon.Collect(0)
+  END Compile;
+
+BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "OR Compiler");
+  Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
+END ORCompiler.

@@ -20,7 +20,7 @@ MODULE DebugClient;
 
   PROCEDURE SendCommand(s: ARRAY OF CHAR);
     VAR i, k: INTEGER; dot: BOOLEAN;
-  BEGIN i := 0;
+  BEGIN i := 0; dot := FALSE;
     REPEAT k := ORD(s[i]);
       IF (s[i] = ".") & ~dot THEN RS232.Send(0); dot := TRUE ELSE RS232.Send(k) END; INC(i)
     UNTIL k = 0;

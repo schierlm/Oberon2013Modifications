@@ -1,0 +1,33 @@
+MODULE ORTexts;
+  IMPORT Files;
+
+  TYPE Text* = POINTER TO TextDesc;
+    TextDesc = RECORD
+      f: Files.File;
+    END;
+
+    Reader* = RECORD
+      eot*: BOOLEAN;
+      off, len: INTEGER;
+      rider: Files.Rider
+    END;
+
+  PROCEDURE Open* (T: Text; name: ARRAY OF CHAR);
+  BEGIN T.f := Files.Old(name); ASSERT(T.f # NIL)
+  END Open;
+
+  PROCEDURE OpenReader* (VAR R: Reader; T: Text; pos: INTEGER);
+  BEGIN R.off := pos; R.len := Files.Length(T.f); Files.Set(R.rider, T.f, pos); R.eot := FALSE
+  END OpenReader;
+
+  PROCEDURE Read* (VAR R: Reader; VAR ch: CHAR);
+  BEGIN Files.Read(R.rider, ch);
+    INC(R.off);
+    IF R.off = R.len THEN R.eot := TRUE END
+  END Read;
+
+  PROCEDURE Pos* (VAR R: Reader): INTEGER;
+  BEGIN RETURN R.off
+  END Pos;
+BEGIN
+END ORTexts.
