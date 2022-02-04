@@ -1,7 +1,8 @@
---- 1/Edit.Mod.txt	2022-01-28 22:03:24.791966000 +0100
-+++ 2/Edit.Mod.txt	2022-01-28 23:57:12.957116000 +0100
-@@ -1,27 +1,21 @@
- MODULE Edit; (*JG 2.11.90 / NW 28.11.2015*)
+--- work/Edit.Mod.txt.orig	2022-02-04 21:35:04.665777000 +0100
++++ EditImprovements/Edit.Mod.txt	2022-02-03 13:03:48.054523000 +0100
+@@ -1,27 +1,20 @@
+-MODULE Edit; (*JG 2.11.90 / NW 28.11.2015*)
++MODULE Edit; (*JG 2.11.1990 / NW 28.11.2015*)
 +
    IMPORT Files, Fonts, Texts, Display, Viewers, Oberon, MenuViewers, TextFrames;
  
@@ -10,8 +11,8 @@
  
    VAR W: Texts.Writer;
 -    time: LONGINT;
-+    time, 
-     M: INTEGER;
+-    M: INTEGER;
++    time, M: INTEGER;
      pat: ARRAY maxlen OF CHAR;
      d: ARRAY 256 OF INTEGER;
  
@@ -33,7 +34,7 @@
    BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
      IF (S.class = Texts.Char) & (S.c = "^") OR (S.line # 0) THEN
        Oberon.GetSelection(T, beg, end, time);
-@@ -42,7 +36,7 @@
+@@ -42,7 +35,7 @@
        T: Texts.Text;
        S: Texts.Scanner;
        f: Files.File; R: Files.Rider;
@@ -42,7 +43,7 @@
  
      PROCEDURE Backup (VAR name: ARRAY OF CHAR);
        VAR res, i: INTEGER; bak: ARRAY 32 OF CHAR;
-@@ -74,7 +68,7 @@
+@@ -74,7 +67,7 @@
      VAR T: Texts.Text;
        F: TextFrames.Frame;
        v: Viewers.Viewer;
@@ -51,7 +52,7 @@
        fnt: Fonts.Font; col, voff: INTEGER;
    BEGIN Oberon.GetSelection(T, beg, end, time);
      IF time >= 0 THEN
-@@ -85,10 +79,10 @@
+@@ -85,10 +78,10 @@
          Texts.ChangeLooks(T, beg, end, {0,1,2}, fnt, col, voff)
        END
      END
@@ -64,7 +65,7 @@
    BEGIN
      Oberon.GetSelection(T, beg, end, time);
      IF time >= 0 THEN
-@@ -102,8 +96,7 @@
+@@ -102,8 +95,7 @@
    PROCEDURE ChangeColor*;
      VAR S: Texts.Scanner;
        T: Texts.Text;
@@ -74,7 +75,7 @@
    BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
      IF S.class = Texts.Int THEN
        col := S.i; Oberon.GetSelection(T, beg, end, time);
-@@ -115,7 +108,7 @@
+@@ -115,7 +107,7 @@
      VAR S: Texts.Scanner;
        T: Texts.Text;
        voff: INTEGER; ch: CHAR;
@@ -83,7 +84,7 @@
    BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
      IF S.class = Texts.Int THEN
        voff := S.i; Oberon.GetSelection(T, beg, end, time);
-@@ -123,12 +116,25 @@
+@@ -123,12 +115,25 @@
      END
    END ChangeOffset;
  
@@ -111,7 +112,7 @@
        buf: ARRAY 32 OF CHAR;
  
      PROCEDURE Forward(n: INTEGER; VAR R: Texts.Reader; VAR buf: ARRAY OF CHAR);
-@@ -141,7 +147,7 @@
+@@ -141,7 +146,7 @@
    BEGIN V := Oberon.Par.vwr;
      IF Oberon.Par.frame # V.dsc THEN V := Oberon.FocusViewer END;
      IF (V.dsc # NIL) & (V.dsc.next IS TextFrames.Frame) THEN
@@ -120,7 +121,7 @@
        prevTime := time; Oberon.GetSelection(T, beg, end, time);
        IF time > prevTime THEN
          Texts.OpenReader(R, T, beg);
-@@ -153,10 +159,10 @@
+@@ -153,10 +158,10 @@
          j := 0;
          WHILE j # M - 1 DO d[ORD(pat[j])] := M - 1 - j; INC(j) END
        END;
@@ -135,7 +136,7 @@
        j := M;
        REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j]);
        WHILE (j >= 0) & (pos < len) DO
-@@ -164,34 +170,52 @@
+@@ -164,20 +169,21 @@
          REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j])
        END ;
        IF j < 0 THEN
@@ -158,51 +159,49 @@
 +    VAR F: TextFrames.Frame;
 +      T: Texts.Text; S: Texts.Scanner; R: Texts.Reader;
        V: Viewers.Viewer;
--      beg, end, time: LONGINT;
-+      name: ARRAY 32 OF CHAR;
-+      beg, end, time, pos, i, n, X, Y: INTEGER; ch: CHAR;
+       name: ARRAY 32 OF CHAR;
+-      beg, end, time, pos, i, X, Y: LONGINT;
++      beg, end, time, pos, i, n, X, Y: INTEGER;
    BEGIN
      V := Oberon.FocusViewer;
      IF (V.dsc # NIL) & (V.dsc.next IS TextFrames.Frame) THEN
--      Text := V.dsc.next(TextFrames.Frame);
-       Oberon.GetSelection(T, beg, end, time);
+@@ -185,12 +191,10 @@
        IF time >= 0 THEN
          Texts.OpenScanner(S, T, beg);
          REPEAT Texts.Scan(S) UNTIL (S.class >= Texts.Int); (*skip names*)
 -        IF S.class = Texts.Int THEN
+-          pos := S.i;
+-          IF (S.nextCh = "@") THEN
++        IF S.class = Texts.Int THEN pos := S.i;
++          IF S.nextCh = "@" THEN
+             Texts.Scan(S); Texts.Scan(S);
+-            IF (S.class = Texts.Name) THEN
+-              i := 0;
++            IF S.class = Texts.Name THEN i := 0;
+               WHILE S.s[i] # 0X DO name[i] := S.s[i]; INC(i) END;
+               name[i] := "."; name[i+1] := "M"; name[i+2] := "o"; name[i+3] := "d"; name[i+4] := 0X;
+               Texts.OpenScanner(S, V.dsc(TextFrames.Frame).text, 0);
+@@ -204,13 +208,13 @@
+               END
+             END
+           END;
+-          Text := V.dsc.next(TextFrames.Frame);
 -          TextFrames.RemoveSelection(Text);
 -          TextFrames.RemoveCaret(Text);
 -          Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
--          TextFrames.Show(Text, Max(0, S.i - 200));
-+        IF S.class = Texts.Int THEN pos := S.i;
-+          IF S.nextCh = "@" THEN
-+            Texts.Scan(S); Texts.Scan(S);
-+            IF S.class = Texts.Name THEN i := 0;
-+              WHILE S.s[i] # 0X DO name[i] := S.s[i]; INC(i) END;
-+              name[i] := "."; name[i+1] := "M"; name[i+2] := "o"; name[i+3] := "d"; name[i+4] := 0X;
-+              Texts.OpenScanner(S, V.dsc(TextFrames.Frame).text, 0);
-+              Texts.Scan(S);
-+              IF (S.class = Texts.Name) & (S.s # name) THEN
-+                Oberon.AllocateUserViewer(V.X, X, Y);
-+                V := MenuViewers.New(
-+                  TextFrames.NewMenu(name, StandardMenu),
-+                  TextFrames.NewText(TextFrames.Text(name), 0),
-+                  TextFrames.menuH, X, Y)
-+              END
-+            END
-+          END;
+-          TextFrames.Show(Text, Max(0, pos - 200));
 +          F := V.dsc.next(TextFrames.Frame);
 +          TextFrames.RemoveSelection(F);
 +          TextFrames.RemoveCaret(F);
 +          Oberon.RemoveMarks(F.X, F.Y, F.W, F.H);
 +          ShowPos(F, pos);
            Oberon.PassFocus(V);
--          TextFrames.SetCaret(Text, S.i)
+-          TextFrames.SetCaret(Text, pos)
 +          TextFrames.SetCaret(F, pos)
          END
        END
      END
-@@ -201,32 +225,30 @@
+@@ -220,32 +224,30 @@
      VAR Menu, Main: Display.Frame;
        buf: Texts.Buffer;
        V: Viewers.Viewer;
