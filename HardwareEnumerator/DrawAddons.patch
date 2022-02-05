@@ -1,0 +1,48 @@
+--- DisplayGrab.Mod.txt
++++ DisplayGrab.Mod.txt
+@@ -1,13 +1,17 @@
+ MODULE DisplayGrab;
+   IMPORT SYSTEM, Display;
+ 
+-  VAR Span: INTEGER;
+-
+   PROCEDURE GrabDot*(x, y: INTEGER) : INTEGER;
+     VAR a, col: INTEGER; s: SET;
+   BEGIN
+-    a := Display.Base + (x DIV 32)*4 + y*Span; col := 1;
+-    SYSTEM.GET(a, s); IF (s * {x MOD 32} = {}) THEN col := 0 END;
++    a := Display.Base + (x DIV (32 DIV Display.Depth)) * 4 + y * Display.Span;
++    IF Display.Depth = 1 THEN
++      col := 1; SYSTEM.GET(a, s); IF (s * {x MOD 32} = {}) THEN col := 0 END
++    ELSIF Display.Depth = 4 THEN
++      SYSTEM.GET(a, col); col := ASR(col, (x MOD 8) * 4) MOD 10H;
++    ELSE
++      col := 0
++    END
+     RETURN col
+   END GrabDot;
+ 
+@@ -15,8 +19,14 @@
+     VAR row, a, aL, aR: INTEGER; pix, mask: SET;
+   BEGIN
+     ASSERT((w > 0) & (w <= 32));
+-    aL := Display.Base + y*Span; aR := ((x+w-1) DIV 32)*4 + aL; aL := (x DIV 32)*4 + aL;
+-    IF aR = aL THEN
++    aL := Display.Base + y*Display.Span; aR := ((x+w-1) DIV 32)*4 + aL; aL := (x DIV 32)*4 + aL;
++    IF Display.Depth # 1 THEN
++      pix := {};
++      FOR row := 0 TO w - 1 DO
++        IF GrabDot(x+row, y) # 0 THEN INCL(pix, row) END
++      END;
++      row := SYSTEM.VAL(INTEGER, pix);
++    ELSIF aR = aL THEN
+       mask := {(x MOD 32) .. ((x+w-1) MOD 32)};
+       SYSTEM.GET(aL, pix);
+       row := ASR(SYSTEM.VAL(INTEGER, pix * mask), x MOD 32)
+@@ -34,5 +44,5 @@
+     RETURN row
+   END GrabPatternRow;
+ 
+-BEGIN Span := 128
++BEGIN
+ END DisplayGrab.

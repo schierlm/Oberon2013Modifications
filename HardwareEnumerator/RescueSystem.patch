@@ -1,0 +1,162 @@
+--- RescueSystemLoader.Mod.txt
++++ RescueSystemLoader.Mod.txt
+@@ -2,88 +2,114 @@
+   IMPORT SYSTEM;
+ 
+   CONST SP = 14; stackOrg = 80000H;
+-    spiData = -48; spiCtrl = -44;
+     CARD0 = 1; SPIFAST = 4;
+     FSoffset = 80000H;   (*block offset*)
+     RSoffset = 80H; (* extra offset due to rescue system *)
+ 
+-  PROCEDURE SPIIdle(n: INTEGER); (*send n FFs slowly with no card selected*)
++  PROCEDURE SPIIdle(n, spiCtrl, spiData: INTEGER); (*send n FFs slowly with no card selected*)
+   BEGIN SYSTEM.PUT(spiCtrl, 0);
+     WHILE n > 0 DO DEC(n); SYSTEM.PUT(spiData, -1);
+       REPEAT UNTIL SYSTEM.BIT(spiCtrl, 0)
+     END
+   END SPIIdle;
+ 
+-  PROCEDURE SPI(n: INTEGER); (*send&rcv byte slowly with card selected*)
++  PROCEDURE SPI(n, spiCtrl, spiData: INTEGER); (*send&rcv byte slowly with card selected*)
+   BEGIN SYSTEM.PUT(spiCtrl, CARD0); SYSTEM.PUT(spiData, n);
+     REPEAT UNTIL SYSTEM.BIT(spiCtrl, 0)
+   END SPI;
+ 
+-  PROCEDURE SPICmd(n, arg: INTEGER);
++  PROCEDURE SPICmd(n, arg, spiCtrl, spiData: INTEGER);
+     VAR i, data, crc: INTEGER;
+   BEGIN (*send cmd*)
+-    REPEAT SPIIdle(1); SYSTEM.GET(spiData, data) UNTIL data = 255; (*flush while unselected*)
+-    REPEAT SPI(255); SYSTEM.GET(spiData, data) UNTIL data = 255; (*flush while selected*)
++    REPEAT SPIIdle(1, spiCtrl, spiData); SYSTEM.GET(spiData, data) UNTIL data = 255; (*flush while unselected*)
++    REPEAT SPI(255, spiCtrl, spiData); SYSTEM.GET(spiData, data) UNTIL data = 255; (*flush while selected*)
+     IF n = 8 THEN crc := 135 ELSIF n = 0 THEN crc := 149 ELSE crc := 255 END;
+-    SPI(n MOD 64 + 64); (*send command*)
+-    FOR i := 24 TO 0 BY -8 DO SPI(ROR(arg, i)) END; (*send arg*)
+-    SPI(crc); i := 32;
+-    REPEAT SPI(255); SYSTEM.GET(spiData, data); DEC(i) UNTIL (data < 80H) OR (i = 0)
++    SPI(n MOD 64 + 64, spiCtrl, spiData); (*send command*)
++    FOR i := 24 TO 0 BY -8 DO SPI(ROR(arg, i), spiCtrl, spiData) END; (*send arg*)
++    SPI(crc, spiCtrl, spiData); i := 32;
++    REPEAT SPI(255, spiCtrl, spiData); SYSTEM.GET(spiData, data); DEC(i) UNTIL (data < 80H) OR (i = 0)
+   END SPICmd;
+ 
+-  PROCEDURE SDShift(VAR n: INTEGER);
++  PROCEDURE SDShift(VAR n, spiCtrl, spiData: INTEGER);
+     VAR data: INTEGER;
+-  BEGIN SPICmd(58, 0);  (*CMD58 get card capacity bit*)
+-    SYSTEM.GET(spiData, data); SPI(-1);
++  BEGIN SPICmd(58, 0, spiCtrl, spiData);  (*CMD58 get card capacity bit*)
++    SYSTEM.GET(spiData, data); SPI(-1, spiCtrl, spiData);
+     IF (data # 0) OR ~SYSTEM.BIT(spiData, 6) THEN n := n * 512 END ;  (*non-SDHC card*)
+-    SPI(-1); SPI(-1); SPIIdle(1)  (*flush response*)
++    SPI(-1, spiCtrl, spiData); SPI(-1, spiCtrl, spiData); SPIIdle(1, spiCtrl, spiData)  (*flush response*)
+   END SDShift;
+ 
+-  PROCEDURE ReadSD(src, dst: INTEGER);
++  PROCEDURE ReadPV(src, dst, pvDisk: INTEGER);
++  BEGIN
++    SYSTEM.PUT(pvDisk, dst);
++    SYSTEM.PUT(pvDisk, 080000000H + src);
++  END ReadPV;
++
++  PROCEDURE ReadSD(src, dst, spiCtrl, spiData: INTEGER);
+     VAR i, data: INTEGER;
+-  BEGIN SDShift(src); SPICmd(17, src); (*CMD17 read one block*)
++  BEGIN SDShift(src, spiCtrl, spiData); SPICmd(17, src, spiCtrl, spiData); (*CMD17 read one block*)
+     i := 0; (*wait for start data marker*)
+-    REPEAT SPI(-1); SYSTEM.GET(spiData, data); INC(i) UNTIL data = 254;
++    REPEAT SPI(-1, spiCtrl, spiData); SYSTEM.GET(spiData, data); INC(i) UNTIL data = 254;
+     SYSTEM.PUT(spiCtrl, SPIFAST + CARD0);
+     FOR i := 0 TO 508 BY 4 DO
+       SYSTEM.PUT(spiData, -1);
+       REPEAT UNTIL SYSTEM.BIT(spiCtrl, 0);
+       SYSTEM.GET(spiData, data); SYSTEM.PUT(dst, data); INC(dst, 4)
+     END;
+-    SPI(255); SPI(255); SPIIdle(1) (*may be a checksum; deselect card*)
++    SPI(255, spiCtrl, spiData); SPI(255, spiCtrl, spiData); SPIIdle(1, spiCtrl, spiData) (*may be a checksum; deselect card*)
+   END ReadSD;
+ 
+-  PROCEDURE WriteSD(dst, src: INTEGER);
++  PROCEDURE WriteSD(dst, src, spiCtrl, spiData: INTEGER);
+     VAR i, n, data: INTEGER; x: BYTE;
+-  BEGIN SDShift(dst); SPICmd(24, dst); (*CMD24 write one block*)
+-    SPI(254); (*write start data marker*)
++  BEGIN SDShift(dst, spiCtrl, spiData); SPICmd(24, dst, spiCtrl, spiData); (*CMD24 write one block*)
++    SPI(254, spiCtrl, spiData); (*write start data marker*)
+     SYSTEM.PUT(spiCtrl, SPIFAST + CARD0);
+     FOR i := 0 TO 508 BY 4 DO
+       SYSTEM.GET(src, n); INC(src, 4); SYSTEM.PUT(spiData, n);
+       REPEAT UNTIL SYSTEM.BIT(spiCtrl, 0)
+     END;
+-    SPI(255); SPI(255); (*dummy checksum*) i := 0;
+-    REPEAT SPI(-1); SYSTEM.GET(spiData, data); INC(i); UNTIL data MOD 32 = 5;
+-    SPIIdle(1) (*deselect card*)
++    SPI(255, spiCtrl, spiData); SPI(255, spiCtrl, spiData); (*dummy checksum*) i := 0;
++    REPEAT SPI(-1, spiCtrl, spiData); SYSTEM.GET(spiData, data); INC(i); UNTIL data MOD 32 = 5;
++    SPIIdle(1, spiCtrl, spiData) (*deselect card*)
+   END WriteSD;
+ 
+   PROCEDURE Load;
+-    VAR src, dst, data: INTEGER;
+-  BEGIN SYSTEM.GET(0, data);
++    VAR src, dst, data, pvDisk, spiCtrl, spiData: INTEGER;
++  BEGIN
++  SYSTEM.PUT(-4, 7644736BH); (* 'vDsk' *)
++  SYSTEM.GET(-4, pvDisk);
++  IF pvDisk = 0 THEN
++    SYSTEM.PUT(-4, 53504966H); (* 'SPIf' *)
++    SYSTEM.GET(-4, spiCtrl);
++    SYSTEM.GET(-4, spiData);
++    IF spiData = 0 THEN spiData := -48; spiCtrl := -44 END;
++  END;
++  SYSTEM.GET(0, data);
+   IF (data = 0E7000006H) THEN
+     SYSTEM.GET(4, data);
+     data := 1 - data;
+     SYSTEM.PUT(4, data);
+-    WriteSD(FSoffset + 4, 0);
+-    FOR src := 0 TO 2048 - 4 BY 4 DO SYSTEM.GET(src, data); SYSTEM.PUT(src + 20000H, data) END;
++    IF pvDisk # 0 THEN
++      SYSTEM.PUT(pvDisk, 0);
++      SYSTEM.PUT(pvDisk, 0C0000000H + 2)
++    ELSE
++      WriteSD(FSoffset + 4, 0, spiCtrl, spiData)
++    END;
++    FOR src := 0 TO 3072 - 4 BY 4 DO SYSTEM.GET(src, data); SYSTEM.PUT(src + 20000H, data) END;
+     data := 0E7008006H;
+     SYSTEM.PUT(0, data)
+   ELSE
+     SYSTEM.GET(4, data);
+-    IF data = 0 THEN src := FSoffset + 8 ELSE src := FSoffset + RSoffset + 4 END;
+-    ReadSD(src, 0); SYSTEM.GET(16, data);
+-    INC(src); dst := 512;
+-    WHILE dst < data DO ReadSD(src, dst); INC(src); INC(dst, 512) END;
++    IF pvDisk # 0 THEN
++      IF data = 0 THEN src :=  5 ELSE src := RSoffset DIV 2 + 2 END;
++      ReadPV(src, 0, pvDisk); SYSTEM.GET(16, data);
++      INC(src); dst := 1024;
++      WHILE dst < data DO ReadPV(src, dst, pvDisk); INC(src); INC(dst, 1024) END
++    ELSE
++      IF data = 0 THEN src := FSoffset + 10 ELSE src := FSoffset + RSoffset + 4 END;
++      ReadSD(src, 0, spiCtrl, spiData); SYSTEM.GET(16, data);
++      INC(src); dst := 512;
++      WHILE dst < data DO ReadSD(src, dst, spiCtrl, spiData); INC(src); INC(dst, 512) END
++    END;
+     SYSTEM.GET(12 + 20000H, data); SYSTEM.PUT(12, data);
+     SYSTEM.GET(24 + 20000H, data); SYSTEM.PUT(24, data)
+   END
+--- RescueSystemTool.Mod.txt
++++ RescueSystemTool.Mod.txt
+@@ -41,8 +41,8 @@
+   secno := (1 - RSoffset) * 29; Kernel.PutSector(secno, sec); INC(secno, 29);
+   (* initialize start of boot loader *)
+   FOR i := 0 TO 1BH DO sec[i] := 0H END;
+-  sec[0] := 06H; sec[3] := 0E7H; sec[11H] := 08H;
+-  (* now load up to 2 sectors of RescueSystemLoader.rsc *)
++  sec[0] := 06H; sec[3] := 0E7H; sec[11H] := 0CH;
++  (* now load up to 3 sectors of RescueSystemLoader.rsc *)
+   F := Files.Old("RescueSystemLoader.rsc"); Files.Set(R, F, 2DH); Files.ReadByte(R, sec[1CH]); i := 1DH;
+   WHILE ~R.eof DO 
+     IF i = Kernel.SectorLength THEN Kernel.PutSector(secno, sec); INC(secno, 29); i := 0 END;
