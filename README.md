@@ -69,6 +69,7 @@ There are also two separate releases available that include the rescue system (t
 | **[CrossCompiler](CrossCompiler/README.md)** | Compile a second set of modules without affecting the current system | Recompile compiler |
 | **[ImageBuilder](ImageBuilder/README.md)** | Build disk images | None |
 | **[HardwareEnumerator](HardwareEnumerator/README.md)** | Make disk images hardware independent by enumerating hardware at startup | Recompile inner core |
+| **[SeamlessResize](SeamlessResize/README.md)** | Automatically resize the Oberon system when emulator window is resized | Hardware Enumerator |
 | **[Scripting](Scripting/README.md)** | Run multiple commands and react on their outcome | Apply `CommandExitCodes` |
 | **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |
 | **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |
