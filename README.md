@@ -70,6 +70,7 @@ There are also two separate releases available that include the rescue system (t
 | **[ImageBuilder](ImageBuilder/README.md)** | Build disk images | None |
 | **[HardwareEnumerator](HardwareEnumerator/README.md)** | Make disk images hardware independent by enumerating hardware at startup | Recompile inner core |
 | **[SeamlessResize](SeamlessResize/README.md)** | Automatically resize the Oberon system when emulator window is resized | Hardware Enumerator |
+| **[DebugConsole](DebugConsole/README.md)** | Write debug strings to MMIO address and view them in emulator output | Hardware Enumerator |
 | **[Scripting](Scripting/README.md)** | Run multiple commands and react on their outcome | Apply `CommandExitCodes` |
 | **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |
 | **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |

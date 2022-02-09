@@ -65,6 +65,8 @@ ORP.Compile HardwareDetect.Mod/s ~
 
 ORP.Compile SeamlessResize.Mod/s ~
 
+ORP.Compile Console.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~

@@ -64,6 +64,7 @@ rmdir work/utf8lite
 
 patch -d work <VariableLinespace/VariableLineSpace.patch
 patch -d work <HardwareEnumerator/HardwareEnumerator.patch
+patch -d work <DebugConsole/DebugConsole.patch
 
 sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
 sed -i '1,2d' work/BootLoad.Mod.txt
@@ -72,7 +73,7 @@ cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt Res
 cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.txt Scripting/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
-cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt work
+cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/* work
 
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
