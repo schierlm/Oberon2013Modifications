@@ -91,8 +91,8 @@ MODULE DebugTools;
       IF ODD(w DIV 10000000H) THEN Texts.Write(W, "L") END ;
       Texts.WriteString(W, mnemo1[a]);
       IF u = 0 THEN DisasmWriteReg(w MOD 10H) ELSE
-        w := w MOD 100000H;
-        IF w >= 80000H THEN w := w - 100000H END ;
+        w := w MOD 1000000H;
+        IF w >= 800000H THEN w := w - 1000000H END ;
         Texts.WriteInt(W, w, 8)
       END;
       IF (u = 0) & ODD(w DIV 10000000H) & (w DIV 10H MOD 100000H # 0) THEN
