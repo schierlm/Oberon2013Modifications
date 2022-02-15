@@ -78,6 +78,7 @@ cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
 patch -d work <HardwareEnumerator/InnerEmulator.patch
+patch -d work <StartupCommand/StartupCommand.patch
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
