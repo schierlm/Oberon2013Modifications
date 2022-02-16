@@ -1,0 +1,16 @@
+MODULE CommandLineDefragger;
+  IMPORT SYSTEM, Kernel, FileDir, DefragFiles, Display, Fonts, Defragger, CommandLineSystem;
+
+  CONST FileInfoPerSector = 28;
+
+  PROCEDURE Defrag*;
+  BEGIN
+    Defragger.SetFinishedHook(CommandLineSystem.FinishCommand);
+    Defragger.Defrag
+  END Defrag;
+
+  PROCEDURE Load*;
+  BEGIN
+  END Load;
+
+END CommandLineDefragger.

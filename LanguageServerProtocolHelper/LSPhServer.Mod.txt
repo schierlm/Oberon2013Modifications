@@ -51,5 +51,5 @@ MODULE LSPhServer;
     END; Oberon.Collect(0)
   END Task;
 
-BEGIN Texts.OpenWriter(W); T := Oberon.NewTask(Task, 0); embedded := FALSE; Run
+BEGIN Texts.OpenWriter(W); T := Oberon.NewTask(Task, 0); embedded := FALSE
 END LSPhServer.
