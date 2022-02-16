@@ -1,0 +1,34 @@
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -362,9 +362,22 @@
+     Texts.Append(Oberon.Log, W.buf)
+   END ShowFonts;
+ 
++  PROCEDURE CheckStartup(T: Texts.Text; F: TextFrames.Frame; prefix: ARRAY OF CHAR);
++    VAR R: Texts.Reader; ch: CHAR; i: INTEGER;
++  BEGIN i := 0;
++    Texts.OpenReader(R, T, 0);
++    Texts.Read(R, ch);
++    WHILE (ch # 0X) & (ch <= " ") DO Texts.Read(R, ch) END;
++    WHILE (ch # 0X) & (ch = prefix[i]) DO Texts.Read(R, ch); INC(i) END;
++    IF prefix[i] = 0X THEN
++      WHILE (ch # 0X) & (ch <= " ") DO Texts.Read(R, ch) END;
++      TextFrames.Call(F, Texts.Pos(R) - 1, FALSE)
++    END
++  END CheckStartup;
++
+   PROCEDURE OpenViewers;
+     VAR logV, toolV: Viewers.Viewer;
+-      menu, main: Display.Frame;
++      menu, main: TextFrames.Frame;
+       d: LONGINT; X, Y: INTEGER;
+   BEGIN d := Kernel.Clock(); Texts.WriteString(W, "Oberon V5  NW 14.4.2013"); EndLine;
+     Oberon.AllocateSystemViewer(0, X, Y);
+@@ -375,6 +388,7 @@
+     menu := TextFrames.NewMenu("System.Tool", StandardMenu);
+     main := TextFrames.NewText(TextFrames.Text("System.Tool"), 0);
+     toolV := MenuViewers.New(menu, main, TextFrames.menuH, X, Y)
++    ;CheckStartup(main.text, main, "@Startup:");
+   END OpenViewers;
+ 
+   PROCEDURE ExtendDisplay*;

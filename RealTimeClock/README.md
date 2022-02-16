@@ -23,8 +23,6 @@ Installation
 
 - Apply [`RealTimeClock.patch`](RealTimeClock.patch) to `Kernel.Mod`.
 
-- In case you are running a supported emulator, also apply [`EmulatorSupport.patch`](EmulatorSupport.patch) to `Kernel.Mod`.
-
 - Recompile `Kernel.Mod` and rebuild the inner core:
 
       ORP.Compile Kernel.Mod FileDir.Mod Files.Mod Modules.Mod ~

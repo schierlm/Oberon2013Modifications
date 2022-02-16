@@ -1,0 +1,92 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -22,7 +22,7 @@
+     data: INTEGER; (*SPI data in*)
+     sectorMapStart*, lastUsedSector: INTEGER;
+     sectorMap: ARRAY mapsize DIV 32 OF SET;
+-    timer, spiData, spiCtrl, pvDisk, softResetAddr, hardResetAddr: INTEGER;
++    timer, spiData, spiCtrl, pvDisk, dbgConsole, softResetAddr, hardResetAddr: INTEGER;
+     powerManagement: BOOLEAN;
+     
+ (* ---------- New: heap allocation ----------*)
+@@ -139,6 +139,40 @@
+     UNTIL p >= heapLim
+   END Scan;
+ 
++(* ---------- Debug console ----------*)
++
++  PROCEDURE ConsoleCh*(ch: CHAR);
++  BEGIN
++    IF dbgConsole # 0 THEN SYSTEM.PUT(dbgConsole, ch) END
++  END ConsoleCh;
++
++  PROCEDURE ConsoleHex*(val: INTEGER);
++    VAR i, d: INTEGER;
++  BEGIN
++    FOR i := 0 TO 7 DO
++      val := ROR(val, 28);
++      d := val MOD 10H;
++      IF d >= 10 THEN INC(d, 7) END;
++      ConsoleCh(CHR(d + 30H));
++    END;
++  END ConsoleHex;
++
++  PROCEDURE ConsoleStr*(str: ARRAY OF CHAR);
++    VAR i: INTEGER;
++  BEGIN i := 0;
++    WHILE str[i] # 0X DO ConsoleCh(str[i]); INC(i) END
++  END ConsoleStr;
++
++  PROCEDURE ConsoleLn*();
++    VAR i: INTEGER;
++  BEGIN ConsoleCh(0DX);
++  END ConsoleLn;
++
++  PROCEDURE ConsoleFlush*();
++    VAR i: INTEGER;
++  BEGIN ConsoleCh(0X);
++  END ConsoleFlush;
++
+ (* ---------- Hardware enumerator ----------*)
+ 
+   PROCEDURE ToHardwareID*(str: ARRAY OF CHAR): INTEGER;
+@@ -152,8 +186,8 @@
+ 
+   PROCEDURE EnumerateHardware;
+     VAR val: INTEGER;
+-      hasTimer, hasRTC, hasSPI, hasPvDsk, hasReset: BOOLEAN;
+-      vRTC, Timr, SPIf, vDsk, Rset: INTEGER; (* hardware IDs *)
++      hasTimer, hasRTC, hasSPI, hasPvDsk, hasReset, hasDebugConsole: BOOLEAN;
++      vRTC, Timr, SPIf, vDsk, Rset, DbgC: INTEGER; (* hardware IDs *)
+   BEGIN
+     SYSTEM.PUT(hwEnumerator, 0);
+     SYSTEM.GET(hwEnumerator, val);
+@@ -167,6 +201,7 @@
+       SPIf := ToHardwareID("SPIf");
+       vDsk := ToHardwareID("vDsk");
+       Rset := ToHardwareID("Rset");
++      DbgC := ToHardwareID("DbgC");
+       SYSTEM.GET(hwEnumerator, val);
+       WHILE val # 0 DO
+         IF val = vRTC THEN hasRTC := TRUE
+@@ -174,6 +209,7 @@
+         ELSIF val = SPIf THEN hasSPI := TRUE
+         ELSIF val = vDsk THEN hasPvDsk := TRUE
+         ELSIF val = Rset THEN hasReset := TRUE
++        ELSIF val = DbgC THEN hasDebugConsole := TRUE
+         END; SYSTEM.GET(hwEnumerator, val);
+       END;
+       IF hasTimer THEN
+@@ -199,6 +235,12 @@
+         SYSTEM.GET(hwEnumerator, hardResetAddr)
+       ELSE
+         softResetAddr := 0; hardResetAddr := 0
++      END;
++      IF hasDebugConsole THEN
++        SYSTEM.PUT(hwEnumerator, DbgC);
++        SYSTEM.GET(hwEnumerator, dbgConsole);
++      ELSE
++        dbgConsole := 0
+       END;
+       IF hasPvDsk THEN
+         SYSTEM.PUT(hwEnumerator, vDsk);

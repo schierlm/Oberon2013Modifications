@@ -1,0 +1,46 @@
+--- KeyTester.Mod.txt
++++ KeyTester.Mod.txt
+@@ -4,7 +4,6 @@
+   CONST
+     Menu = "System.Close  System.Copy  System.Grow  KeyTester.Start  KeyTester.Delay0  KeyTester.Delay100  KeyTester.Delay500";
+     Factor = 10; Space = 5; KeyCount = 128;
+-    msAdr = -40; kbdAdr = -36;
+ 
+   TYPE
+     KeyInfo = RECORD
+@@ -17,6 +16,7 @@
+     keys: ARRAY KeyCount OF KeyInfo;
+     keylookup: ARRAY 3*256 OF INTEGER;
+     delay: INTEGER;
++    msAdr, kbdAdr: INTEGER;
+ 
+   PROCEDURE DrawText(text: ARRAY OF CHAR; x, y: INTEGER);
+   VAR
+@@ -151,10 +151,16 @@
+ 
+   PROCEDURE InitKeys();
+   VAR
+-    x, y, ctr: INTEGER;
++    x, y, ctr, mode, MsKb: INTEGER;
+   BEGIN
+-    FOR ctr := 0 TO 3*256-1 DO keylookup[ctr] := -1 END;
+-
++   FOR ctr := 0 TO 3*256-1 DO keylookup[ctr] := -1 END;
++   MsKb := Kernel.ToHardwareID("MsKb");
++   SYSTEM.PUT(-4, MsKb);
++   SYSTEM.GET(-4, msAdr);
++   SYSTEM.GET(-4, kbdAdr);
++   SYSTEM.GET(-4, mode);
++   IF kbdAdr = 0 THEN msAdr := -40; kbdAdr := -36 END;
++   IF mode # 1 THEN
+     x := 0; y := 0; ctr := 0;
+     AddKey("ESC", 0, 76H, ctr, x, y); INC(x,4);
+     AddKey("F1", 0, 05H, ctr, x, y);
+@@ -326,6 +332,7 @@
+     AddKey("Stop", 1, 3BH, ctr, x, y);
+     AddKey("Prev", 1, 15H, ctr, x, y);
+     AddKey("Next", 1, 4DH, ctr, x, y)
++   END
+   END InitKeys;
+ 
+ BEGIN InitKeys()

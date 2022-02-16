@@ -1,0 +1,1050 @@
+--- Kernel.Mod.txt
++++ Kernel.Mod.txt
+@@ -1,7 +1,7 @@
+ MODULE Kernel;  (*NW/PR  11.4.86 / 27.12.95 / 4.2.2014*)
+   IMPORT SYSTEM;
+   CONST SectorLength* = 1024;
+-    timer = -64; spiData = -48; spiCtrl = -44;
++    hwEnumerator* = -4;
+     CARD0 = 1; SPIFAST = 4;
+     FSoffset = 80000H; (*256MB in 512-byte blocks*)
+     mapsize = 10000H; (*1K sectors, 64MB*)
+@@ -22,6 +22,8 @@
+     data: INTEGER; (*SPI data in*)
+     sectorMapStart*, lastUsedSector: INTEGER;
+     sectorMap: ARRAY mapsize DIV 32 OF SET;
++    timer, spiData, spiCtrl, pvDisk, softResetAddr, hardResetAddr: INTEGER;
++    powerManagement: BOOLEAN;
+     
+ (* ---------- New: heap allocation ----------*)
+ 
+@@ -137,6 +139,112 @@
+     UNTIL p >= heapLim
+   END Scan;
+ 
++(* ---------- Hardware enumerator ----------*)
++
++  PROCEDURE ToHardwareID*(str: ARRAY OF CHAR): INTEGER;
++  BEGIN
++  RETURN ORD(str[0]) * 1000000H + ORD(str[1]) * 10000H + ORD(str[2]) * 100H + ORD(str[3])
++  END ToHardwareID;
++
++  PROCEDURE PowerManagementSleep*(until: INTEGER);
++  BEGIN IF powerManagement THEN SYSTEM.PUT(timer, until) END
++  END PowerManagementSleep;
++
++  PROCEDURE EnumerateHardware;
++    VAR val: INTEGER;
++      hasTimer, hasRTC, hasSPI, hasPvDsk, hasReset: BOOLEAN;
++      vRTC, Timr, SPIf, vDsk, Rset: INTEGER; (* hardware IDs *)
++  BEGIN
++    SYSTEM.PUT(hwEnumerator, 0);
++    SYSTEM.GET(hwEnumerator, val);
++    IF val # 1 THEN
++      timer := -64; spiData := -48; spiCtrl := -44; pvDisk := 0;
++      powerManagement := FALSE;
++      SYSTEM.GET(timer, clockTime)
++    ELSE
++      vRTC := ToHardwareID("vRTC");
++      Timr := ToHardwareID("Timr");
++      SPIf := ToHardwareID("SPIf");
++      vDsk := ToHardwareID("vDsk");
++      Rset := ToHardwareID("Rset");
++      SYSTEM.GET(hwEnumerator, val);
++      WHILE val # 0 DO
++        IF val = vRTC THEN hasRTC := TRUE
++        ELSIF val = Timr THEN hasTimer := TRUE
++        ELSIF val = SPIf THEN hasSPI := TRUE
++        ELSIF val = vDsk THEN hasPvDsk := TRUE
++        ELSIF val = Rset THEN hasReset := TRUE
++        END; SYSTEM.GET(hwEnumerator, val);
++      END;
++      IF hasTimer THEN
++        SYSTEM.PUT(hwEnumerator, Timr);
++        SYSTEM.GET(hwEnumerator, timer);
++        SYSTEM.GET(hwEnumerator, val);
++        powerManagement := (val = 1);
++      ELSE
++        timer := 0;
++        powerManagement := FALSE;
++      END;
++      IF hasRTC THEN
++        SYSTEM.PUT(hwEnumerator, vRTC);
++        SYSTEM.GET(hwEnumerator, clockTime);
++        SYSTEM.GET(hwEnumerator, clock)
++      ELSE
++        clock := 0;
++        SYSTEM.GET(timer, clockTime);
++      END;
++      IF hasReset THEN
++        SYSTEM.PUT(hwEnumerator, Rset);
++        SYSTEM.GET(hwEnumerator, softResetAddr);
++        SYSTEM.GET(hwEnumerator, hardResetAddr)
++      ELSE
++        softResetAddr := 0; hardResetAddr := 0
++      END;
++      IF hasPvDsk THEN
++        SYSTEM.PUT(hwEnumerator, vDsk);
++        SYSTEM.GET(hwEnumerator, pvDisk);
++        spiCtrl := 0; spiData := 0
++      ELSIF hasSPI THEN
++        SYSTEM.PUT(hwEnumerator, SPIf);
++        SYSTEM.GET(hwEnumerator, spiCtrl);
++        SYSTEM.GET(hwEnumerator, spiData);
++        (* TODO having disk as not first device? *)
++        pvDisk := 0
++      ELSE
++        pvDisk := 0; spiCtrl := 0; spiData := 0
++      END
++    END;
++    SYSTEM.GET(timer, clockTime);
++  END EnumerateHardware;
++
++(* ---------- Reset ----------*)
++
++  PROCEDURE PerformReset(addr: INTEGER; clearLNK: BOOLEAN);
++  TYPE Ptr = PROCEDURE;
++  VAR resetBuffer: ARRAY 4 OF INTEGER; start: INTEGER; ptr: Ptr;
++  BEGIN
++    IF clearLNK THEN start := 0 ELSE start := 1 END;
++    resetBuffer[0] := 04F000000H;                                 (* MOV   LNK,    0        *)
++    resetBuffer[1] := 060000000H + (addr DIV 10000H MOD 10000H);  (* MOV+U R0,     HI(addr) *)
++    resetBuffer[2] := 040060000H + (addr MOD 10000H);             (* IOR   R0, R0, LO(addr) *)
++    resetBuffer[3] := 0C7000000H;                                 (* BC    R0               *)
++    ptr := SYSTEM.VAL(Ptr, SYSTEM.ADR(resetBuffer[start]));
++    ptr;
++  END PerformReset;
++
++  PROCEDURE SoftReset*;
++  BEGIN IF softResetAddr # 0 THEN PerformReset(softResetAddr, FALSE) END
++  END SoftReset;
++
++  PROCEDURE HardReset*;
++  BEGIN
++    IF hardResetAddr # 0 THEN
++      PerformReset(hardResetAddr, FALSE)
++    ELSIF softResetAddr # 0 THEN
++      PerformReset(softResetAddr, TRUE)
++    END
++  END HardReset;
++
+ (* ---------- Disk storage management ----------*)
+ 
+   PROCEDURE SPIIdle(n: INTEGER); (*send n FFs slowly with no card selected*)
+@@ -255,30 +363,48 @@
+ 
+   PROCEDURE GetSector*(src: INTEGER; VAR dst: Sector);
+   BEGIN src := src DIV 29; ASSERT(SYSTEM.H(0) = 0);
+-    src := src * 2 + FSoffset;
+-    ReadSD(src, SYSTEM.ADR(dst)); ReadSD(src+1, SYSTEM.ADR(dst)+512) 
++    IF pvDisk # 0 THEN
++      src := src + (FSoffset - 80000H) DIV 2;
++      SYSTEM.PUT(pvDisk, SYSTEM.ADR(dst));
++      SYSTEM.PUT(pvDisk, 080000000H + src)
++    ELSE
++      src := src * 2 + FSoffset;
++      ReadSD(src, SYSTEM.ADR(dst)); ReadSD(src+1, SYSTEM.ADR(dst)+512)
++    END
+   END GetSector;
+   
+   PROCEDURE PutSector*(dst: INTEGER; VAR src: Sector);
+   BEGIN dst := dst DIV 29; ASSERT(SYSTEM.H(0) =  0);
+-    dst := dst * 2 + FSoffset;
+-    WriteSD(dst, SYSTEM.ADR(src)); WriteSD(dst+1, SYSTEM.ADR(src)+512)
++    IF pvDisk # 0 THEN
++      dst := dst + (FSoffset - 80000H) DIV 2;
++      SYSTEM.PUT(pvDisk, SYSTEM.ADR(src));
++      SYSTEM.PUT(pvDisk, 0C0000000H + dst)
++    ELSE
++      dst := dst * 2 + FSoffset;
++      WriteSD(dst, SYSTEM.ADR(src)); WriteSD(dst+1, SYSTEM.ADR(src)+512)
++    END
+   END PutSector;
+ 
+   PROCEDURE TrimAllSectorsAfter*(sec: INTEGER);
+   VAR i: INTEGER; magicSector: ARRAY 512 OF BYTE;
+   BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+-    sec := sec * 2 + FSoffset + 2;
+-    magicSector[0] := ORD("!"); magicSector[504] := ORD("!");
+-    magicSector[1] := ORD("!"); magicSector[505] := ORD("!");
+-    magicSector[2] := ORD("T"); magicSector[506] := ORD("T");
+-    magicSector[3] := ORD("R"); magicSector[507] := ORD("R");
+-    magicSector[4] := ORD("I"); magicSector[508] := ORD("I");
+-    magicSector[5] := ORD("M"); magicSector[509] := ORD("M");
+-    magicSector[6] := ORD("!"); magicSector[510] := ORD("!");
+-    magicSector[7] := ORD("!"); magicSector[511] := ORD("!");
+-    FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
+-    WriteSD(sec, SYSTEM.ADR(magicSector));
++    IF pvDisk # 0 THEN
++      sec := sec + (FSoffset - 80000H) DIV 2;
++      SYSTEM.PUT(pvDisk, 3FFFFFFFH);
++      SYSTEM.PUT(pvDisk, 0C0000000H + sec);
++    ELSE
++      sec := sec * 2 + FSoffset + 2;
++      magicSector[0] := ORD("!"); magicSector[504] := ORD("!");
++      magicSector[1] := ORD("!"); magicSector[505] := ORD("!");
++      magicSector[2] := ORD("T"); magicSector[506] := ORD("T");
++      magicSector[3] := ORD("R"); magicSector[507] := ORD("R");
++      magicSector[4] := ORD("I"); magicSector[508] := ORD("I");
++      magicSector[5] := ORD("M"); magicSector[509] := ORD("M");
++      magicSector[6] := ORD("!"); magicSector[510] := ORD("!");
++      magicSector[7] := ORD("!"); magicSector[511] := ORD("!");
++      FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
++      WriteSD(sec, SYSTEM.ADR(magicSector))
++    END
+   END TrimAllSectorsAfter;
+ 
+ (*-------- Miscellaneous procedures----------*)
+@@ -341,6 +467,7 @@
+     list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
+     SYSTEM.PUT(list0, heapLim - heapOrg); SYSTEM.PUT(list0+4, -1); SYSTEM.PUT(list0+8, 0);
+     allocated := 0; clock := 0; InitSecMap
++    ;EnumerateHardware
+   END Init;
+ 
+ END Kernel.
+--- FileDir.Mod.txt
++++ FileDir.Mod.txt
+@@ -55,6 +55,7 @@
+       END ;
+ 
+   VAR initFS: InitHandler;
++    HostFsAddr*, UsedHeaderSize*: INTEGER;
+ 
+   PROCEDURE AllocSector*(hint: INTEGER; VAR sec: INTEGER);
+     VAR mapFull: BOOLEAN;
+@@ -70,10 +71,23 @@
+ 
+   (*Exported procedures: Search, Insert, Delete, Enumerate, Init*)
+ 
++  PROCEDURE HFSearch(name: FileName; VAR A: DiskAdr);
++    TYPE blobType = RECORD op, adr: INTEGER; name: FileName END;
++    VAR continue: BOOLEAN; blob: blobType;
++  BEGIN blob.op := 0;
++    blob.name := name;
++    SYSTEM.PUT(HostFsAddr, SYSTEM.ADR(blob));
++    A := blob.adr
++  END HFSearch;
++
+   PROCEDURE Search*(name: FileName; VAR A: DiskAdr);
+     VAR i, L, R: INTEGER; dadr: DiskAdr;
+       a: DirPage;
+-  BEGIN dadr := DirRootAdr; A := 0;
++  BEGIN
++   IF HostFsAddr # 0 THEN
++    HFSearch(name, A)
++   ELSE
++    dadr := DirRootAdr; A := 0;
+     REPEAT Kernel.GetSector(dadr, a); ASSERT(a.mark = DirMark);
+       L := 0; R := a.m; (*binary search*)
+       WHILE L < R DO
+@@ -85,6 +99,7 @@
+       ELSE dadr := a.e[R-1].p
+       END ;
+     UNTIL (dadr = 0) OR (A # 0)
++   END
+   END Search;
+ 
+   PROCEDURE insert(name: FileName;
+@@ -147,11 +162,23 @@
+     END
+   END insert;
+ 
++  PROCEDURE HFInsert(name: FileName; fad: DiskAdr);
++    TYPE blobType = RECORD op, adr: INTEGER; name: FileName END;
++    VAR blob: blobType;
++  BEGIN blob.op := 4;
++    blob.adr := fad;
++    blob.name := name;
++    SYSTEM.PUT(HostFsAddr, SYSTEM.ADR(blob))
++  END HFInsert;
++
+   PROCEDURE Insert*(name: FileName; fad: DiskAdr);
+     VAR  oldroot: DiskAdr;
+       h: BOOLEAN; U: DirEntry;
+       a: DirPage;
+   BEGIN h := FALSE;
++   IF HostFsAddr # 0 THEN
++    HFInsert(name, fad)
++   ELSE
+     insert(name, DirRootAdr, h, U, fad);
+     IF h THEN (*root overflow*)
+       Kernel.GetSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
+@@ -159,6 +186,7 @@
+       a.mark := DirMark; a.m := 1; a.p0 := oldroot; a.e[0] := U;
+       Kernel.PutSector(DirRootAdr, a)
+     END
++   END
+   END Insert;
+ 
+ 
+@@ -257,10 +285,22 @@
+     END
+   END delete;
+ 
++  PROCEDURE HFDelete(name: FileName; VAR fad: DiskAdr);
++    TYPE blobType = RECORD op, adr: INTEGER; name: FileName END;
++    VAR blob: blobType;
++  BEGIN blob.op := 5;
++    blob.name := name;
++    SYSTEM.PUT(HostFsAddr, SYSTEM.ADR(blob));
++    fad := blob.adr;
++  END HFDelete;
++
+   PROCEDURE Delete*(name: FileName; VAR fad: DiskAdr);
+     VAR h: BOOLEAN; newroot: DiskAdr;
+       a: DirPage;
+   BEGIN h := FALSE;
++   IF HostFsAddr # 0 THEN
++    HFDelete(name, fad)
++   ELSE
+     delete(name, DirRootAdr, h, fad);
+     IF h THEN (*root underflow*)
+       Kernel.GetSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
+@@ -269,6 +309,7 @@
+         Kernel.PutSector(DirRootAdr, a) (*discard newroot*)
+       END
+     END
++   END
+   END Delete;
+ 
+   PROCEDURE enumerate(prefix:   ARRAY OF CHAR;
+@@ -297,11 +338,50 @@
+     END
+   END enumerate;
+ 
++  PROCEDURE HFEnumerate(prefix: ARRAY OF CHAR; proc: EntryHandler);
++    TYPE blobType = RECORD op, adr: INTEGER; name: FileName END;
++    VAR continue: BOOLEAN; blob: blobType;
++  BEGIN continue := TRUE;
++    blob.op := 1;
++    blob.name := prefix;
++    SYSTEM.PUT(HostFsAddr, SYSTEM.ADR(blob));
++    WHILE continue & (blob.adr # 0) DO
++      proc(blob.name, blob.adr, continue);
++      IF continue THEN
++        blob.op := 2;
++        SYSTEM.PUT(HostFsAddr, SYSTEM.ADR(blob))
++      END
++    END;
++  END HFEnumerate;
++
+   PROCEDURE Enumerate*(prefix: ARRAY OF CHAR; proc: EntryHandler);
+     VAR b: BOOLEAN;
+-  BEGIN b := TRUE; enumerate(prefix, DirRootAdr, proc, b)
++  BEGIN
++    IF HostFsAddr # 0 THEN
++      HFEnumerate(prefix, proc)
++    ELSE
++      b := TRUE; enumerate(prefix, DirRootAdr, proc, b)
++    END
+   END Enumerate;
+ 
++  PROCEDURE GetAttributes*(adr: INTEGER; VAR date, length: INTEGER);
++    TYPE blobType = RECORD op, adr, date, length: INTEGER END;
++    VAR hp: FileHeader; blob : blobType;
++  BEGIN
++    IF HostFsAddr # 0 THEN
++      blob.op := 3;
++      blob.adr := adr;
++      SYSTEM.PUT(HostFsAddr, SYSTEM.ADR(blob));
++      date := blob.date;
++      length := blob.length
++    ELSE
++      Kernel.GetSector(adr, hp);
++      date := hp.date;
++      length := hp.aleng * SectorSize + hp.bleng - HeaderSize
++    END
++  END GetAttributes;
++
++
+ (* ----- initialization ----- *)
+ 
+ PROCEDURE InitFS;
+@@ -377,8 +457,18 @@
+   END InitFS;
+ 
+   PROCEDURE Init*;
+-  BEGIN initFS := InitFS;
+-    InitFS();
++    VAR HsFs: INTEGER;
++  BEGIN
++    HsFs := Kernel.ToHardwareID("HsFs");
++    SYSTEM.PUT(Kernel.hwEnumerator, HsFs);
++    SYSTEM.GET(Kernel.hwEnumerator, HostFsAddr);
++    IF HostFsAddr # 0 THEN
++      UsedHeaderSize := 0
++    ELSE
++      UsedHeaderSize := HeaderSize;
++      initFS := InitFS;
++      InitFS();
++    END
+   END Init;
+   
+ END FileDir.
+--- Files.Mod.txt
++++ Files.Mod.txt
+@@ -90,6 +90,26 @@
+     END
+   END Check;
+ 
++  PROCEDURE HFReadBuf(f: File; buf: Buffer; pos: INTEGER);
++    TYPE blobType = RECORD op, adr, offset, length, ptr: INTEGER END;
++    VAR blob : blobType;
++  BEGIN
++    IF pos < f.aleng THEN buf.lim := SS ELSE buf.lim := f.bleng END;
++    buf.apos := pos; buf.mod := FALSE;
++    blob.op := 7; blob.adr := f.sec[0]; blob.offset := pos * SS;
++    blob.length := buf.lim; blob.ptr := SYSTEM.ADR(buf.data);
++    SYSTEM.PUT(FileDir.HostFsAddr, SYSTEM.ADR(blob))
++  END HFReadBuf;
++
++  PROCEDURE HFWriteBuf(f: File; buf: Buffer);
++    TYPE blobType = RECORD op, adr, offset, length, ptr: INTEGER END;
++    VAR blob : blobType;
++  BEGIN
++    blob.op := 8; blob.adr := f.sec[0]; blob.offset := buf.apos * SS;
++    blob.length := buf.lim; blob.ptr := SYSTEM.ADR(buf.data);
++    SYSTEM.PUT(FileDir.HostFsAddr, SYSTEM.ADR(blob)); buf.mod := FALSE
++  END HFWriteBuf;
++
+   PROCEDURE Old*(name: ARRAY OF CHAR): File;
+     VAR i, k, res: INTEGER;
+       f: File; wf: WeakFile;
+@@ -111,6 +131,12 @@
+         END;
+         IF f = NIL THEN (*file not yet present*)
+           NEW(buf); buf.apos := 0; buf.next := buf; buf.mod := FALSE;
++         IF FileDir.HostFsAddr # 0 THEN
++          NEW(f); FileDir.GetAttributes(header, f.date, i);
++          f.aleng := i DIV SS; f.bleng := i MOD SS;
++          f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf; f.registered := TRUE;
++          f.sec[0] := header; HFReadBuf(f, buf, 0);
++         ELSE
+           F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(buf.data));
+           Kernel.GetSector(header, buf.data); ASSERT(F.mark = FileDir.HeaderMark);
+           NEW(f); f.aleng := F.aleng; f.bleng := F.bleng; f.date := F.date;
+@@ -136,8 +162,9 @@
+             Kernel.GetSector(linxpg.adr, linxpg.sec); linxpg2.next := linxpg; INC(i)
+           END;
+           WHILE i < FileDir.ExTabSize DO f.ext[i] := NIL; INC(i) END ;
+-          f.sechint := header; f.modH := FALSE;
+-          NEW(wf); wf.target := SYSTEM.VAL(INTEGER, f); wf.next := weakRoot; weakRoot := wf; Kernel.AddWeakReference(weakRoot)
++         END;
++         f.sechint := header; f.modH := FALSE;
++         NEW(wf); wf.target := SYSTEM.VAL(INTEGER, f); wf.next := weakRoot; weakRoot := wf; Kernel.AddWeakReference(weakRoot)
+         END
+       END
+     END ;
+@@ -145,14 +172,24 @@
+   END Old;
+ 
+   PROCEDURE New*(name: ARRAY OF CHAR): File;
++    TYPE blobType = RECORD op, adr: INTEGER; name: FileDir.FileName END;
+     VAR i, res: INTEGER;
+       f: File;
+       buf: Buffer;
+       F: FileDir.FileHd;
+       namebuf: FileDir.FileName;
++      blob : blobType;
+   BEGIN f := NIL; Check(name, namebuf, res);
+     IF res <= 0 THEN
+-      NEW(buf); buf.apos := 0; buf.mod := TRUE; buf.lim := HS; buf.next := buf;
++     NEW(buf); buf.apos := 0; buf.mod := TRUE; buf.lim := FileDir.UsedHeaderSize; buf.next := buf;
++     IF FileDir.HostFsAddr # 0 THEN
++      NEW(f); f.aleng := 0; f.bleng := 0;
++      f.registered := FALSE; f.date := Kernel.Clock();
++      f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf;
++      blob.op := 6; blob.name := namebuf;
++      SYSTEM.PUT(FileDir.HostFsAddr, SYSTEM.ADR(blob));
++      f.sec[0] := blob.adr
++     ELSE
+       F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(buf.data));
+       F.mark := FileDir.HeaderMark;
+       F.aleng := 0; F.bleng := HS; F.name := namebuf;
+@@ -165,6 +202,7 @@
+       f.lext := NIL; F.lext := 0;
+       i := 0;
+       REPEAT f.sec[i] := 0; F.sec[i] := 0; INC(i) UNTIL i = STS
++     END
+     END ;
+     RETURN f
+   END New;
+@@ -181,6 +219,9 @@
+   PROCEDURE ReadBuf(f: File; buf: Buffer; pos: INTEGER);
+     VAR sec: DiskAdr; lidx: LinkedIndex; i: INTEGER;
+   BEGIN
++   IF FileDir.HostFsAddr # 0 THEN
++    HFReadBuf(f, buf, pos)
++   ELSE
+     IF pos < STS THEN sec := f.sec[pos]
+     ELSIF pos >= STS + FileDir.ExTabSize * XS THEN 
+       lidx := f.lext; i := pos - STS - FileDir.ExTabSize * XS;
+@@ -191,12 +232,16 @@
+     Kernel.GetSector(sec, buf.data);
+     IF pos < f.aleng THEN buf.lim := SS ELSE buf.lim := f.bleng END ;
+     buf.apos := pos; buf.mod := FALSE
++   END;
+   END ReadBuf;
+ 
+   PROCEDURE WriteBuf(f: File; buf: Buffer);
+     VAR i, k: INTEGER;
+       secadr: DiskAdr; inx: Index; linx, linx2: LinkedIndex;
+   BEGIN 
++   IF FileDir.HostFsAddr # 0 THEN
++    HFWriteBuf(f, buf)
++   ELSE
+     IF buf.apos < STS THEN
+       secadr := f.sec[buf.apos];
+       IF secadr = 0 THEN
+@@ -237,6 +282,7 @@
+      END
+     END ;
+     Kernel.PutSector(secadr, buf.data); buf.mod := FALSE
++   END
+   END WriteBuf;
+ 
+   PROCEDURE Buf(f: File; pos: INTEGER): Buffer;
+@@ -269,10 +315,11 @@
+       linx, linx2: LinkedIndex;
+       head: FileDir.FileHeader;
+   BEGIN buf := f.firstbuf;
+-    REPEAT
++   REPEAT
+       IF buf.mod THEN WriteBuf(f, buf) END ;
+       buf := buf.next
+-    UNTIL buf = f.firstbuf;
++   UNTIL buf = f.firstbuf;
++   IF FileDir.HostFsAddr = 0 THEN
+     k := (f.aleng + (XS-STS)) DIV XS; i := 0;
+     IF k > FileDir.ExTabSize THEN
+       k := FileDir.ExTabSize + (f.aleng + XS - STS - FileDir.ExTabSize * XS) DIV (XS - 1)
+@@ -308,6 +355,7 @@
+       Kernel.GetSector(f.sec[0], head); UpdateHeader(f, head);
+       Kernel.PutSector(f.sec[0], head); f.modH := FALSE
+     END
++   END
+   END Unbuffer;
+ 
+   PROCEDURE Register*(f: File);
+@@ -332,6 +380,7 @@
+       ind: FileDir.IndexSector;
+       lidx: LinkedIndex;
+   BEGIN
++    ASSERT(FileDir.HostFsAddr = 0);
+     IF f # NIL THEN a := f.aleng + 1; f.aleng := 0; f.bleng := HS;
+       IF a <= STS THEN i := a;
+       ELSE i := STS; DEC(a, i); j := (a-1) MOD XS; k := (a-1) DIV XS;
+@@ -378,7 +427,9 @@
+         FileDir.Delete(oldbuf, adr);
+         IF adr # 0 THEN
+           FileDir.Insert(newbuf, adr);
+-          Kernel.GetSector(adr, head); head.name := newbuf; Kernel.PutSector(adr, head)
++          IF FileDir.HostFsAddr = 0 THEN
++            Kernel.GetSector(adr, head); head.name := newbuf; Kernel.PutSector(adr, head)
++          END
+         ELSE res := 2
+         END
+       END
+@@ -386,7 +437,7 @@
+   END Rename;
+ 
+   PROCEDURE Length*(f: File): INTEGER;
+-  BEGIN RETURN f.aleng * SS + f.bleng - HS
++  BEGIN RETURN f.aleng * SS + f.bleng - FileDir.UsedHeaderSize
+   END Length;
+ 
+   PROCEDURE Date*(f: File): INTEGER;
+@@ -399,9 +450,9 @@
+     VAR a, b: INTEGER;
+   BEGIN  r.eof := FALSE; r.res := 0;
+     IF f # NIL THEN
+-      IF pos < 0 THEN a := 0; b := HS
+-      ELSIF pos < f.aleng * SS + f.bleng - HS THEN
+-        a := (pos + HS) DIV SS; b := (pos + HS) MOD SS;
++      IF pos < 0 THEN a := 0; b := FileDir.UsedHeaderSize
++      ELSIF pos < f.aleng * SS + f.bleng - FileDir.UsedHeaderSize THEN
++        a := (pos + FileDir.UsedHeaderSize) DIV SS; b := (pos + FileDir.UsedHeaderSize) MOD SS;
+       ELSE a := f.aleng; b := f.bleng
+       END ;
+       r.file := f; r.apos := a; r.bpos := b; r.buf := f.firstbuf
+@@ -410,7 +461,7 @@
+   END Set;
+ 
+   PROCEDURE Pos*(VAR r: Rider): INTEGER;
+-  BEGIN RETURN r.apos * SS + r.bpos - HS
++  BEGIN RETURN r.apos * SS + r.bpos - FileDir.UsedHeaderSize
+   END Pos;
+ 
+   PROCEDURE Base*(VAR r: Rider): File;
+@@ -523,7 +574,7 @@
+         IF buf = NIL THEN
+           IF r.apos <= f.aleng THEN ReadBuf(f, r.buf, r.apos)
+           ELSE r.buf.apos := r.apos; r.buf.lim := 1; f.aleng := f.aleng + 1; f.bleng := 1; f.modH := TRUE;
+-            MaybeNewExt(f)
++            IF FileDir.HostFsAddr = 0 THEN MaybeNewExt(f) END
+           END
+         ELSE r.buf := buf
+         END ;
+@@ -550,7 +601,7 @@
+         IF buf = NIL THEN
+           IF r.apos <= f.aleng THEN ReadBuf(f, r.buf, r.apos)
+           ELSE r.buf.apos := r.apos; r.buf.lim := 1; f.aleng := f.aleng + 1; f.bleng := 1; f.modH := TRUE;
+-            MaybeNewExt(f)
++            IF FileDir.HostFsAddr = 0 THEN MaybeNewExt(f) END
+           END
+         ELSE r.buf := buf
+         END ;
+--- Input.Mod.txt
++++ Input.Mod.txt
+@@ -1,8 +1,9 @@
+ MODULE Input; (*NW 5.10.86 / 15.11.90 Ceres-2; PDR 21.4.12 / NW 15.5.2013 Ceres-4*)
+   IMPORT SYSTEM;
+ 
+-  CONST msAdr = -40; kbdAdr = -36;
+   VAR kbdCode: BYTE; (*last keyboard code read*)
++    msAdr, kbdAdr: INTEGER;
++    pvKbd: BOOLEAN;
+     Recd, Up, Shift, Ctrl, Ext: BOOLEAN;
+     KTabAdr: INTEGER;  (*keyboard code translation table*)
+     MW, MH, MX, MY: INTEGER; (*mouse limits and coords*)
+@@ -12,8 +13,14 @@
+   including tracking the state of the Shift and Ctrl keys*)
+   
+   PROCEDURE Peek();
++    VAR pvKbdCode: INTEGER;
+   BEGIN
+-    IF SYSTEM.BIT(msAdr, 28) THEN
++    WHILE ~Recd & SYSTEM.BIT(msAdr, 28) DO
++     IF pvKbd THEN
++      SYSTEM.GET(kbdAdr, pvKbdCode);
++      kbdCode := pvKbdCode DIV 1000000H;
++      IF kbdCode # 0H THEN Recd := TRUE END;
++     ELSE
+       SYSTEM.GET(kbdAdr, kbdCode);
+       IF kbdCode = 0F0H THEN Up := TRUE
+       ELSIF kbdCode = 0E0H THEN Ext := TRUE
+@@ -24,6 +31,7 @@
+         END ;
+         Up := FALSE; Ext := FALSE
+       END
++     END
+     END;
+   END Peek;
+ 
+@@ -39,6 +47,7 @@
+   (* ch := kbdTab[kbdCode]; *)
+     SYSTEM.GET(KTabAdr + kbdCode, ch);
+     IF Ctrl THEN ch := CHR(ORD(ch) MOD 20H) END;
++    IF pvKbd THEN ch := CHR(kbdCode) END;
+     Recd := FALSE
+   END Read;
+ 
+@@ -49,4 +58,4 @@
+-    x := w MOD 400H; y := (w DIV 1000H) MOD 400H;
++    x := w MOD 1000H; y := (w DIV 1000H) MOD 1000H;
+     IF y >= MH THEN y := MH-1 END
+   END Mouse;
+ 
+@@ -75,5 +84,17 @@
+       00 7F 00 00 00 00 1B 00  00 00 00 00 00 00 00 00$)
+   END Init;
+ 
+-BEGIN Init
++  PROCEDURE EnumerateHardware;
++      VAR val, MsKb: INTEGER;
++  BEGIN
++    MsKb := 4D734B62H;
++    SYSTEM.PUT(-4, MsKb);
++    SYSTEM.GET(-4, msAdr);
++    SYSTEM.GET(-4, kbdAdr);
++    SYSTEM.GET(-4, val);
++    pvKbd := val = 1;
++    IF kbdAdr = 0 THEN msAdr := -40; kbdAdr := -36 END
++  END EnumerateHardware;
++
++BEGIN EnumerateHardware; Init
+ END Input.
+--- Display.Mod.txt
++++ Display.Mod.txt
+@@ -3,7 +3,6 @@
+ 
+   CONST black* = 0; white* = 1;  (*black = background*)
+     replace* = 0; paint* = 1; invert* = 2;  (*modes*)
+-    base = 0E7F00H;  (*adr of 1024 x 768 pixel, monocolor display frame*)
+ 
+   TYPE Frame* = POINTER TO FrameDesc;
+     FrameMsg* = RECORD END ;
+@@ -13,7 +12,7 @@
+         handle*: Handler
+       END ;
+ 
+-  VAR Base*, Width*, Height*: INTEGER;
++  VAR Base*, Width*, Height*, Depth*, Span*: INTEGER;
+     arrow*, star*, hook*, updown*, block*, cross*, grey*: INTEGER;
+     (*a pattern is an array of bytes; the first is its width (< 32), the second its height, the rest the raster*)
+ 
+@@ -22,15 +21,80 @@
+     IF (F # NIL) & (F.handle # NIL) THEN F.handle(F, M) END
+   END Handle;
+ 
++  PROCEDURE InitResolution*;
++  VAR val, modes, currmode: INTEGER;
++  BEGIN
++    SYSTEM.PUT(-4, 6D566964H); (* 'mVid' *)
++    SYSTEM.GET(-4, modes);
++    SYSTEM.GET(-4, currmode);
++    IF (currmode # 0) THEN
++      SYSTEM.GET(currmode, val); currmode := val;
++    END;
++    IF currmode < modes THEN
++      WHILE currmode > 0 DO
++        SYSTEM.GET(-4, val); SYSTEM.GET(-4, val); SYSTEM.GET(-4, val); SYSTEM.GET(-4, val); DEC(currmode)
++      END;
++      SYSTEM.GET(-4, Width);
++      SYSTEM.GET(-4, Height);
++      SYSTEM.GET(-4, Span);
++      SYSTEM.GET(-4, Base);
++    ELSIF currmode DIV 40000000H = 1 THEN
++      Width := currmode DIV 8000H MOD 8000H;
++      Height := currmode MOD 8000H;
++      SYSTEM.PUT(-4, 6D44796EH); (* 'mDyn' *)
++      SYSTEM.GET(-4, val); SYSTEM.GET(-4, val); SYSTEM.GET(-4, val); SYSTEM.GET(-4, val); SYSTEM.GET(-4, val);
++      SYSTEM.GET(-4, Span);
++      SYSTEM.GET(-4, Base);
++      IF Span = -1 THEN Span := Width DIV 8 END
++    ELSE
++      Base := 0E7F00H;
++      Width := 1024;
++      Height := 768;
++      Span := 128
++    END
++  END InitResolution;
++
+   PROCEDURE SetSize*(w, h: INTEGER) : BOOLEAN;
+-  RETURN FALSE
++    VAR val, modes, modeaddr, i, mw, mh: INTEGER; success: BOOLEAN;
++  BEGIN success := FALSE;
++    SYSTEM.PUT(-4, 6D566964H); (* 'mVid' *)
++    SYSTEM.GET(-4, modes);
++    SYSTEM.GET(-4, modeaddr);
++    IF modeaddr # 0 THEN
++      FOR i := 0 TO modes DO
++        SYSTEM.GET(-4, mw); SYSTEM.GET(-4, mh); SYSTEM.GET(-4, val); SYSTEM.GET(-4, val);
++        IF ~success & (mw = w) & (mh = h) THEN
++          SYSTEM.PUT(modeaddr, i); success := TRUE
++        END
++      END
++    END;
++    IF ~success & (w > 0) & (h > 0) THEN
++      SYSTEM.PUT(-4, 6D44796EH); (* 'mDyn' *)
++      SYSTEM.GET(-4, modeaddr);
++      IF modeaddr # 0 THEN
++        success := TRUE;
++        SYSTEM.GET(-4, val); (* max width *)
++        IF w > val THEN success := FALSE END;
++        SYSTEM.GET(-4, val); (* max height *)
++        IF h > val THEN success := FALSE END;
++        SYSTEM.GET(-4, val); (* width increment *)
++        IF w MOD val # 0 THEN success := FALSE END;
++        SYSTEM.GET(-4, val); (* height increment *)
++        IF h MOD val # 0 THEN success := FALSE END;
++        IF success THEN
++          SYSTEM.PUT(modeaddr, 40000000H + w * 8000H + h)
++        END
++      END
++    END;
++    IF success THEN InitResolution END
++  RETURN success
+   END SetSize;
+ 
+   (* raster ops *)
+     
+   PROCEDURE Dot*(col, x, y, mode: INTEGER);
+     VAR a: INTEGER; u, s: SET;
+-  BEGIN a := base + (x DIV 32)*4 + y*128;
++  BEGIN a := Base + (x DIV 32)*4 + y*Span;
+     s := {x MOD 32}; SYSTEM.GET(a, u);
+     IF mode = paint THEN SYSTEM.PUT(a, u + s)
+     ELSIF mode = invert THEN SYSTEM.PUT(a, u / s)
+@@ -40,21 +104,24 @@
+   END Dot;
+ 
+   PROCEDURE ReplConst*(col, x, y, w, h, mode: INTEGER);
+-    VAR al, ar, a0, a1: INTEGER; left, right, mid, pix, pixl, pixr: SET;
+-  BEGIN al := base + y*128;
++    VAR al, ar, a0, a1, i: INTEGER; left, right, mid, pix, pixl, pixr: SET;
++  BEGIN al := Base + y*Span;
+     ar := ((x+w-1) DIV 32)*4 + al; al := (x DIV 32)*4 + al;
+     IF ar = al THEN
+       mid := {(x MOD 32) .. ((x+w-1) MOD 32)};
+-      FOR a1 := al TO al + (h-1)*128 BY 128 DO
++      a1 := al;
++      FOR i := 1 TO h DO
+         SYSTEM.GET(a1, pix);
+         IF mode = invert THEN SYSTEM.PUT(a1, pix / mid)
+         ELSIF (mode = replace) & (col = black) THEN (*erase*) SYSTEM.PUT(a1, pix - mid)
+         ELSE (* (mode = paint) OR (mode = replace) & (col # black) *) SYSTEM.PUT(a1, pix + mid)
+         END
++        ;INC(a1, Span)
+       END
+     ELSIF ar > al THEN
+       left := {(x MOD 32) .. 31}; right := {0 .. ((x+w-1) MOD 32)};
+-      FOR a0 := al TO al + (h-1)*128 BY 128 DO
++      a0 := al;
++      FOR i := 1 TO h DO
+         SYSTEM.GET(a0, pixl); SYSTEM.GET(ar, pixr);
+         IF mode = invert THEN
+           SYSTEM.PUT(a0, pixl / left);
+@@ -69,17 +136,17 @@
+           FOR a1 := a0+4 TO ar-4 BY 4 DO SYSTEM.PUT(a1, {0 .. 31}) END ;
+           SYSTEM.PUT(ar, pixr + right)
+         END ;
+-        INC(ar, 128)
++        INC(ar, Span); INC(a0, Span)
+       END
+     END
+   END ReplConst;
+ 
+   PROCEDURE CopyPattern*(col, patadr, x, y, mode: INTEGER);  (*only for modes = paint, invert*)
+-    VAR a, a0, a1, pwd: INTEGER;
++    VAR a0, a1, pwd, i: INTEGER;
+       w, h, w1, w2, pbt: BYTE; pix, mask: SET;
+   BEGIN SYSTEM.GET(patadr, w1); SYSTEM.GET(patadr+1, h); INC(patadr, 2);
+-    a := base + (x DIV 32)*4 + y*128; x := x MOD 32; mask := SYSTEM.VAL(SET, ASR(7FFFFFFFH, 31-x));
+-    FOR a1 := a TO a + (h-1)*128 BY 128 DO
++    a1 := Base + (x DIV 32)*4 + y*Span; x := x MOD 32; mask := SYSTEM.VAL(SET, ASR(7FFFFFFFH, 31-x));
++    FOR i := 1 TO h DO
+       a0 := a1;
+       FOR w2 := 0 TO w1 DIV 32 * 32 BY 32 DO
+        w := w1 - w2;
+@@ -103,6 +170,7 @@
+       END
+        ;INC(a0, 4)
+       END
++      ;INC(a1, Span)
+     END
+   END CopyPattern;
+ 
+@@ -115,12 +183,12 @@
+   BEGIN
+     u0 := sx DIV 32; u1 := sx MOD 32; u2 := (sx+w) DIV 32; u3 := (sx+w) MOD 32;
+     v0 := dx DIV 32; v1 := dx MOD 32; v2 := (dx+w) DIV 32; v3 := (dx+w) MOD 32;
+-    sa := base + u0*4 + sy*128; da := base + v0*4 + dy*128;
++    sa := Base + u0*4 + sy*Span; da := Base + v0*4 + dy*Span;
+     d := da - sa; n := u1 - v1;   (*displacement in words and bits*)
+     len := (u2 - u0) * 4;
+     m0 := {v1 .. 31}; m2 := {v3 .. 31}; m3 := m0 / m2;
+-    IF d >= 0 THEN (*copy up, scan down*) sa0 := sa + (h-1)*128; end := sa-128; step := -128
+-    ELSE (*copy down, scan up*) sa0 := sa; end := sa + h*128; step := 128
++    IF d >= 0 THEN (*copy up, scan down*) sa0 := sa + (h-1)*Span; end := sa-Span; step := -Span
++    ELSE (*copy down, scan up*) sa0 := sa; end := sa + h*Span; step := Span
+     END ;
+     WHILE sa0 # end DO
+       IF n >= 0 THEN (*shift right*) m1 := {n .. 31};
+@@ -164,32 +232,36 @@
+ 
+   PROCEDURE ReplPattern*(col, patadr, x, y, w, h, mode: INTEGER);
+   (* pattern width = 32, fixed; pattern starts at patadr+4, for mode = invert only *)
+-    VAR al, ar, a0, a1: INTEGER;
++    VAR al, ar, a0, a1, i: INTEGER;
+       pta0, pta1: INTEGER;  (*pattern addresses*)
+       ph: BYTE;
+       left, right, mid, pix, pixl, pixr, ptw: SET;
+-  BEGIN al := base + y*128; SYSTEM.GET(patadr+1, ph);
++  BEGIN al := Base + y*Span; SYSTEM.GET(patadr+1, ph);
+     pta0 := patadr+4; pta1 := ph*4 + pta0;
+     ar := ((x+w-1) DIV 32)*4 + al; al := (x DIV 32)*4 + al;
+     IF ar = al THEN
+       mid := {(x MOD 32) .. ((x+w-1) MOD 32)};
+-      FOR a1 := al TO al + (h-1)*128 BY 128 DO
++      a1 := al;
++      FOR i := 1 TO h DO
+         SYSTEM.GET(a1, pix); SYSTEM.GET(pta0, ptw); SYSTEM.PUT(a1, (pix - mid) + (pix/ptw * mid)); INC(pta0, 4);
+         IF pta0 = pta1 THEN pta0 := patadr+4 END
++        ;INC(a1, Span)
+       END
+     ELSIF ar > al THEN
+       left := {(x MOD 32) .. 31}; right := {0 .. ((x+w-1) MOD 32)};
+-      FOR a0 := al TO al + (h-1)*128 BY 128 DO
++      a0 := al;
++      FOR i := 1 TO h DO
+         SYSTEM.GET(a0, pixl); SYSTEM.GET(pta0, ptw); SYSTEM.PUT(a0, (pixl - left) + (pixl/ptw * left));
+         FOR a1 := a0+4 TO ar-4 BY 4 DO SYSTEM.GET(a1, pix); SYSTEM.PUT(a1, pix/ptw) END ;
+         SYSTEM.GET(ar, pixr); SYSTEM.PUT(ar, (pixr - right) + (pixr/ptw * right));
+-        INC(pta0, 4); INC(ar, 128);
++        INC(pta0, 4); INC(ar, Span);
+         IF pta0 = pta1 THEN pta0 := patadr+4 END
++        ;INC(a0, Span)
+       END
+     END
+   END ReplPattern;
+ 
+-BEGIN Base := base; Width := 1024; Height := 768;
++BEGIN Depth := 1; InitResolution;
+   arrow := SYSTEM.ADR($0F0F 0060 0070 0038 001C 000E 0007 8003 C101 E300 7700 3F00 1F00 3F00 7F00 FF00$);
+   star := SYSTEM.ADR($0F0F 8000 8220 8410 8808 9004 A002 C001 7F7F C001 A002 9004 8808 8410 8220 8000$);
+   hook := SYSTEM.ADR($0C0C 070F 8707 C703 E701 F700 7F00 3F00 1F00 0F00 0700 0300 01$);
+--- Oberon.Mod.txt
++++ Oberon.Mod.txt
+@@ -367,7 +367,8 @@
+   PROCEDURE Loop*;
+     VAR V: Viewers.Viewer; M: InputMsg; N: ControlMsg;
+        prevX, prevY, X, Y, t: INTEGER; keys: SET; ch: CHAR;
+-  BEGIN
++       minTime: INTEGER;
++  BEGIN minTime := 0;
+     REPEAT
+       Input.Mouse(keys, X, Y);
+       IF Input.Available() > 0 THEN Input.Read(ch);
+@@ -389,9 +390,15 @@
+           IF Y >= Display.Height THEN Y := Display.Height END ;
+           M.Y := Y; M.keys := keys; V := Viewers.This(X, Y); V.handle(V, M); prevX := X; prevY := Y
+         END;
++        Kernel.PowerManagementSleep(minTime);
+         CurTask := CurTask.next; t := Kernel.Time();
+         IF t >= CurTask.nextTime THEN
+           CurTask.nextTime := t + CurTask.period; CurTask.state := active; CurTask.handle; CurTask.state := idle
++          ;minTime := CurTask.nextTime;
++          FOR t := 1 TO NofTasks DO
++            CurTask := CurTask.next;
++            IF CurTask.nextTime < minTime THEN minTime := CurTask.nextTime END;
++          END
+         END
+       END
+     UNTIL FALSE
+--- RS232.Mod.txt
++++ RS232.Mod.txt
+@@ -1,10 +1,11 @@
+ MODULE RS232;   (*NW 3.1.2012*)
+   IMPORT SYSTEM;
+-  CONST data = -56; stat = -52;
++
++  VAR data, stat, pmgmt: INTEGER;
+ 
+   PROCEDURE Idle;
+   BEGIN
+-    (* SYSTEM.PUT(-64, 7FFFFFFFH) *)
++    IF pmgmt # 0 THEN SYSTEM.PUT(pmgmt, 7FFFFFFFH) END
+   END Idle;
+ 
+   PROCEDURE Available*() : BOOLEAN;
+@@ -83,4 +84,22 @@
+   BEGIN Send(7)
+   END End;
+ 
+-BEGIN END RS232.
++  PROCEDURE InitIO;
++    VAR count: INTEGER;
++  BEGIN
++    SYSTEM.PUT(-4, 53507274H); (* SPrt *)
++    SYSTEM.GET(-4, count);
++    IF count > 0 THEN
++      SYSTEM.GET(-4, stat);
++      SYSTEM.GET(-4, data)
++    ELSE
++      data := -56; stat := -52
++    END;
++    SYSTEM.PUT(-4, 54696D72H); (* Timr *)
++    SYSTEM.GET(-4, pmgmt);
++    SYSTEM.GET(-4, count);
++    IF count # 1 THEN pmgmt := 0 END
++  END InitIO;
++
++BEGIN InitIO
++END RS232.
+--- SCC.Mod.txt
++++ SCC.Mod.txt
+@@ -2,7 +2,6 @@
+   IMPORT SYSTEM, Kernel;
+ 
+   CONST
+-    swi = -60; spiData = -48; spiCtrl = -44;
+     netSelect = 1; spiFast = 2; netEnable = 3;
+     HdrSize = 8; MaxPayload = 512; SubPacket = 32; Wait = 50; SendTries = 50;
+     MaxPacket = (HdrSize + MaxPayload + SubPacket-1) DIV SubPacket *
+@@ -21,6 +20,8 @@
+       dat: ARRAY MaxPacket-HdrSize OF BYTE
+     END;
+ 
++    swi, spiData, spiCtrl: INTEGER;
++
+   PROCEDURE SPICtrl(s: SET);
+   BEGIN SYSTEM.PUT(spiCtrl, s);
+     IF netEnable IN s THEN LED(55H) ELSE LED(0) END
+@@ -99,7 +100,8 @@
+   PROCEDURE Start*(filt: BOOLEAN);
+     VAR n: INTEGER;
+   BEGIN filter := filt; Adr := 0;
+-    SYSTEM.GET(swi, n); n := n DIV 4 MOD 10H * 10 + 5;
++    IF swi # 0 THEN SYSTEM.GET(swi, n) ELSE n := 0 END;
++    n := n DIV 4 MOD 10H * 10 + 5;
+     WriteReg1(5, n); (*RF_CH <= channel: 5, 15, 25...*)
+     WriteReg1(6, 07H); (*RF_SETUP <= 1Mb for better range, 0dBm*)
+     WriteReg1(11H, SubPacket); (*RX_PW_P0 <= pipe 0 payload width*)
+@@ -177,5 +179,40 @@
+   BEGIN SPICtrl({}); Flush(); ResetRcv
+   END Stop;
+ 
+-BEGIN Start(TRUE)
++  PROCEDURE EnumerateHardware;
++    VAR val: INTEGER;
++      hasSPI, hasSwitches: BOOLEAN;
++      SPIf, Swtc: INTEGER; (* hardware IDs *)
++  BEGIN
++    SYSTEM.PUT(Kernel.hwEnumerator, 0);
++    SYSTEM.GET(Kernel.hwEnumerator, val);
++    IF val # 1 THEN
++      swi := -60; spiData := -48; spiCtrl := -44
++    ELSE
++      SPIf := Kernel.ToHardwareID("SPIf");
++      Swtc := Kernel.ToHardwareID("Swtc");
++      SYSTEM.GET(Kernel.hwEnumerator, val);
++      WHILE val # 0 DO
++        IF val = SPIf THEN hasSPI := TRUE
++        ELSIF val = Swtc THEN hasSwitches := TRUE
++        END; SYSTEM.GET(Kernel.hwEnumerator, val);
++      END;
++      IF hasSPI THEN
++        SYSTEM.PUT(Kernel.hwEnumerator, SPIf);
++        SYSTEM.GET(Kernel.hwEnumerator, spiCtrl);
++        SYSTEM.GET(Kernel.hwEnumerator, spiData);
++      ELSE
++        spiData := -48; spiCtrl := -44
++      END;
++      IF hasSwitches THEN
++        SYSTEM.PUT(Kernel.hwEnumerator, Swtc);
++        SYSTEM.GET(Kernel.hwEnumerator, val);
++        SYSTEM.GET(Kernel.hwEnumerator, swi);
++      ELSE
++        swi := 0
++      END
++    END
++  END EnumerateHardware;
++
++BEGIN EnumerateHardware; Start(TRUE)
+ END SCC.
+--- System.Mod.txt
++++ System.Mod.txt
+@@ -171,7 +171,7 @@
+   (* ------------- Toolbox of file system ---------------*)
+ 
+   PROCEDURE List(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+-    VAR i0, i, j0, j: INTEGER; hp: FileDir.FileHeader;
++    VAR i0, i, j0, j, date, length: INTEGER;
+   BEGIN
+     i := 0;
+     WHILE (pat[i] > "*") & (pat[i] = name[i]) DO INC(i) END ;
+@@ -191,9 +191,9 @@
+     IF (name[i0] = 0X) & (pat[j0] = 0X) THEN (*found*)
+       Texts.WriteString(W, name);
+       IF pat[j0+1] = "!" THEN (*option*)
+-        Kernel.GetSector(adr, hp);
+-        Texts.Write(W, 9X); Texts.WriteClock(W, hp.date);
+-        Texts.WriteInt(W, hp.aleng*FileDir.SectorSize + hp.bleng - FileDir.HeaderSize, 8); (*length*)
++        FileDir.GetAttributes(adr, date, length);
++        Texts.Write(W, 9X); Texts.WriteClock(W, date);
++        Texts.WriteInt(W, length, 8);
+         (*Texts.WriteHex(W, adr)*)
+       END ;
+       Texts.WriteLn(W)

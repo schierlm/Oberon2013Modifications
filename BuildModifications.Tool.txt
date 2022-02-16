@@ -19,7 +19,7 @@ ORP.Compile ORG.Mod/s ORP.Mod/s ~
 ORP.Compile ORL.Mod/s ORTool.Mod/s ~
 ORP.Compile Graphics.Mod/s GraphicFrames.Mod/s ~
 ORP.Compile Rectangles.Mod/s Curves.Mod/s ~
-ORP.Compile Draw.Mod/s MacroTool.Mod/s ~
+ORP.Compile Draw.Mod/s MacroTool.Mod/s SCC.Mod/s ~
 
 ORP.Compile BootLoad.Mod ~
 
@@ -60,6 +60,12 @@ ORP.Compile LSPhConstants.Mod/s RS232.Mod/s ~
 ORP.Compile LSPhORS.Mod/s LSPhORB.Mod/s ~
 ORP.Compile LSPhORG.Mod/s LSPhORP.Mod/s ~
 ORP.Compile LSPhServer.Mod/s ~
+
+ORP.Compile HardwareDetect.Mod/s ~
+
+ORP.Compile SeamlessResize.Mod/s ~
+
+ORP.Compile Console.Mod/s ~
 
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~

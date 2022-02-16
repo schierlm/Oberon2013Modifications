@@ -3,7 +3,7 @@ set -e
 
 rm -rf work
 mkdir work
-for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORS ORB ORG ORP BootLoad RS232; do
+for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORS ORB ORG ORP BootLoad SCC RS232; do
 	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
@@ -64,6 +64,8 @@ mv work/utf8lite/TextFrames.Mod.txt work/TextFramesU.Mod.txt
 rmdir work/utf8lite
 
 patch -d work <VariableLinespace/VariableLineSpace.patch
+patch -d work <HardwareEnumerator/HardwareEnumerator.patch
+patch -d work <DebugConsole/DebugConsole.patch
 
 sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
 sed -i '1,2d' work/BootLoad.Mod.txt
@@ -72,7 +74,12 @@ cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt Res
 cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.txt Scripting/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
-cp LanguageServerProtocolHelper/*.txt work
+cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/* work
+
+patch -d work <HardwareEnumerator/KeyTester.patch
+patch -d work <HardwareEnumerator/DrawAddons.patch
+patch -d work <HardwareEnumerator/InnerEmulator.patch
+patch -d work <StartupCommand/StartupCommand.patch
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
@@ -96,6 +103,7 @@ cp RescueSystem/*.txt MinimalFonts/Fonts.Embedded.Mod.txt work/rescue
 
 patch -d work/rescue <RescueSystem/RescueSystem.patch -F 3
 patch -d work/rescue <RescueSystem/POSTPATCH_after_DefragSupport.patch
+patch -d work/rescue <HardwareEnumerator/RescueSystem.patch
 patch -d work/debugrescue <RescueSystem/RescueSystem.patch -F 3
 
 rm work/*.orig work/debug/*.orig work/rescue/*.orig work/debugrescue/*.orig

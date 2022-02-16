@@ -1,0 +1,71 @@
+--- EmulatorCore.Mod.txt
++++ EmulatorCore.Mod.txt
+@@ -14,6 +14,8 @@
+       keyBuffer: ARRAY 16 OF CHAR;
+       keyBufferStart, keyBufferEnd, mouseStatus: INTEGER;
+       useSerialPort, stopped*, sector0missing: BOOLEAN;
++      hwEnumBuffer: ARRAY 32 OF INTEGER;
++      hwEnumAddr, hwEnumCount: INTEGER;
+     END;
+ 
+     EmulatorContinue = POINTER TO EmulatorContinueDesc;
+@@ -67,6 +69,9 @@
+       ELSE
+         val := 0
+       END
++    ELSIF (address = EmulatorCPU.IoStart + 44) & (e.hwEnumAddr < e.hwEnumCount) THEN
++        val := e.hwEnumBuffer[e.hwEnumAddr];
++        INC(e.hwEnumAddr)
+     ELSE
+       val := 0
+     END
+@@ -119,6 +124,49 @@
+           Texts.WriteLn(CW);
+           Texts.Append(Oberon.Log, CW.buf)
+         END
++      END
++    ELSIF address = EmulatorCPU.IoStart + 60 THEN
++      e.hwEnumAddr := 0; e.hwEnumCount := 0;
++      IF val = 0 THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := 1; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("mVid"); INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("Timr"); INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("LEDs"); INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("MsKb"); INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("vClp"); INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("vDsk"); INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID("Rset"); INC(e.hwEnumAddr);
++        IF e.useSerialPort THEN
++          e.hwEnumBuffer[e.hwEnumAddr] := Kernel.ToHardwareID(""); INC(e.hwEnumAddr)
++        END;
++      ELSIF val = Kernel.ToHardwareID("mVid") THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := 1; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := 0; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := e.width; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := e.height; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := 128; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := EmulatorCPU.DisplayStart; INC(e.hwEnumAddr);
++      ELSIF val = Kernel.ToHardwareID("Rset") THEN
++         e.hwEnumBuffer[e.hwEnumAddr] := EmulatorCPU.RomStart; INC(e.hwEnumAddr);
++      ELSIF (val = Kernel.ToHardwareID("SPrt")) & e.useSerialPort THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := 1; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := -52; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := -56; INC(e.hwEnumAddr);
++      ELSIF val = Kernel.ToHardwareID("Timr") THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := -64; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := 1; INC(e.hwEnumAddr);
++      ELSIF val = Kernel.ToHardwareID("LEDs") THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := 8; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := -60; INC(e.hwEnumAddr);
++      ELSIF val = Kernel.ToHardwareID("MsKb") THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := -40; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := -36; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := 1; INC(e.hwEnumAddr);
++      ELSIF val = Kernel.ToHardwareID("vClp") THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := -24; INC(e.hwEnumAddr);
++        e.hwEnumBuffer[e.hwEnumAddr] := -20; INC(e.hwEnumAddr);
++      ELSIF val = Kernel.ToHardwareID("vDsk") THEN
++        e.hwEnumBuffer[e.hwEnumAddr] := -28; INC(e.hwEnumAddr);
+       END
+     ELSE
+       val := 0
