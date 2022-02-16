@@ -1,0 +1,53 @@
+--- 1/Edit.Mod.txt
++++ 2/Edit.Mod.txt
+@@ -10,12 +10,6 @@
+     pat: ARRAY maxlen OF CHAR;
+     d: ARRAY 256 OF INTEGER;
+ 
+-  PROCEDURE Max(i, j: LONGINT): LONGINT;
+-    VAR m: LONGINT;
+-  BEGIN IF i >= j THEN m := i ELSE m := j END ;
+-    RETURN m
+-  END Max;
+-
+   PROCEDURE Open*;
+     VAR T: Texts.Text;
+     S: Texts.Scanner;
+@@ -123,6 +117,19 @@
+     END
+   END ChangeOffset;
+ 
++  PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
++    VAR R: Texts.Reader; ch: CHAR; n: INTEGER;
++  BEGIN
++    IF (pos < F.org) OR (TextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
++      IF 256 < pos THEN n := pos - 256 ELSE n := 0 END;
++      Texts.OpenReader(R, F.text, n);
++      REPEAT Texts.Read(R, ch);
++        IF ch = 0DX THEN n := Texts.Pos(R) - 1 END
++      UNTIL Texts.Pos(R) = pos;
++      TextFrames.Show(F, n)
++    END
++  END ShowPos;
++
+   PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
+     VAR Text: TextFrames.Frame;
+       V: Viewers.Viewer;
+@@ -166,7 +173,7 @@
+       IF j < 0 THEN
+         TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
+         Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
+-        TextFrames.Show(Text, pos - 300); Oberon.PassFocus(V);
++        ShowPos(Text, pos); Oberon.PassFocus(V);
+         TextFrames.SetCaret(Text, pos)
+       END
+     END
+@@ -208,7 +215,7 @@
+           TextFrames.RemoveSelection(Text);
+           TextFrames.RemoveCaret(Text);
+           Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
+-          TextFrames.Show(Text, Max(0, S.i - 200));
++          ShowPos(Text, pos);
+           Oberon.PassFocus(V);
+           TextFrames.SetCaret(Text, pos)
+         END
