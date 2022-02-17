@@ -1,5 +1,5 @@
---- Edit.Mod.txt.orig	2022-02-16 19:28:58.000000000 +0100
-+++ Edit.Mod.txt	2022-02-16 20:41:28.207411000 +0100
+--- ext/Edit.Mod.txt.orig	2022-02-16 19:28:58.000000000 +0100
++++ Edit.Mod.txt	2022-02-17 15:20:45.759185000 +0100
 @@ -10,12 +10,6 @@
      pat: ARRAY maxlen OF CHAR;
      d: ARRAY 256 OF INTEGER;
@@ -33,33 +33,30 @@
    PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
      VAR Text: TextFrames.Frame;
        V: Viewers.Viewer;
-@@ -164,10 +171,12 @@
-         REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j])
-       END ;
+@@ -156,7 +163,7 @@
+       IF Text.hasCar THEN pos := Text.carloc.pos ELSE pos := 0 END;
+       len := Text.text.len;
+       Texts.OpenReader(R, Text.text, pos);
+-      Forward(M, R, buf); pos := pos + M;
++      Forward(M, R, buf); INC(pos, M);
+       j := M;
+       REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j]);
+       WHILE (j >= 0) & (pos < len) DO
+@@ -166,7 +173,7 @@
        IF j < 0 THEN
--        TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
-+        TextFrames.RemoveSelection(Text);
-+		  TextFrames.RemoveCaret(Text);
+         TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
          Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
 -        TextFrames.Show(Text, pos - 300); Oberon.PassFocus(V);
--        TextFrames.SetCaret(Text, pos)
-+        ShowPos(Text, pos);
-+		  Oberon.PassFocus(V);
-+		  TextFrames.SetCaret(Text, pos)
++        ShowPos(Text, pos); Oberon.PassFocus(V);
+         TextFrames.SetCaret(Text, pos)
        END
      END
-   END Search;
-@@ -206,10 +215,10 @@
-           END;
-           Text := V.dsc.next(TextFrames.Frame);
+@@ -208,7 +215,7 @@
            TextFrames.RemoveSelection(Text);
--          TextFrames.RemoveCaret(Text);
-+			 TextFrames.RemoveCaret(Text);
+           TextFrames.RemoveCaret(Text);
            Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
 -          TextFrames.Show(Text, Max(0, pos - 200));
--          Oberon.PassFocus(V);
 +          ShowPos(Text, pos);
-+			 Oberon.PassFocus(V);
+           Oberon.PassFocus(V);
            TextFrames.SetCaret(Text, pos)
          END
-       END
