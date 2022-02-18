@@ -1,5 +1,5 @@
---- ../UTF8CharsetLite/EditU.Mod.txt	2022-02-16 20:12:52.000000000 +0100
-+++ ../EditImprovements/EditU.0.Mod.txt	2022-02-18 20:22:32.747131000 +0100
+--- EditU.Mod.txt	2022-02-16 20:12:52.000000000 +0100
++++ EditU.0.Mod.txt	2022-02-18 20:22:32.747131000 +0100
 @@ -1,4 +1,5 @@
 -MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
 +MODULE EditU;

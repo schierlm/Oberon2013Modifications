@@ -49,6 +49,7 @@ patch -d work <ChangeResolution/ChangeResolution.patch
 patch -d work <LanguageServerProtocolHelper/LSPHelper.patch
 patch -d work <KernelDebugger/RS232.patch
 patch -d work <EditImprovements/Edit.1r.patch
+cp -p UTF8CharsetLite/EditU.Mod.txt work/
 patch -d work <EditImprovements/EditU.0.patch
 
 mkdir work/utf8lite
