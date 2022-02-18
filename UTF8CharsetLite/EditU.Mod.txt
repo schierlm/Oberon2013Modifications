@@ -1,27 +1,19 @@
-MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
+MODULE EditU; (*based on Edit; JG 2.11.1990 / NW 28.11.2015*)
   IMPORT Files, Fonts, Texts, TextsU, Display, Viewers, Oberon, MenuViewers, TextFrames := TextFramesU;
 
   CONST CR = 0DX; maxlen = 32;
     StandardMenu = "System.Close System.Copy System.Grow EditU.Search EditU.Store";
 
   VAR W: Texts.Writer;
-    time: LONGINT;
-    M: INTEGER;
+    time, M: INTEGER;
     pat: ARRAY maxlen OF CHAR;
     d: ARRAY 256 OF INTEGER;
 
-  PROCEDURE Max(i, j: LONGINT): LONGINT;
-    VAR m: LONGINT;
-  BEGIN IF i >= j THEN m := i ELSE m := j END ;
-    RETURN m
-  END Max;
-
   PROCEDURE Open*;
     VAR T: Texts.Text;
-    S: Texts.Scanner;
-    V: Viewers.Viewer;
-    X, Y: INTEGER;
-    beg, end, time: LONGINT;
+      S: Texts.Scanner;
+      V: Viewers.Viewer;
+      X, Y, beg, end, time: INTEGER;
   BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
     IF (S.class = Texts.Char) & (S.c = "^") OR (S.line # 0) THEN
       Oberon.GetSelection(T, beg, end, time);
@@ -42,7 +34,7 @@ MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
       T: Texts.Text;
       S: Texts.Scanner;
       f: Files.File; R: Files.Rider;
-      beg, end, time, len: LONGINT;
+      beg, end, time, len: INTEGER;
 
     PROCEDURE Backup (VAR name: ARRAY OF CHAR);
       VAR res, i: INTEGER; bak: ARRAY 32 OF CHAR;
@@ -74,7 +66,7 @@ MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
     VAR T: Texts.Text;
       F: TextFrames.Frame;
       v: Viewers.Viewer;
-      beg, end, time: LONGINT;
+      beg, end, time: INTEGER;
       fnt: Fonts.Font; col, voff: INTEGER;
   BEGIN Oberon.GetSelection(T, beg, end, time);
     IF time >= 0 THEN
@@ -92,7 +84,7 @@ MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
       V: Viewers.Viewer;
       R: Texts.Reader;
       T: Texts.Text;
-      pos, beg, end, prevTime, len: LONGINT; n, i, j: INTEGER;
+      pos, beg, end, prevTime, len, n, i, j: INTEGER;
       buf: ARRAY 32 OF CHAR;
 
     PROCEDURE Forward(n: INTEGER; VAR R: Texts.Reader; VAR buf: ARRAY OF CHAR);
@@ -126,7 +118,7 @@ MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
       WHILE (j >= 0) & (pos < len) DO
         n := d[ORD(buf[M-1])]; Forward(n, R, buf); INC(pos, n); j := M;
         REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j])
-      END ;
+      END;
       IF j < 0 THEN
         TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
         Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
@@ -148,11 +140,9 @@ MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
       TextsU.WriteUnicode(W, S.i);
       F := Oberon.FocusViewer.dsc.next(TextFrames.Frame);
       Texts.Insert(F.text, F.carloc.pos, W.buf);
-      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i));
+      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i))
     END
   END InsertUnicode;
 
 BEGIN Texts.OpenWriter(W)
 END EditU.
-
-
