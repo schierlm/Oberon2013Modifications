@@ -1,0 +1,62 @@
+--- EditU.Mod.txt	2022-02-16 20:12:52.000000000 +0100
++++ EditU.0.Mod.txt	2022-02-18 20:22:32.747131000 +0100
+@@ -1,4 +1,5 @@
+-MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
++MODULE EditU;
++
+   IMPORT Files, Fonts, Texts, TextsU, Display, Viewers, Oberon, MenuViewers, TextFrames := TextFramesU;
+ 
+   CONST CR = 0DX; maxlen = 32;
+@@ -10,12 +11,6 @@
+     pat: ARRAY maxlen OF CHAR;
+     d: ARRAY 256 OF INTEGER;
+ 
+-  PROCEDURE Max(i, j: LONGINT): LONGINT;
+-    VAR m: LONGINT;
+-  BEGIN IF i >= j THEN m := i ELSE m := j END ;
+-    RETURN m
+-  END Max;
+-
+   PROCEDURE Open*;
+     VAR T: Texts.Text;
+     S: Texts.Scanner;
+@@ -85,7 +80,20 @@
+         Texts.ChangeLooks(T, beg, end, {0,1,2}, fnt, col, voff)
+       END
+     END
+-  END CopyLooks;
++  END CopyLooks; 
++
++  PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
++    VAR R: Texts.Reader; ch: CHAR; n: INTEGER;
++  BEGIN
++    IF (pos < F.org) OR (TextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
++      IF 256 < pos THEN n := pos - 256 ELSE n := 0 END;
++      Texts.OpenReader(R, F.text, n);
++      REPEAT Texts.Read(R, ch);
++        IF ch = 0DX THEN n := Texts.Pos(R) - 1 END
++      UNTIL Texts.Pos(R) = pos;
++      TextFrames.Show(F, n)
++    END
++  END ShowPos;
+ 
+   PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
+     VAR Text: TextFrames.Frame;
+@@ -130,7 +138,7 @@
+       IF j < 0 THEN
+         TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
+         Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
+-        TextFrames.Show(Text, pos - 300); Oberon.PassFocus(V);
++        ShowPos(Text, pos); Oberon.PassFocus(V);
+         TextFrames.SetCaret(Text, pos)
+       END
+     END
+@@ -148,7 +156,7 @@
+       TextsU.WriteUnicode(W, S.i);
+       F := Oberon.FocusViewer.dsc.next(TextFrames.Frame);
+       Texts.Insert(F.text, F.carloc.pos, W.buf);
+-      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i));
++      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i))
+     END
+   END InsertUnicode;
+ 

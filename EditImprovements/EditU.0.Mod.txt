@@ -1,20 +1,15 @@
-MODULE Edit; (*JG 2.11.90 / NW 28.11.2015*)
-  IMPORT Files, Fonts, Texts, Display, Viewers, Oberon, MenuViewers, TextFrames;
+MODULE EditU;
+
+  IMPORT Files, Fonts, Texts, TextsU, Display, Viewers, Oberon, MenuViewers, TextFrames := TextFramesU;
 
   CONST CR = 0DX; maxlen = 32;
-    StandardMenu = "System.Close System.Copy System.Grow Edit.Search Edit.Store";
+    StandardMenu = "System.Close System.Copy System.Grow EditU.Search EditU.Store";
 
   VAR W: Texts.Writer;
     time: LONGINT;
     M: INTEGER;
     pat: ARRAY maxlen OF CHAR;
     d: ARRAY 256 OF INTEGER;
-
-  PROCEDURE Max(i, j: LONGINT): LONGINT;
-    VAR m: LONGINT;
-  BEGIN IF i >= j THEN m := i ELSE m := j END ;
-    RETURN m
-  END Max;
 
   PROCEDURE Open*;
     VAR T: Texts.Text;
@@ -52,7 +47,7 @@ MODULE Edit; (*JG 2.11.90 / NW 28.11.2015*)
       Files.Rename(name, bak, res)
     END Backup;
 
-  BEGIN Texts.WriteString(W, "Edit.Store ");
+  BEGIN Texts.WriteString(W, "EditU.Store ");
     IF Oberon.Par.frame = Oberon.Par.vwr.dsc THEN
       V := Oberon.Par.vwr; Texts.OpenScanner(S, V.dsc(TextFrames.Frame).text, 0)
     ELSE V := Oberon.MarkedViewer(); Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos)
@@ -87,41 +82,18 @@ MODULE Edit; (*JG 2.11.90 / NW 28.11.2015*)
     END
   END CopyLooks; 
 
-  PROCEDURE ChangeFont*;
-    VAR S: Texts.Scanner; T: Texts.Text; beg, end: LONGINT;
+  PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
+    VAR R: Texts.Reader; ch: CHAR; n: INTEGER;
   BEGIN
-    Oberon.GetSelection(T, beg, end, time);
-    IF time >= 0 THEN
-      Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
-      IF S.class = Texts.Name THEN
-        Texts.ChangeLooks(T, beg, end, {0}, Fonts.This(S.s), 0, 0)
-      END
+    IF (pos < F.org) OR (TextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
+      IF 256 < pos THEN n := pos - 256 ELSE n := 0 END;
+      Texts.OpenReader(R, F.text, n);
+      REPEAT Texts.Read(R, ch);
+        IF ch = 0DX THEN n := Texts.Pos(R) - 1 END
+      UNTIL Texts.Pos(R) = pos;
+      TextFrames.Show(F, n)
     END
-  END ChangeFont;
-
-  PROCEDURE ChangeColor*;
-    VAR S: Texts.Scanner;
-      T: Texts.Text;
-      col: INTEGER;
-      beg, end, time: LONGINT;
-  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
-    IF S.class = Texts.Int THEN
-      col := S.i; Oberon.GetSelection(T, beg, end, time);
-      IF time >= 0 THEN Texts.ChangeLooks(T, beg, end, {1}, NIL, col, 0) END
-    END
-  END ChangeColor;
-
-  PROCEDURE ChangeOffset*;
-    VAR S: Texts.Scanner;
-      T: Texts.Text;
-      voff: INTEGER; ch: CHAR;
-      beg, end, time: LONGINT;
-  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
-    IF S.class = Texts.Int THEN
-      voff := S.i; Oberon.GetSelection(T, beg, end, time);
-      IF time >= 0 THEN Texts.ChangeLooks(T, beg, end, {2}, NIL, voff, 0) END
-    END
-  END ChangeOffset;
+  END ShowPos;
 
   PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
     VAR Text: TextFrames.Frame;
@@ -166,67 +138,29 @@ MODULE Edit; (*JG 2.11.90 / NW 28.11.2015*)
       IF j < 0 THEN
         TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
         Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
-        TextFrames.Show(Text, pos - 300); Oberon.PassFocus(V);
+        ShowPos(Text, pos); Oberon.PassFocus(V);
         TextFrames.SetCaret(Text, pos)
       END
     END
   END Search;
 
-  PROCEDURE Locate*;
-    VAR Text: TextFrames.Frame;
-      T: Texts.Text; S: Texts.Scanner;
-      V: Viewers.Viewer;
-      beg, end, time: LONGINT;
-  BEGIN
-    V := Oberon.FocusViewer;
-    IF (V.dsc # NIL) & (V.dsc.next IS TextFrames.Frame) THEN
-      Text := V.dsc.next(TextFrames.Frame);
-      Oberon.GetSelection(T, beg, end, time);
-      IF time >= 0 THEN
-        Texts.OpenScanner(S, T, beg);
-        REPEAT Texts.Scan(S) UNTIL (S.class >= Texts.Int); (*skip names*)
-        IF S.class = Texts.Int THEN
-          TextFrames.RemoveSelection(Text);
-          TextFrames.RemoveCaret(Text);
-          Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
-          TextFrames.Show(Text, Max(0, S.i - 200));
-          Oberon.PassFocus(V);
-          TextFrames.SetCaret(Text, S.i)
-        END
-      END
+  PROCEDURE InsertUnicode*;
+    VAR S: Texts.Scanner;
+      W: Texts.Writer;
+      T: Texts.Text;
+      F: TextFrames.Frame;
+      codepoint: INTEGER;
+  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF (S.class = Texts.Int) & (Oberon.FocusViewer.dsc.next IS TextFrames.Frame) THEN
+      Texts.OpenWriter(W);
+      TextsU.WriteUnicode(W, S.i);
+      F := Oberon.FocusViewer.dsc.next(TextFrames.Frame);
+      Texts.Insert(F.text, F.carloc.pos, W.buf);
+      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i))
     END
-  END Locate;
-
-  PROCEDURE Recall*;
-    VAR Menu, Main: Display.Frame;
-      buf: Texts.Buffer;
-      V: Viewers.Viewer;
-      pos: LONGINT;
-      M: TextFrames.Frame;
-  BEGIN V := Oberon.FocusViewer;
-    IF (V # NIL) & (V IS MenuViewers.Viewer) THEN
-      Menu := V.dsc; Main := V.dsc.next;
-      IF Main IS TextFrames.Frame THEN
-        M := Main(TextFrames.Frame);
-        IF M.hasCar THEN
-          TextFrames.Recall(buf);
-          pos := M.carloc.pos + buf.len;
-          Texts.Insert(M.text, M.carloc.pos, buf);
-          TextFrames.SetCaret(M, pos)
-        END
-      ELSIF Menu IS TextFrames.Frame THEN
-        M := Menu(TextFrames.Frame);
-        IF M.hasCar THEN
-          TextFrames.Recall(buf);
-          pos := M.carloc.pos + buf.len;
-          Texts.Insert(M.text, M.carloc.pos, buf);
-          TextFrames.SetCaret(M, pos)
-        END
-      END
-    END
-  END Recall;
+  END InsertUnicode;
 
 BEGIN Texts.OpenWriter(W)
-END Edit.
+END EditU.
 
 
