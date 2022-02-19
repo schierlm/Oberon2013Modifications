@@ -52,12 +52,11 @@ Installation
 
 - Push [`CommandLineSystem.Mod.txt`](CommandLineSystem.Mod.txt).
 
-- To automatically load the command line system, edit `Oberon.Mod` and replace
-  `Modules.Load("System", Mod)` by `Modules.Load("CommandLineSystem", Mod)`.
+- To automatically load the command line system, use the [StartupCommand](../StartupCommand/README.md)
+  modification.
 
-- Recompile the modules:
+- Compile the module:
 
       ORP.Compile CommandLineSystem.Mod/s  ~
-      ORP.Compile Oberon.Mod ~
 
 - Restart the system

@@ -21,7 +21,7 @@ cd work
 for i in *.txt; do unix2mac $i; mv $i ${i%.txt}; done
 tar --sort=name --mode="ugo-rwx" --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner -cf oberon-reproducible.tar *.Mod *.Tool
 
-echo 'de6837b84320e37fc2025fde8060b17aa0f688da266651e7b6976d8cb3875d50 *oberon-reproducible.tar' | sha256sum -c
+echo 'ea1de3ba621b0cf65b93d6f5a698324d4419a6af0d3e54226e59256de0b93413 *oberon-reproducible.tar' | sha256sum -c
 
 cd ..
 
@@ -29,14 +29,13 @@ wget -nc https://github.com/schierlm/Oberon2013Modifications/releases/download/2
 
 cd work
 sed 's/Oberon.RetVal/0/' <../CommandLineCompiler/CommandLineSystem.Mod.txt >CommandLineSystem.Mod
-mac2unix Oberon.Mod
-sed 's/Modules.Load("System"/Modules.Load("CommandLineSystem"/' <Oberon.Mod >OberonX.Mod
-unix2mac Oberon.Mod OberonX.Mod CommandLineSystem.Mod
-mac2unix Defragger.Mod
-mv Defragger.Mod Defragger.Mod.txt
-patch <../CommandLineCompiler/CommandLineDefragger.patch
-mv Defragger.Mod.txt Defragger.Mod
-unix2mac Defragger.Mod
+cp ../CommandLineCompiler/CommandLineDefragger.Mod.txt CommandLineDefragger.Mod
+cp System.Mod System.Mod.txt
+mac2unix System.Mod.txt
+patch <../StartupCommand/StartupCommand.patch
+mv System.Mod.txt SystemX.Mod
+echo '@Startup: CommandLineSystem.Run' >System0.Tool
+unix2mac SystemX.Mod CommandLineSystem.Mod CommandLineDefragger.Mod System0.Tool
 
 unzip ../CommandLineCompiler.zip
 gcc main.c disk.c risc.c risc-fp.c -o risc
@@ -50,16 +49,18 @@ head -n 4 ../ReproducibleBuild/BuildReproducibly.Tool.txt > .cmds
 ./risc work.dsk < .cmds
 
 tail -n +6 ../ReproducibleBuild/BuildReproducibly.Tool.txt | head -n 16 > .cmds
-echo 'ORP.Compile CommandLineSystem.Mod OberonX.Mod ~' >> .cmds
+echo 'ORP.Compile CommandLineSystem.Mod/s CommandLineDefragger.Mod SystemX.Mod ~' >> .cmds
+echo 'System.RenameFiles System.Tool => System1.Tool System0.Tool => System.Tool ~' >> .cmds
 ./risc work.dsk < .cmds
 
 tail -n +25 ../ReproducibleBuild/BuildReproducibly.Tool.txt | head -n 22 | tr -d '\n' | \
-  sed 's/~/ CommandLineSystem.rsc ~/' > .cmds
+  sed 's/~/ CommandLineSystem.rsc CommandLineDefragger.rsc System1.Tool ~/' > .cmds
 ./risc work.dsk < .cmds
-echo 'Defragger.Load' > .cmds
-echo 'ORP.Compile Oberon.Mod ~' >> .cmds
-echo 'System.DeleteFiles DefragFiles.rsc Defragger.rsc BuildReproducibly.Tool CommandLineSystem.rsc ~' >> .cmds
-echo 'Defragger.Defrag' >> .cmds
+echo 'CommandLineDefragger.Load' > .cmds
+echo 'ORP.Compile System.Mod ~' >> .cmds
+echo 'System.RenameFiles System1.Tool => System.Tool ~' >> .cmds
+echo 'System.DeleteFiles DefragFiles.rsc Defragger.rsc CommandLineDefragger.rsc BuildReproducibly.Tool CommandLineSystem.rsc ~' >> .cmds
+echo 'CommandLineDefragger.Defrag' >> .cmds
 ./risc work.dsk < .cmds
 ../DefragmentFreeSpace/trim_defragmented_image.sh work.dsk
 mv work.dsk_trimmed oberon-reproducible.dsk

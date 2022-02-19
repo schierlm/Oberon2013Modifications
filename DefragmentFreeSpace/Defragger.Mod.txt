@@ -10,7 +10,10 @@ MODULE Defragger;
       lengths: ARRAY FileInfoPerSector OF INTEGER;
     END;
 
+    FinishedHook = PROCEDURE;
+
   VAR fileInfo: FileInfoSector;
+    finishedHook: FinishedHook;
 
   PROCEDURE DrawText(text: ARRAY OF CHAR; x, y: INTEGER);
   VAR
@@ -31,6 +34,7 @@ MODULE Defragger;
     Display.ReplConst(Display.black, 22, 22, 166, 26, Display.replace);
     DrawText("Defrag finished. Please restart.", 30, 30);
     Kernel.Install(SYSTEM.ADR(ShowRestartMessage), 0);
+    IF finishedHook # NIL THEN finishedHook END;
     REPEAT SYSTEM.PUT(-64, Kernel.Time() + 1000) UNTIL FALSE
   END ShowRestartMessage;
 
@@ -51,6 +55,10 @@ MODULE Defragger;
       fileInfo.count := 0
     END
   END EnumAll;
+
+  PROCEDURE SetFinishedHook*(hook: FinishedHook);
+  BEGIN finishedHook := hook
+  END SetFinishedHook;
 
   PROCEDURE Defrag*;
   VAR
@@ -123,4 +131,5 @@ MODULE Defragger;
     Trim; ShowRestartMessage
   END Defrag;
 
+BEGIN finishedHook := NIL
 END Defragger.

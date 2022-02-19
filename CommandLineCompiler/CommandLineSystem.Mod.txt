@@ -69,13 +69,18 @@ MODULE CommandLineSystem;
   END Task;
 
   PROCEDURE Run*;
-  BEGIN (* already started by initializer *)
+  BEGIN
+    Oberon.Install(T); Texts.WriteString(W, "CommandLineSystem started");
+    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
   END Run;
 
-BEGIN Modules.Load("System", Mod); Mod := NIL;
-  Texts.OpenWriter(W);
+  PROCEDURE Stop*;
+  BEGIN
+    Oberon.Install(T); Texts.WriteString(W, "CommandLineSystem stopped");
+    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+  END Stop;
+
+BEGIN Texts.OpenWriter(W);
   FR := TextFrames.NewText(Oberon.Log, 0);
-  T := Oberon.NewTask(Task, 0); LogPos := 0;
-  Oberon.Install(T); Texts.WriteString(W, "CommandLineSystem started");
-  Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+  T := Oberon.NewTask(Task, 0); LogPos := 0
 END CommandLineSystem.
