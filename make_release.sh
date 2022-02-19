@@ -48,6 +48,7 @@ patch -d work <FontConversion/RemoveGlyphWidthLimit.patch
 patch -d work <ChangeResolution/ChangeResolution.patch
 patch -d work <LanguageServerProtocolHelper/LSPHelper.patch
 patch -d work <KernelDebugger/RS232.patch
+patch -d work <EditImprovements/Edit.1r.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite
@@ -79,6 +80,7 @@ cp ColorSupport/*.txt DrawAddons/16Color/Color*.Mod.txt DrawAddons/16Color/*.Too
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
 patch -d work <HardwareEnumerator/InnerEmulator.patch
+patch -d work <EditImprovements/EditU.0.patch
 patch -d work <StartupCommand/StartupCommand.patch
 
 mv work/Display.Mod.txt work/DisplayM.Mod.txt

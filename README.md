@@ -78,3 +78,4 @@ There are also two separate releases available that include the rescue system (t
 | **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |
 | **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |
 | **[EmbeddableCompiler](EmbeddableCompiler/README.md)**† | Version of the Oberon RISC Compiler that does not (directly) depend on Fonts/Texts/Oberon | None |
+| **[EditImprovements](EditImprovements/README.md)** | Edit.Locate and ~.Search display the target location in the first line of the viewer | Recompile Edit.Mod |

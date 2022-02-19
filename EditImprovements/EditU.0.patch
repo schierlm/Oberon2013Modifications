@@ -1,0 +1,31 @@
+--- 1/EditU0.Mod.txt
++++ 2/EditU.Mod.txt
+@@ -79,6 +79,19 @@
+     END
+   END CopyLooks;
+ 
++  PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
++    VAR R: Texts.Reader; ch: CHAR; n: INTEGER;
++  BEGIN
++    IF (pos < F.org) OR (TextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
++      IF 256 < pos THEN n := pos - 256 ELSE n := 0 END;
++      Texts.OpenReader(R, F.text, n);
++      REPEAT Texts.Read(R, ch);
++        IF ch = 0DX THEN n := Texts.Pos(R) - 1 END
++      UNTIL Texts.Pos(R) = pos;
++      TextFrames.Show(F, n)
++    END
++  END ShowPos;
++
+   PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
+     VAR Text: TextFrames.Frame;
+       V: Viewers.Viewer;
+@@ -122,7 +135,7 @@
+       IF j < 0 THEN
+         TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
+         Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
+-        TextFrames.Show(Text, pos - 300); Oberon.PassFocus(V);
++        ShowPos(Text, pos); Oberon.PassFocus(V);
+         TextFrames.SetCaret(Text, pos)
+       END
+     END
