@@ -9,8 +9,8 @@ This patch insures that the target location will always be at the first line of 
 Installation
 ------------
 
-- Apply [`Edit.patch`](Edit.patch) to `Edit.Mod`.
+- Apply [`Edit.1r.patch`](Edit1r.patch) to `Edit.Mod` and [`EditU.0.patch`](Editu.0.patch) to `EditU.Mod`.
 
-- Recompile `Edit.Mod`:
+- Recompile `Edit.Mod` and EditU.Mod`:
 
-      ORP.Compile Edit.Mod ~
+      ORP.Compile Edit.Mod EditU.Mod ~
