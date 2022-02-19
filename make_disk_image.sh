@@ -49,7 +49,8 @@ echo 'RescueSystemTool.MoveFilesystem' >> .cmds
 echo 'ORP.Compile Modules.RS.Mod Fonts.Embedded.Mod System.RS.Mod ~' > .cmds
 echo 'ORL.Link Modules ~' >> .cmds
 echo 'System.RenameFiles Modules.bin => Modules.bin.RS Fonts.rsc => Fonts.rsc.RS System.rsc => System.rsc.RS ~' >> .cmds
-echo 'ORP.Compile Modules.Mod Fonts.Mod System.Mod ~' >> .cmds
+echo 'System.RenameFiles DisplayM.rsc => DisplayM.rsc.RS DisplayC.rsc => DisplayC.rsc.RS ~' >> .cmds
+echo 'ORP.Compile Modules.Mod Fonts.Mod System.Mod DisplayM.Mod DisplayC.Mod ~' >> .cmds
 echo 'ORL.Link Modules ~' >> .cmds
 echo 'System.CopyFiles Input.rsc => Input.rsc.RS Display.rsc => Display.rsc.RS Viewers.rsc => Viewers.rsc.RS' \
      'Texts.rsc => Texts.rsc.RS MenuViewers.rsc => MenuViewers.rsc.RS TextFrames.rsc => TextFrames.rsc.RS' \
@@ -100,10 +101,11 @@ echo 'ORP.Compile ORS.Mod/s ORB.Mod/s ~' >> .cmds
 echo 'ORP.Compile ORG.Mod/s ORP.Mod/s ~' >> .cmds
 echo 'System.RenameFiles Modules.bin => Modules.bin.RS Fonts.rsc => Fonts.rsc.RS' \
      'Texts.rsc => Texts.rsc.RS MenuViewers.rsc => MenuViewers.rsc.RS' \
+     'DisplayM.rsc => DisplayM.rsc.RS DisplayC.rsc => DisplayC.rsc.RS' \
      'TextFrames.rsc => TextFrames.rsc.RS Edit.rsc => Edit.rsc.RS Clipboard.rsc => Clipboard.rsc.RS' \
      'System.rsc => System.rsc.RS Oberon.rsc => Oberon.rsc.RS ORL.rsc => ORL.rsc.RS PCLink1.rsc => PCLink1.rsc.RS' \
      'ORS.rsc => ORS.rsc.RS ORB.rsc => ORB.rsc.RS ORG.rsc => ORG.rsc.RS ORP.rsc => ORP.rsc.RS ~' >> .cmds
-echo 'ORP.Compile Modules.Mod/d Fonts.Mod/s/d Texts.Mod/s/d Oberon.Mod/s/d ~' >> .cmds
+echo 'ORP.Compile Modules.Mod/d DisplayM.Mod/s/d DisplayC.Mod/s/d Fonts.Mod/s/d Texts.Mod/s/d Oberon.Mod/s/d ~' >> .cmds
 echo 'ORP.Compile MenuViewers.Mod/s/d TextFrames.Mod/s/d System.Mod/s/d Edit.Mod/s/d Clipboard.Mod/s/d PCLink1.Mod/s/d ORL.Mod/s/d ~' >> .cmds
 echo 'ORP.Compile ORS.Mod/s/d ORB.Mod/s/d ~' >> .cmds
 echo 'ORP.Compile ORG.Mod/s/d ORP.Mod/s/d ~' >> .cmds

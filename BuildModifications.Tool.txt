@@ -7,7 +7,8 @@ ORP.Compile Kernel.Mod/s FileDir.Mod/s Files.Mod/s Modules.Mod/s ~
 ORL.Link Modules ~
 ORL.Load Modules.bin ~
 
-ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
+ORP.Compile Input.Mod/s DisplayM.Mod/s DisplayC.Mod/s ~
+ORP.Compile Display.Mod/s Viewers.Mod/s ~
 ORP.Compile Fonts.Mod/s Texts.Mod/s ~
 ORP.Compile Oberon.Mod/s ~
 ORP.Compile MenuViewers.Mod/s ~
@@ -27,6 +28,7 @@ ORP.Compile Calc.Mod/s RealCalc.Mod/s ~
 ORP.Compile Splines.Mod/s PictureTiles.Mod/s ~
 ORP.Compile DisplayGrab.Mod/s Fills.Mod/s ~
 ORP.Compile PictureGrab.Mod/s ~
+ORP.Compile ColorPictureGrab.Mod/s ColorPictureTiles.Mod/s ~
 ORP.Compile PixelizrObjects.Mod/s Pixelizr.Mod/s ~
 
 ORP.Compile ResourceMonitor.Mod/s ~

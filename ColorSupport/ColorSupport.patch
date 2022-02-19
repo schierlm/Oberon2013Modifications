@@ -1,0 +1,101 @@
+--- 1/DisplayM.Mod.txt
++++ 2/DisplayM.Mod.txt
+@@ -1,7 +1,7 @@
+-MODULE Display;  (*NW 5.11.2013 / 17.1.2019*)
++MODULE DisplayM;  (*NW 5.11.2013 / 17.1.2019*)
+   IMPORT SYSTEM;
+ 
+-  CONST black* = 0; white* = 1;  (*black = background*)
++  CONST black* = 0; white* = 15;  (*black = background*)
+     replace* = 0; paint* = 1; invert* = 2;  (*modes*)
+ 
+   TYPE Frame* = POINTER TO FrameDesc;
+@@ -46,6 +46,11 @@
+       SYSTEM.GET(-4, Span);
+       SYSTEM.GET(-4, Base);
+       IF Span = -1 THEN Span := Width DIV 8 END
++    ELSIF modes > 0 THEN
++      SYSTEM.GET(-4, Width);
++      SYSTEM.GET(-4, Height);
++      Span := 0;
++      Base := 0E7F00H;
+     ELSE
+       Base := 0E7F00H;
+       Width := 1024;
+@@ -90,6 +95,11 @@
+   RETURN success
+   END SetSize;
+ 
++  PROCEDURE SetDepth*(depth: INTEGER): BOOLEAN;
++  BEGIN
++  RETURN depth = 1
++  END SetDepth;
++
+   (* raster ops *)
+     
+   PROCEDURE Dot*(col, x, y, mode: INTEGER);
+@@ -104,8 +114,10 @@
+   END Dot;
+ 
+   PROCEDURE ReplConst*(col, x, y, w, h, mode: INTEGER);
+-    VAR al, ar, a0, a1, i: INTEGER; left, right, mid, pix, pixl, pixr: SET;
+-  BEGIN al := Base + y*Span;
++    VAR al, ar, a0, a1, i: INTEGER; left, right, mid, pix, pixl, pixr: SET; tmp: BOOLEAN;
++  BEGIN
++    IF Span = 0 THEN tmp := SetSize(Width, Height) END;
++    al := Base + y*Span;
+     ar := ((x+w-1) DIV 32)*4 + al; al := (x DIV 32)*4 + al;
+     IF ar = al THEN
+       mid := {(x MOD 32) .. ((x+w-1) MOD 32)};
+@@ -261,6 +273,14 @@
+     END
+   END ReplPattern;
+ 
++  PROCEDURE GetPalette*(col: INTEGER; VAR val: INTEGER): BOOLEAN;
++  BEGIN
++  RETURN FALSE
++  END GetPalette;
++
++  PROCEDURE SetPalette*(col, val: INTEGER);
++  END SetPalette;
++
+ BEGIN Depth := 1; InitResolution;
+   arrow := SYSTEM.ADR($0F0F 0060 0070 0038 001C 000E 0007 8003 C101 E300 7700 3F00 1F00 3F00 7F00 FF00$);
+   star := SYSTEM.ADR($0F0F 8000 8220 8410 8808 9004 A002 C001 7F7F C001 A002 9004 8808 8410 8220 8000$);
+@@ -269,4 +289,4 @@
+   block := SYSTEM.ADR($0808 FFFF C3C3 C3C3 FFFF$);
+   cross := SYSTEM.ADR($0F0F 0140 0220 0410 0808 1004 2002 4001 0000 4001 2002 1004 0808 0410 0220 0140$);
+   grey := SYSTEM.ADR($2002 0000 5555 5555 AAAA AAAA$)
+-END Display.
++END DisplayM.
+--- 1/Texts.Mod.txt
++++ 2/Texts.Mod.txt
+@@ -115,7 +115,7 @@
+       IF tag = TextTag THEN Load(R, T)
+       ELSE (*Ascii file*)
+         len := Files.Length(f); Q := Trailer();
+-        NEW(q); q.fnt := Fonts.Default; q.col := 1; q.voff := 0; q.f := f; q.off := 0; q.len := len;
++        NEW(q); q.fnt := Fonts.Default; q.col := 15; q.voff := 0; q.f := f; q.off := 0; q.len := len;
+         Q.next := q; q.prev := Q; q.next := Q; Q.prev := q; T.trailer := Q; T.len := len
+       END
+     ELSE (*create new text*)
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -356,11 +356,15 @@
+   PROCEDURE SetScreenSize*;
+     VAR S: Texts.Scanner;
+       w, h: INTEGER;
++      tmp: BOOLEAN;
+   BEGIN GetArg(S);
+     IF S.class = Texts.Int THEN w := S.i; Texts.Scan(S) END;
+     IF S.class = Texts.Int THEN
+-      h := S.i;
+-      IF Display.SetSize(w, h) THEN
++      h := S.i; Texts.Scan(S);
++      IF (S.class = Texts.Int) & (S.i IN {1,4,8,16,24}) & Display.SetDepth(S.i) THEN
++        tmp := Display.SetSize(w, h);
++        Oberon.UpdateScreenSize()
++      ELSIF Display.SetSize(w, h) THEN
+         Oberon.UpdateScreenSize()
+       END
+     END

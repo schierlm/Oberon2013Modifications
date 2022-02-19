@@ -74,11 +74,17 @@ cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.t
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/* work
+cp ColorSupport/*.txt DrawAddons/16Color/Color*.Mod.txt DrawAddons/16Color/*.Tool.txt work
 
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
 patch -d work <HardwareEnumerator/InnerEmulator.patch
 patch -d work <StartupCommand/StartupCommand.patch
+
+mv work/Display.Mod.txt work/DisplayM.Mod.txt
+mv work/Display.Switch.Mod.txt work/Display.Mod.txt
+patch -d work <ColorSupport/ColorSupport.patch
+patch -d work <ColorSupport/DrawAddons.patch
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
@@ -103,6 +109,7 @@ cp RescueSystem/*.txt MinimalFonts/Fonts.Embedded.Mod.txt work/rescue
 patch -d work/rescue <RescueSystem/RescueSystem.patch -F 3
 patch -d work/rescue <RescueSystem/POSTPATCH_after_DefragSupport.patch
 patch -d work/rescue <HardwareEnumerator/RescueSystem.patch
+patch -d work/rescue <ColorSupport/RescueSystem.patch
 patch -d work/debugrescue <RescueSystem/RescueSystem.patch -F 3
 
 rm work/*.orig work/debug/*.orig work/rescue/*.orig work/debugrescue/*.orig
