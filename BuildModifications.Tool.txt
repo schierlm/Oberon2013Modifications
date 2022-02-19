@@ -69,6 +69,8 @@ ORP.Compile SeamlessResize.Mod/s ~
 
 ORP.Compile Console.Mod/s ~
 
+ORP.Compile ColorPalette.Mod/s PaletteEdit.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
