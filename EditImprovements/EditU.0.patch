@@ -1,26 +1,52 @@
---- EditU.Mod.txt	2022-02-16 20:12:52.000000000 +0100
+--- ../UTF8CharsetLite/EditU.Mod.txt	2022-02-19 11:39:08.000000000 +0100
 +++ EditU.0.Mod.txt	2022-02-18 20:22:32.747131000 +0100
-@@ -1,4 +1,5 @@
--MODULE EditU; (*JG 2.11.90 / NW 28.11.2015*)
+@@ -1,19 +1,22 @@
+-MODULE EditU; (*based on Edit; JG 2.11.1990 / NW 28.11.2015*)
 +MODULE EditU;
 +
    IMPORT Files, Fonts, Texts, TextsU, Display, Viewers, Oberon, MenuViewers, TextFrames := TextFramesU;
  
    CONST CR = 0DX; maxlen = 32;
-@@ -10,12 +11,6 @@
+     StandardMenu = "System.Close System.Copy System.Grow EditU.Search EditU.Store";
+ 
+   VAR W: Texts.Writer;
+-    time, M: INTEGER;
++    time: LONGINT;
++    M: INTEGER;
      pat: ARRAY maxlen OF CHAR;
      d: ARRAY 256 OF INTEGER;
  
--  PROCEDURE Max(i, j: LONGINT): LONGINT;
--    VAR m: LONGINT;
--  BEGIN IF i >= j THEN m := i ELSE m := j END ;
--    RETURN m
--  END Max;
--
    PROCEDURE Open*;
      VAR T: Texts.Text;
-     S: Texts.Scanner;
-@@ -85,7 +80,20 @@
+-      S: Texts.Scanner;
+-      V: Viewers.Viewer;
+-      X, Y, beg, end, time: INTEGER;
++    S: Texts.Scanner;
++    V: Viewers.Viewer;
++    X, Y: INTEGER;
++    beg, end, time: LONGINT;
+   BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+     IF (S.class = Texts.Char) & (S.c = "^") OR (S.line # 0) THEN
+       Oberon.GetSelection(T, beg, end, time);
+@@ -34,7 +37,7 @@
+       T: Texts.Text;
+       S: Texts.Scanner;
+       f: Files.File; R: Files.Rider;
+-      beg, end, time, len: INTEGER;
++      beg, end, time, len: LONGINT;
+ 
+     PROCEDURE Backup (VAR name: ARRAY OF CHAR);
+       VAR res, i: INTEGER; bak: ARRAY 32 OF CHAR;
+@@ -66,7 +69,7 @@
+     VAR T: Texts.Text;
+       F: TextFrames.Frame;
+       v: Viewers.Viewer;
+-      beg, end, time: INTEGER;
++      beg, end, time: LONGINT;
+       fnt: Fonts.Font; col, voff: INTEGER;
+   BEGIN Oberon.GetSelection(T, beg, end, time);
+     IF time >= 0 THEN
+@@ -77,14 +80,27 @@
          Texts.ChangeLooks(T, beg, end, {0,1,2}, fnt, col, voff)
        END
      END
@@ -42,7 +68,20 @@
  
    PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
      VAR Text: TextFrames.Frame;
-@@ -130,7 +138,7 @@
+       V: Viewers.Viewer;
+       R: Texts.Reader;
+       T: Texts.Text;
+-      pos, beg, end, prevTime, len, n, i, j: INTEGER;
++      pos, beg, end, prevTime, len: LONGINT; n, i, j: INTEGER;
+       buf: ARRAY 32 OF CHAR;
+ 
+     PROCEDURE Forward(n: INTEGER; VAR R: Texts.Reader; VAR buf: ARRAY OF CHAR);
+@@ -118,11 +134,11 @@
+       WHILE (j >= 0) & (pos < len) DO
+         n := d[ORD(buf[M-1])]; Forward(n, R, buf); INC(pos, n); j := M;
+         REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j])
+-      END;
++      END ;
        IF j < 0 THEN
          TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
          Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
@@ -51,12 +90,9 @@
          TextFrames.SetCaret(Text, pos)
        END
      END
-@@ -148,7 +156,7 @@
-       TextsU.WriteUnicode(W, S.i);
-       F := Oberon.FocusViewer.dsc.next(TextFrames.Frame);
-       Texts.Insert(F.text, F.carloc.pos, W.buf);
--      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i));
-+      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i))
-     END
-   END InsertUnicode;
+@@ -146,3 +162,5 @@
  
+ BEGIN Texts.OpenWriter(W)
+ END EditU.
++
++
