@@ -9,8 +9,10 @@ This patch insures that the target location will always be at the first line of 
 Installation
 ------------
 
-- Apply [`Edit.1r.patch`](Edit1r.patch) to `Edit.Mod` and [`EditU.0.patch`](Editu.0.patch) to `EditU.Mod`.
+- Apply [`Edit.1r.patch`](Edit.1r.patch) to `Edit.Mod`.
 
-- Recompile `Edit.Mod` and EditU.Mod`:
+- In case you want to use the [UTF8CharsetLite](../UTF8CharsetLite/README.md) modification, apply [`EditU.0.patch`](EditU.0.patch) to `EditU.Mod`.
+
+- Recompile `Edit.Mod` and optionally `EditU.Mod`:
 
       ORP.Compile Edit.Mod EditU.Mod ~

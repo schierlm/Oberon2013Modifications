@@ -80,7 +80,6 @@ cp ColorSupport/*.txt DrawAddons/16Color/Color*.Mod.txt DrawAddons/16Color/*.Too
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
 patch -d work <HardwareEnumerator/InnerEmulator.patch
-cp -p UTF8CharsetLite/EditU.Mod.txt work/
 patch -d work <EditImprovements/EditU.0.patch
 patch -d work <StartupCommand/StartupCommand.patch
 
