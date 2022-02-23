@@ -31,7 +31,7 @@ therefore has to be done by calling `Edit.InsertUnicode 20ACH` or similar.
 Installation
 ------------
 
-- Apply [`UTF8Charset.patch`].
+- Apply [`UTF8Charset.patch`](UTF8Charset.patch).
 
 - Recompile the changed modules and their dependencies (including the compiler):
 
