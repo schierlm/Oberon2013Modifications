@@ -5,7 +5,6 @@ Description
 
 Here are some small bugfixes.
 
-
 Fix 1: Aborting when module exceeds globals size
 ------------------------------------------------
 
@@ -15,16 +14,13 @@ exported variables may fail. Enforce this in the compiler.
 Fix 2: Initializing of `GraphicFrames.TBuf` variable
 ----------------------------------------------------
 
-
 When you delete text from a Drawing, the extra letters get moved into a `Texts.Buffer` called `Tbuf`.
 Only that this buffer is never initialized, resulting in memory corruption if you delete enough text.
-
 
 Fix 3: Avoid freelist corruption after memory allocation failure
 ----------------------------------------------------------------
 
-
-When a memory of a small type from a large block fails, the system will still store
+If allocation of a small amount from a large block fails, the system will still store
 the "second half" of the null pointer into the free lists, resulting in memory corruption
 as soon as these free lists are used.
 
@@ -33,7 +29,7 @@ Fix 4: Avoid illegal IO access (-4) when GC encounters NIL pointers
 
 As discussed on the mailing list (`PO: Illegal memory access in GC`), the garbage collector
 will read from IO address -4 when it encounters a NIL pointer and tries to read the metadata
-preceding the pointer. By default, IO address -4 is unused and will return 0, but better
+preceding the pointer. By definition, IO address -4 is unused and will return 0, but better
 to avoid these accesses if possible.
 
 Fix 5: Fix register index for non-constant set literals
@@ -47,7 +43,7 @@ the wrong register index, so the value was not correctly used.
 MODULE Test;
 
   PROCEDURE Mask(a: SET; b: INTEGER): SET;
-  RETURN a - {b .. b+7}
+  RETURN a - {b .. b + 7}
   END Mask;
 
 BEGIN
