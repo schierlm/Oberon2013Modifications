@@ -21,7 +21,7 @@ if your Oberon system has a reliable real-time clock. If not, you can only start
 the top and recompile everything.
 
 - `-`: Module (probably) does not need to be recompiled (timestamp is older)
-- `?`: Unsure (there are two timestamps that are same)
+- `?`: Unsure (there are two timestamps that are equal)
 - `!`: Module needs to be recompiled as its timestamp is newer
 - `*`: Module needs to be recompiled as one of its dependencies needs to be recompiled
   or its timestamp is newer
