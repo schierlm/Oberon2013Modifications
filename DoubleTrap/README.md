@@ -31,7 +31,7 @@ at the beginning of the trap handler. This is usually sufficient memory for the 
 handler to run. In case it is not, the reentrance check is still present and will
 avoid a total lockup at the expense of missing trap information.
 
-This approach, implemented by [`DoubleTrap.Minimal.patch`](DoubleTrap.Minimal.patch),
+This approach, implemented by [`DoubleTrap.patch`](DoubleTrap.patch),
 needs a changed `Kernel.Mod`, as the memory model does not support freeing memory
 outside a GC cycle. The kernel patch introduces a new function, `ForceFree`, which
 takes the address of the type tag pointer at the beginning of the heap element, and
