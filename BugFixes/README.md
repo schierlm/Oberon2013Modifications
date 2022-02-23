@@ -14,7 +14,7 @@ exported variables may fail. Enforce this in the compiler.
 Fix 2: Initializing of `GraphicFrames.TBuf` variable
 ----------------------------------------------------
 
-When you delete text from a Drawing, the extra letters get moved into a `Texts.Buffer` called `Tbuf`.
+If you delete text from a Drawing, the extra letters get moved into a `Texts.Buffer` called `Tbuf`.
 Only that this buffer is never initialized, resulting in memory corruption if you delete enough text.
 
 Fix 3: Avoid freelist corruption after memory allocation failure
