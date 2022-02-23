@@ -18,7 +18,7 @@ are no problem.
 
 The original `Fonts.Mod` always loads all glyphs. As Unicode fonts can grow quite
 big and often only very few glyph ranges are needed, the modified `Fonts.Mod` loads
-glyphs in ranges of 64 character. A two-way indirect lookup table (16*64*64 entries)
+glyphs in ranges of 64 character. A two-way indirect lookup table (16\*64\*64 entries)
 is used to lookup loaded glyphs.
 
 Glyphs that do not exist in a font are rendered as fallback glyphs, containing 4 tiny
