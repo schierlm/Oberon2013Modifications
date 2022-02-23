@@ -22,7 +22,7 @@ way is needed to encode this information. This patch takes a simple approach and
 a "jump never" instruction before such function call jumps, which is used to encode
 the code position.
 
-ABORT (pushing the reset button) have another problem: The stack register gets
+ABORT (pushing the reset button) has another problem: The stack register gets
 overwritten by the boot loader, making it impossible to find a starting point for
 the stack walk. This overwrite happens in the module header emitted by the compiler.
 Therefore patch the compiler to emit an additional instruction to save the previous
