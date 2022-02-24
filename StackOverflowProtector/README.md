@@ -25,7 +25,7 @@ value, since in most cases the trap handler never returns.
 
 One small issue remains: The trap itself is a BLR instruction; therefore the trap
 procedure's prolog also tries to decrement the stack pointer to store the LNK value
-(which is also guarded by the compiler chaing). As this is conterproductive (the trap
+(which is also guarded by the compiler change). As this is conterproductive (the trap
 handler should be able to use the extra 1KB memory), a new procedure `Oberon.DisarmTrap`
 is implemented that is called during module initialization and scans the code of the
 trap procedure for the newly injected trap. That trap instruction is replaced by a no-op

@@ -23,7 +23,7 @@ Only that this buffer is never initialized, resulting in memory corruption if yo
 Fix 3: Avoid freelist corruption after memory allocation failure
 ----------------------------------------------------------------
 
-When a memory of a small type from a large block fails, the system will still store
+When allocation of a small type from a large block fails, the system will still store
 the "second half" of the null pointer into the free lists, resulting in memory corruption
 as soon as these free lists are used.
 
@@ -50,7 +50,7 @@ the wrong register index, so the value was not correctly used.
 MODULE Test;
 
   PROCEDURE Mask(a: SET; b: INTEGER): SET;
-  RETURN a - {b .. b+7}
+  RETURN a - {b .. b + 7}
   END Mask;
 
 BEGIN

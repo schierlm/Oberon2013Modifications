@@ -25,7 +25,7 @@ from smaller ones.
 
 [PCF fonts](https://en.wikipedia.org/wiki/Portable_Compiled_Format) were originally
 designed for the X Window System, and therefore lots of pixel fonts (monospaced
-and prportional ones) are available in this format.
+and proportional ones) are available in this format.
 
 There is support for directly using PCF fonts inside Oberon in
 [Integrated Oberon](https://github.com/io-core/Edit/blob/795889b215dd831f44369f0a6edc0f8ec6caf05c/Fonts.Mod),
