@@ -29,7 +29,7 @@ Fix 4: Avoid illegal IO access (-4) when GC encounters NIL pointers
 
 As discussed on the mailing list (`PO: Illegal memory access in GC`), the garbage collector
 will read from IO address -4 when it encounters a NIL pointer and tries to read the metadata
-preceding the pointer. By definition, IO address -4 is unused and will return 0, but better
+preceding the pointer. By construction, IO address -4 is unused and will return 0, but better
 to avoid these accesses if possible.
 
 Fix 5: Fix register index for non-constant set literals
