@@ -1,0 +1,71 @@
+--- 1/Oberon.Mod.txt
++++ 2/Oberon.Mod.txt
+@@ -356,22 +356,22 @@
+   BEGIN CurCol := col
+   END SetColor;
+ 
+-  PROCEDURE SetColorTheme* (mix: BOOLEAN; fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc: INTEGER);
++  PROCEDURE SetColorTheme* (mix: BOOLEAN; colors: ARRAY OF INTEGER);
+      VAR  M: Viewers.ViewerMsg;
+   BEGIN
+     M.id := Viewers.suspend;
+     Viewers.Broadcast(M);
+     MixTextColors := mix;
+-    FrameColor := fc;
+-    BackgroundColor := bc;
+-    MenuBackgroundColor := mbc;
+-    TextBackgroundColor := tbc;
+-    ScrollMarkColor := smc;
+-    ScrollBarColor := sbc;
+-    CursorColor := cc;
+-    ChangeMarkColor := cmc;
+-    SelectionColor := sc;
+-    UnderlineColor := uc;
++    FrameColor := colors[0];
++    BackgroundColor := colors[1];
++    MenuBackgroundColor := colors[2];
++    TextBackgroundColor := colors[3];
++    ScrollMarkColor := colors[4];
++    ScrollBarColor := colors[5];
++    CursorColor := colors[6];
++    ChangeMarkColor := colors[7];
++    SelectionColor := colors[8];
++    UnderlineColor := colors[9];
+     M.id := Viewers.restore;
+     Viewers.Broadcast(M);
+   END SetColorTheme;
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -309,20 +309,20 @@
+     VAR S: Texts.Scanner;
+       w, h: INTEGER;
+       tmp: BOOLEAN;
+-      mix: BOOLEAN; fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc: INTEGER;
++      mix: BOOLEAN; colors: ARRAY 10 OF INTEGER;
+   BEGIN GetArg(S);
+     IF (S.class = Texts.Char) & (S.c = "*") THEN mix := TRUE; Texts.Scan(S) ELSE mix := FALSE END;
+-    IF S.class = Texts.Int THEN fc := S.i; Texts.Scan(S) ELSE fc := Display.white END;
+-    IF S.class = Texts.Int THEN bc := S.i; Texts.Scan(S) ELSE bc := Display.black END;
+-    IF S.class = Texts.Int THEN mbc := S.i; Texts.Scan(S) ELSE mbc := fc END;
+-    IF S.class = Texts.Int THEN tbc := S.i; Texts.Scan(S) ELSE tbc := bc END;
+-    IF S.class = Texts.Int THEN smc := S.i; Texts.Scan(S) ELSE smc := fc END;
+-    IF S.class = Texts.Int THEN sbc := S.i; Texts.Scan(S) ELSE sbc := fc END;
+-    IF S.class = Texts.Int THEN cc := S.i; Texts.Scan(S); ELSE cc := Display.white END;
+-    IF S.class = Texts.Int THEN cmc := S.i; Texts.Scan(S) ELSE cmc := cc END;
+-    IF S.class = Texts.Int THEN sc := S.i; Texts.Scan(S) ELSE sc := cc END;
+-    IF S.class = Texts.Int THEN uc := S.i; Texts.Scan(S) ELSE uc := cc END;
+-    Oberon.SetColorTheme(mix, fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc)
++    IF S.class = Texts.Int THEN colors[0] := S.i; Texts.Scan(S) ELSE colors[0] := Display.white END;
++    IF S.class = Texts.Int THEN colors[1] := S.i; Texts.Scan(S) ELSE colors[1] := Display.black END;
++    IF S.class = Texts.Int THEN colors[2] := S.i; Texts.Scan(S) ELSE colors[2] := colors[0] END;
++    IF S.class = Texts.Int THEN colors[3] := S.i; Texts.Scan(S) ELSE colors[3] := colors[1] END;
++    IF S.class = Texts.Int THEN colors[4] := S.i; Texts.Scan(S) ELSE colors[4] := colors[0] END;
++    IF S.class = Texts.Int THEN colors[5] := S.i; Texts.Scan(S) ELSE colors[5] := colors[0] END;
++    IF S.class = Texts.Int THEN colors[6] := S.i; Texts.Scan(S); ELSE colors[6] := Display.white END;
++    IF S.class = Texts.Int THEN colors[7] := S.i; Texts.Scan(S) ELSE colors[7] := colors[6] END;
++    IF S.class = Texts.Int THEN colors[8] := S.i; Texts.Scan(S) ELSE colors[8] := colors[6] END;
++    IF S.class = Texts.Int THEN colors[9] := S.i; Texts.Scan(S) ELSE colors[9] := colors[6] END;
++    Oberon.SetColorTheme(mix, colors)
+   END SetColorTheme;
+ 
+   PROCEDURE ShowModules*;

@@ -3,7 +3,7 @@ set -e
 
 rm -rf work
 mkdir work
-for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon TextFrames System Edit Graphics GraphicFrames ORS ORB ORG ORP BootLoad SCC RS232; do
+for i in Kernel FileDir Files Modules Fonts Input Display Viewers Texts Oberon MenuViewers TextFrames System Edit Graphics GraphicFrames ORS ORB ORG ORP BootLoad SCC RS232; do
 	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work
 	dos2unix work/$i.Mod.txt
 done
@@ -76,6 +76,7 @@ cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspec
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/*.txt work
 cp ColorSupport/*.txt DrawAddons/16Color/Color*.Mod.txt DrawAddons/16Color/*.Tool.txt ColorPalette/*.txt work
+cp ColorTheme/*.txt work
 
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
@@ -87,6 +88,10 @@ mv work/Display.Mod.txt work/DisplayM.Mod.txt
 mv work/Display.Switch.Mod.txt work/Display.Mod.txt
 patch -d work <ColorSupport/ColorSupport.patch
 patch -d work <ColorSupport/DrawAddons.patch
+patch -d work <ColorTheme/PREPATCH_after_VariableLinespace.patch
+patch -d work <ColorTheme/ColorTheme.patch
+patch -d work <ColorTheme/POSTPATCH_after_VariableLinespace.patch
+patch -d work <ColorTheme/UTF8CharsetLite.patch
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
@@ -97,9 +102,14 @@ patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
 patch -d work/debug <CrossCompiler/POSTPATCH_after_StackSymbols.patch
 patch -d work/debug <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch
+patch -d work/debug <KernelDebugger/PREPATCH_after_ColorTheme.patch
 patch -d work/debug <KernelDebugger/ReserveRegisters.patch
 patch -d work/debug -R <KernelDebugger/PREPATCH_after_StackOverflowProtector.patch
+patch -d work/debug <KernelDebugger/POSTPATCH_after_ColorTheme.patch
+patch -d work/debug <KernelDebugger/POSTPATCH2_after_ColorTheme.patch
+sed 's/TextFrames.Mod/TextFramesU.Mod/g' KernelDebugger/PREPATCH_after_ColorTheme.patch | patch -d work/debug
 patch -d work/debug <KernelDebugger/ReserveRegistersExtra.patch
+sed 's/TextFrames.Mod/TextFramesU.Mod/g' KernelDebugger/POSTPATCH_after_ColorTheme.patch | patch -d work/debug
 cp ORStackInspect/*.txt KernelDebugger/*.txt work/debug
 
 for i in Kernel System.RS Modules.RS Oberon; do

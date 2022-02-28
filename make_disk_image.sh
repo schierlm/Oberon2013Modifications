@@ -3,10 +3,10 @@ set -e
 
 wget -nc https://github.com/schierlm/Oberon2013Modifications/releases/download/2020.05/CommandLineCompiler.zip
 
-for i in MenuViewers Rectangles Curves Draw MacroTool PCLink1 ORTool; do
-	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.Mod.txt work/$i.Mod
-	dos2unix work/$i.Mod
-	unix2mac work/$i.Mod
+for i in Rectangles.Mod Curves.Mod Draw.Mod Draw.Tool MacroTool.Mod PCLink1.Mod ORTool.Mod; do
+	cp ${WIRTH_PERSONAL:-../wirth-personal/}people.inf.ethz.ch/wirth/ProjectOberon/Sources/$i.txt work/$i
+	dos2unix work/$i
+	unix2mac work/$i
 done
 
 cd work

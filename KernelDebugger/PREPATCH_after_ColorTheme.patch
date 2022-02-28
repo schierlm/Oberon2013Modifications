@@ -1,0 +1,18 @@
+--- 1/TextFrames.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -899,13 +899,13 @@
+   PROCEDURE NewMenu* (name, commands: ARRAY OF CHAR): Frame;
+     VAR F: Frame; T: Texts.Text;
+   BEGIN NEW(F); T := Menu(name, commands);
+-    Open(F, Handle, T, 0, -2, left DIV 4, 0, 0, 0, lsp); RETURN F
++    Open(F, Handle, T, 0, Display.white, left DIV 4, 0, 0, 0, lsp); RETURN F
+   END NewMenu;
+ 
+   PROCEDURE NewText* (text: Texts.Text; pos: LONGINT): Frame;
+     VAR F: Frame;
+   BEGIN NEW(F);
+-    Open(F, Handle, text, pos, -1, left, right, top, bot, lsp); RETURN F
++    Open(F, Handle, text, pos, Display.black, left, right, top, bot, lsp); RETURN F
+   END NewText;
+ 
+ BEGIN NEW(TBuf); NEW(DelBuf);

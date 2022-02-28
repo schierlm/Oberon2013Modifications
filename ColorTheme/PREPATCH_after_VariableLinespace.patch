@@ -1,0 +1,116 @@
+--- 1/TextFrames.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -126,8 +126,9 @@
+     WHILE (nextCh # CR) & (R.fnt # NIL) DO
+       Fonts.GetPat(R.fnt, nextCh, dx, x, y, w, h, patadr);
+       IF -R.fnt.minY < dsr THEN dy := dsr + R.fnt.minY ELSE dy := 0 END;
++      **PREPATCH**
+       IF (X + x + w <= NX) & (h # 0) THEN
+-        Display.CopyPattern(R.col, patadr, X + x, Y + y - dy, Display.invert)
++        Display.CopyPattern(R.col, patadr, X + x, Y + y, Display.invert)
+       END;
+       X := X + dx; INC(len); Texts.Read(R, nextCh)
+     END;
+@@ -245,9 +246,10 @@
+           WHILE L.next # F.trailer DO (*!*)
+             org := org + L.len; curY := curY - L.lsp; L := L.next
+           END;
++          *PREPATCH*
+           Display.CopyBlock (F.X + F.left, curY - dsr - L.lsp, F.W - F.left, Y0 + asr + L.lsp - (curY - dsr),
+               F.X + F.left, curY - dsr + F.Y + F.H - F.top - asr - L.lsp - Y0, 0);
+-          curY := curY + F.Y + F.H - F.top - asr - L.lsp - Y0;
++          curY := curY + F.Y + F.H - F.top - asr - Y0;
+           Display.ReplConst(F.col, F.X + F.left, F.Y, F.W - F.left, curY - dsr - F.Y, Display.replace);
+           botY := F.Y + F.bot + dsr;
+           org := org + L.len;
+@@ -382,16 +384,17 @@
+ 
+   PROCEDURE FlipSelection (F: Frame; VAR beg, end: Location);
+     VAR L: Line; Y: INTEGER;
++    **PREPATCH_LARGE**
+   BEGIN L := beg.lin; Y := F.Y + beg.y - 2;
+-    IF L = end.lin THEN ReplConst(Display.white, F, F.X + beg.x, Y, end.x - beg.x, L.lsp, Display.invert)
++    IF L = end.lin THEN ReplConst(Display.white, F, F.X + beg.x, Y, end.x - beg.x, selH, Display.invert)
+     ELSE
+-      ReplConst(Display.white, F, F.X + beg.x, Y, F.left + L.wid - beg.x, L.lsp, Display.invert);
+-      Y := Y - L.lsp; L := L.next;
++      ReplConst(Display.white, F, F.X + beg.x, Y, F.left + L.wid - beg.x, selH, Display.invert);
++      L := L.next; Y := Y - lsp;
+       WHILE L # end.lin DO
+-        ReplConst(Display.white, F, F.X + F.left, Y, L.wid, L.lsp, Display.invert);
+-        Y := Y - L.lsp; L := L.next
++        ReplConst(Display.white, F, F.X + F.left, Y, L.wid, selH, Display.invert);
++        L := L.next; Y := Y - lsp
+       END;
+-      ReplConst(Display.white, F, F.X + F.left, Y, end.x - F.left, L.lsp, Display.invert)
++      ReplConst(Display.white, F, F.X + F.left, Y, end.x - F.left, selH, Display.invert)
+     END
+   END FlipSelection;
+ 
+@@ -500,13 +503,13 @@
+         ELSE
+           hchg := FALSE; len := beg - org; wid := Width(R, len)
+         END;
+-        ReplConst(F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp, Display.replace);
++        **PREPATCH_LARGE_len_ADDED_update_REMOVED**
++        len := beg - org; wid := Width(R, len);
++        ReplConst(F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, lsp, Display.replace);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+-        org := org + L.len; L := L.next;
++        org := org + L.len; L := L.next; curY := curY - lsp;
+         WHILE (L # F.trailer) & (org <= end) DO
+-          ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
+-          IF ll # L.lsp THEN hchg := TRUE END;
+-          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
++          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
+           DisplayLine(F, L, R, F.X + F.left, curY, 0);
+           org := org + L.len; L := L.next
+         END;
+@@ -540,7 +543,10 @@
+         org := org + L.len;
+         Y0 := curY; L0 := L.next;
+         WHILE (org <= end) & (curY >= botY) DO
++          **PREPATCH_ADDED**
+           NEW(l);
++          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
++          DisplayLine(F, l, R, F.X + F.left, curY, 0);
+           UpdateLineHeight(l, R, F.text);
+           curY := curY - l.lsp;
+           IF curY >= botY THEN
+@@ -564,9 +570,9 @@
+           ELSE Y2 := curY
+           END;
+           curY := Y1; L := L0;
+-          WHILE curY > Y2 DO
+-            curY := curY - L.lsp;
+-            Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
++          **PREPATCH_removed_curY**
++          WHILE curY # Y2 DO
++            Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
+             DisplayLine(F, L, R, F.X + F.left, curY, 0);
+             L := L.next
+           END
+@@ -603,7 +609,9 @@
+         ELSE
+           len := 0; wid := 0
+         END;
+-        ReplConst (F.col, F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, L0.lsp, Display.replace);
++        **PREPATCH_ADD_len**
++        len := beg - org0; wid := Width(R, len);
++        ReplConst (F.col, F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, lsp, Display.replace);
+         DisplayLine(F, L0, R, F.X + F.left + wid, Y0, len);
+         IF (L # L0.next) OR (Y1 # Y0) THEN
+           Y0 := Y0 - L.lsp;
+@@ -615,9 +623,10 @@
+           END;
+           Display.CopyBlock(F.X + F.left, curY + L0.next.lsp - dsr, F.W - F.left, Y1 - curY,
+               F.X + F.left, curY + L0.next.lsp - dsr + (Y0 - Y1), 0);
++          **PREPATCH_removed_curY**
+           curY := curY + (Y0 - Y1);
+-          Display.ReplConst (F.col, F.X + F.left, F.Y, F.W - F.left, curY + L0.next.lsp - (F.Y + dsr), Display.replace);
+-          Texts.OpenReader(R, F.text, org); Texts.Read(R, nextCh); curY := curY + L0.next.lsp;
++          Display.ReplConst (F.col, F.X + F.left, F.Y, F.W - F.left, curY + lsp - (F.Y + dsr), Display.replace);
++          Texts.OpenReader(R, F.text, org); Texts.Read(R, nextCh);
+           WHILE ~L.eot & (curY >= botY) DO
+             NEW(l);
+             UpdateLineHeight(l, R, F.text);
