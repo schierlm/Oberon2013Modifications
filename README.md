@@ -30,6 +30,15 @@ a high performance or binary size overhead, and are therefore undesirable in nor
 
 There are also two separate releases available that include the rescue system (the normal one and the "debug" one).
 
+In case you want to pick & patch your own modifications, you can obtain the unpatched original
+files from the [wirth-personal](https://github.com/Spirit-of-Oberon/wirth-personal) repository.
+The scripts in this repo assume that the other repo is located at `../wirth-personal`; if it is not,
+you can override the location using the `WIRTH_PERSONAL` environment variable.
+
+The `get_unpatched_source.sh` script collects the files to be patched into `work` directory,
+the `make_release.sh` also applies the releease patches to it, and the `make_disk_image.sh`
+script expects patched sources in `work` directory and builds a disk image from them.
+
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
 | **[BugFixes](BugFixes/README.md)** | Fixes for what I consider to be bugs | Optionally recompile inner core |
