@@ -58,6 +58,8 @@ rmdir work/utf8lite
 patch -d work <VariableLinespace/VariableLineSpace.patch
 patch -d work <HardwareEnumerator/HardwareEnumerator.patch
 patch -d work <DebugConsole/DebugConsole.patch
+patch -d work <CacheCoherence/CacheCoherence.patch -F 3
+patch -d work <CacheCoherence/DynamicMemorySplit.patch
 
 sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
 sed -i '1,2d' work/BootLoad.Mod.txt
@@ -103,6 +105,7 @@ sed 's/TextFrames.Mod/TextFramesU.Mod/g' KernelDebugger/PREPATCH_after_ColorThem
 patch -d work/debug <KernelDebugger/ReserveRegistersExtra.patch
 sed 's/TextFrames.Mod/TextFramesU.Mod/g' KernelDebugger/POSTPATCH_after_ColorTheme.patch | patch -d work/debug
 cp ORStackInspect/*.txt KernelDebugger/*.txt work/debug
+patch -d work/debug <CacheCoherence/KernelDebugger.patch
 
 for i in Kernel System.RS Modules.RS Oberon; do
 	cp work/${i%%.RS}.Mod.txt work/rescue/$i.Mod.txt
@@ -114,6 +117,7 @@ patch -d work/rescue <RescueSystem/RescueSystem.patch -F 3
 patch -d work/rescue <RescueSystem/POSTPATCH_after_DefragSupport.patch
 patch -d work/rescue <HardwareEnumerator/RescueSystem.patch
 patch -d work/rescue <ColorSupport/RescueSystem.patch
+patch -d work/rescue <CacheCoherence/RescueSystem.patch
 patch -d work/debugrescue <RescueSystem/RescueSystem.patch -F 3
 
 rm work/*.orig work/debug/*.orig work/rescue/*.orig work/debugrescue/*.orig

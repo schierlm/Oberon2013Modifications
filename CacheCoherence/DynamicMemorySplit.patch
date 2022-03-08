@@ -1,0 +1,10 @@
+--- 1/System.Mod.txt
++++ 2/System.Mod.txt
+@@ -334,6 +334,7 @@
+     AbortTrampoline[2] := 001E90000H;                                (* SUB  R1, SP, R0                  *)
+     AbortTrampoline[3] := 0E6000001H;                                (* BLE  +1                          *)
+     AbortTrampoline[4] := 0E0000000H;                                (* MOV  SP, R0                      *)
++    Kernel.InvalidateCodeCache(SYSTEM.ADR(AbortTrampoline[0]));
+   END MakeAbortTrampoline;
+ 
+   PROCEDURE ShowCommands*;

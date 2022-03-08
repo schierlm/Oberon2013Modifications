@@ -42,6 +42,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
 | **[BugFixes](BugFixes/README.md)** | Fixes for what I consider to be bugs | Optionally recompile inner core |
+| **[CacheCoherence](CacheCoherence/README.md)**| Invalidate code cache after loading modules | Recompile inner core |
 | **[Calculator](Calculator/README.md)**| Simple prefix notation calculator | None |
 | **[ChangeResolution](ChangeResolution/README.md)** | Dynamically change the display resolution if the driver supports it | Recompile outer core |
 | **[Clock](Clock/README.md)** | Show a clock in the lower right corner | None |

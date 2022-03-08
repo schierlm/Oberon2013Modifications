@@ -1,0 +1,102 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -22,7 +22,7 @@
+     data: INTEGER; (*SPI data in*)
+     sectorMapStart*, lastUsedSector: INTEGER;
+     sectorMap: ARRAY mapsize DIV 32 OF SET;
+-    timer, spiData, spiCtrl, pvDisk, dbgConsole, softResetAddr, hardResetAddr: INTEGER;
++    timer, spiData, spiCtrl, pvDisk, cacheInvalAddr, dbgConsole, softResetAddr, hardResetAddr: INTEGER;
+     powerManagement: BOOLEAN;
+     
+ (* ---------- New: heap allocation ----------*)
+@@ -186,8 +186,8 @@
+ 
+   PROCEDURE EnumerateHardware;
+     VAR val: INTEGER;
+-      hasTimer, hasRTC, hasSPI, hasPvDsk, hasReset, hasDebugConsole: BOOLEAN;
+-      vRTC, Timr, SPIf, vDsk, Rset, DbgC: INTEGER; (* hardware IDs *)
++      hasTimer, hasICIv, hasRTC, hasSPI, hasPvDsk, hasReset, hasDebugConsole: BOOLEAN;
++      vRTC, ICIv, Timr, SPIf, vDsk, Rset, DbgC: INTEGER; (* hardware IDs *)
+   BEGIN
+     SYSTEM.PUT(hwEnumerator, 0);
+     SYSTEM.GET(hwEnumerator, val);
+@@ -197,6 +197,7 @@
+       SYSTEM.GET(timer, clockTime)
+     ELSE
+       vRTC := ToHardwareID("vRTC");
++      ICIv := ToHardwareID("ICIv");
+       Timr := ToHardwareID("Timr");
+       SPIf := ToHardwareID("SPIf");
+       vDsk := ToHardwareID("vDsk");
+@@ -205,6 +206,7 @@
+       SYSTEM.GET(hwEnumerator, val);
+       WHILE val # 0 DO
+         IF val = vRTC THEN hasRTC := TRUE
++        ELSIF val = ICIv THEN hasICIv := TRUE
+         ELSIF val = Timr THEN hasTimer := TRUE
+         ELSIF val = SPIf THEN hasSPI := TRUE
+         ELSIF val = vDsk THEN hasPvDsk := TRUE
+@@ -221,6 +223,15 @@
+         timer := 0;
+         powerManagement := FALSE;
+       END;
++      IF hasICIv THEN
++        SYSTEM.PUT(hwEnumerator, ICIv);
++        SYSTEM.GET(hwEnumerator, cacheInvalAddr);
++        IF cacheInvalAddr # 0 THEN
++          SYSTEM.PUT(cacheInvalAddr, 20H) (* for the TRAP handler *)
++        END
++      ELSE
++        cacheInvalAddr := 0;
++      END;
+       IF hasRTC THEN
+         SYSTEM.PUT(hwEnumerator, vRTC);
+         SYSTEM.GET(hwEnumerator, clockTime);
+@@ -259,6 +270,14 @@
+     SYSTEM.GET(timer, clockTime);
+   END EnumerateHardware;
+ 
++(* ---------- Code Cache ---------- *)
++  PROCEDURE InvalidateCodeCache*(fromAddr: INTEGER);
++  BEGIN
++    IF cacheInvalAddr # 0 THEN
++      SYSTEM.PUT(cacheInvalAddr, fromAddr)
++    END
++  END InvalidateCodeCache;
++
+ (* ---------- Reset ----------*)
+ 
+   PROCEDURE PerformReset(addr: INTEGER; clearLNK: BOOLEAN);
+@@ -270,6 +289,7 @@
+     resetBuffer[1] := 060000000H + (addr DIV 10000H MOD 10000H);  (* MOV+U R0,     HI(addr) *)
+     resetBuffer[2] := 040060000H + (addr MOD 10000H);             (* IOR   R0, R0, LO(addr) *)
+     resetBuffer[3] := 0C7000000H;                                 (* BC    R0               *)
++    InvalidateCodeCache(SYSTEM.ADR(resetBuffer[0]));
+     ptr := SYSTEM.VAL(Ptr, SYSTEM.ADR(resetBuffer[start]));
+     ptr;
+   END PerformReset;
+@@ -491,6 +511,7 @@
+ 
+   PROCEDURE Install*(Padr, at: INTEGER);
+   BEGIN SYSTEM.PUT(at, 0E7000000H + (Padr - at) DIV 4 -1)
++    ;InvalidateCodeCache(at)
+   END Install;
+ 
+   PROCEDURE Trap(VAR a: INTEGER; b: INTEGER);
+--- 1/Modules.Mod.txt
++++ 2/Modules.Mod.txt
+@@ -1,5 +1,5 @@
+ MODULE Modules;  (*Link and load on RISC; NW 20.10.2013 / 8.1.2019*)
+-  IMPORT SYSTEM, Files;
++  IMPORT SYSTEM, Kernel, Files;
+   CONST versionkey = 1X; MT = 12; DescSize = 80;
+ 
+   TYPE Module* = POINTER TO ModDesc;
+@@ -177,6 +177,7 @@
+           END ;
+           SYSTEM.PUT(adr, inst); adr := adr - disp*4
+         END ;
++        Kernel.InvalidateCodeCache(SYSTEM.VAL(INTEGER, mod));
+         body   (*initialize module*)
+       ELSIF res >= 3 THEN importing := name;
+         WHILE nofimps > 0 DO DEC(nofimps); DEC(import[nofimps].refcnt) END

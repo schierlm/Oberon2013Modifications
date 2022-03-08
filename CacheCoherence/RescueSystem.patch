@@ -1,0 +1,21 @@
+--- 1/RescueSystemLoader.Mod.txt
++++ 2/RescueSystemLoader.Mod.txt
+@@ -73,7 +73,7 @@
+   END WriteSD;
+ 
+   PROCEDURE Load;
+-    VAR src, dst, data, pvDisk, spiCtrl, spiData: INTEGER;
++    VAR src, dst, data, pvDisk, cacheInvalAddr, spiCtrl, spiData: INTEGER;
+   BEGIN
+   SYSTEM.PUT(-4, 7644736BH); (* 'vDsk' *)
+   SYSTEM.GET(-4, pvDisk);
+@@ -113,6 +113,9 @@
+     SYSTEM.GET(12 + 20000H, data); SYSTEM.PUT(12, data);
+     SYSTEM.GET(24 + 20000H, data); SYSTEM.PUT(24, data)
+   END
++  ;SYSTEM.PUT(-4, 49434976H); (* 'ICIv' *)
++  SYSTEM.GET(-4, cacheInvalAddr);
++  IF cacheInvalAddr # 0 THEN SYSTEM.PUT(cacheInvalAddr, 0) END
+ END Load;
+ 
+ BEGIN SYSTEM.LDREG(SP, stackOrg); Load
