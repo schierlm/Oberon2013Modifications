@@ -1,0 +1,29 @@
+--- 1/EditU.3r.patch
++++ 2/EditU.3r.patch
+@@ -1,8 +1,8 @@
+---- 1/Edit.Mod.txt
+-+++ 2/Edit.Mod.txt
++--- 1/EditU.Mod.txt
+++++ 2/EditU.Mod.txt
+ @@ -4,6 +4,13 @@
+    CONST CR = 0DX; maxlen = 32;
+-     StandardMenu = "System.Close System.Copy System.Grow Edit.Search Edit.Store";
++     StandardMenu = "System.Close System.Copy System.Grow EditU.Search EditU.Store";
+  
+ +  TYPE Line = POINTER TO LineDesc;
+ +    LineDesc = RECORD
+@@ -12,10 +12,10 @@
+ +    END;
+ +
+    VAR W: Texts.Writer;
+-     time: LONGINT;
+-     M: INTEGER;
+-@@ -118,15 +125,95 @@
+-   END ChangeOffset;
++     time, M: INTEGER;
++     pat: ARRAY maxlen OF CHAR;
++@@ -80,15 +87,95 @@
++   END CopyLooks;
+  
+    PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
+ -    VAR R: Texts.Reader; ch: CHAR; n: INTEGER;

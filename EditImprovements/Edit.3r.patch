@@ -1,0 +1,119 @@
+--- 1/Edit.Mod.txt
++++ 2/Edit.Mod.txt
+@@ -4,6 +4,13 @@
+   CONST CR = 0DX; maxlen = 32;
+     StandardMenu = "System.Close System.Copy System.Grow Edit.Search Edit.Store";
+ 
++  TYPE Line = POINTER TO LineDesc;
++    LineDesc = RECORD
++      p, n: Line;
++      b, e, h: INTEGER;
++      c: BOOLEAN
++    END;
++
+   VAR W: Texts.Writer;
+     time: LONGINT;
+     M: INTEGER;
+@@ -118,15 +125,95 @@
+   END ChangeOffset;
+ 
+   PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
+-    VAR R: Texts.Reader; ch: CHAR; n: INTEGER;
++    VAR R: Texts.Reader; ch: CHAR; p, n: INTEGER; Fst, Mid, Lst: Line;
++
++    PROCEDURE CountForw(l: Line): INTEGER;
++      VAR cnt: INTEGER;
++    BEGIN cnt := 0; REPEAT l := l.n; INC(cnt) UNTIL l = NIL
++    RETURN cnt
++    END CountForw;
++
++    PROCEDURE CountBack(l: Line): INTEGER;
++      VAR cnt: INTEGER; c: BOOLEAN;
++    BEGIN cnt := -1; REPEAT c := l.c; l := l.p; INC(cnt) UNTIL l = NIL;
++      IF ~ c THEN DEC(cnt) END
++    RETURN cnt
++    END CountBack;
++
++    PROCEDURE Forward(t: Texts.Text; p: INTEGER; line: Line);
++      VAR R: Texts.Reader; ch: CHAR; h: INTEGER;
++    BEGIN Texts.OpenReader(R, t, p); h := 0;
++      REPEAT Texts.Read(R, ch);
++        IF R.eot THEN ch := CR
++        ELSIF (ch # CR) & (h < R.fnt.height) THEN
++          h := R.fnt.height
++        END
++      UNTIL ch = CR;
++      line.b := p; line.e := Texts.Pos(R) - 1; line.h := h
++    END Forward;
++
++    PROCEDURE Backward(t: Texts.Text; p: INTEGER; line: Line; VAR fst: Line); (* 0 < p *)
++      VAR R: Texts.Reader; ch: CHAR; b, n, h: INTEGER; l: Line;
++    BEGIN l := NIL;
++      REPEAT IF 64 < p THEN n := p - 64 ELSE n := 0 END;
++        Texts.OpenReader(R, t, n); h := 0;
++        REPEAT Texts.Read(R, ch);
++          IF ch = CR THEN
++            IF l = NIL
++            THEN NEW(l); l.p := NIL; l.n := NIL; l.b := n; l.c := FALSE; fst := l
++            ELSE NEW(l.n); l.n.p := l; l := l.n; l.n := NIL; l.b := b; l.c := TRUE
++            END;
++            l.e := Texts.Pos(R) - 1; b := l.e + 1;
++            IF h = 0 THEN l.h := R.fnt.height ELSE l.h := h END
++          ELSIF h < R.fnt.height THEN
++            h := R.fnt.height
++          END
++        UNTIL Texts.Pos(R) - 1 = p;
++        p := n
++      UNTIL (p = 0) OR (l # NIL);
++      IF l = NIL THEN line.b := 0; fst := line
++      ELSE l.n := line; line.p := l; line.b := b
++      END;
++      IF h = 0 THEN line.h := R.fnt.height ELSE line.h := h END;
++      line.c := TRUE
++    END Backward;
++
++    PROCEDURE Height(l: Line): INTEGER;
++      VAR h: INTEGER;
++    BEGIN IF l.c THEN h := l.h ELSE h := 0 END; l := l.n;
++      WHILE l # NIL DO INC(h, l.h); l := l.n END
++    RETURN h
++    END Height;
+   BEGIN
+     IF (pos < F.org) OR (TextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
+-      IF 256 < pos THEN n := pos - 256 ELSE n := 0 END;
+-      Texts.OpenReader(R, F.text, n);
+-      REPEAT Texts.Read(R, ch);
+-        IF ch = 0DX THEN n := Texts.Pos(R) - 1 END
+-      UNTIL Texts.Pos(R) = pos;
+-      TextFrames.Show(F, n)
++      IF pos <= 0 THEN
++        TextFrames.Show(F, 0)
++      ELSE
++        NEW(Mid); Fst := Mid; Lst := Mid;
++        Forward(F.text, pos, Lst); Backward(F.text, pos - 1, Fst, Fst);
++        IF Mid.h <= F.H - F.bot - F.top THEN p := CountBack(Mid); n := CountForw(Mid);
++          WHILE ((0 < Fst.b) OR (Lst.e < F.text.len)) & (Height(Fst) < F.H - F.bot - F.top) OR ((2 * (n - 1) < p) & (Lst.e < F.text.len)) DO
++            IF (2 * (n - 1) <= p) OR (Fst.b = 0) THEN NEW(Lst.n); Lst.n.p := Lst; Lst := Lst.n; Lst.n := NIL; Lst.c := TRUE;
++              Forward(F.text, Lst.p.e + 1, Lst); INC(n)
++            ELSE Backward(F.text, Fst.b - 1, Fst, Fst); p := CountBack(Mid)
++            END
++          END;
++          p := CountBack(Mid); n := CountForw(Mid);
++          WHILE (F.H - F.bot - F.top < Height(Fst)) & (Fst # Lst) DO
++            IF (2 * (n - 1) <= p) OR (Lst = Mid) THEN DEC(p);
++              IF Fst.c THEN Fst := Fst.n ELSE Fst := Fst.n.n END; Fst.p := NIL
++            ELSE DEC(n); Lst := Lst.p; Lst.n := NIL
++            END
++          END;
++          IF Fst.c THEN p := Fst.b ELSE p := Fst.n.b END
++        ELSE IF 256 < pos THEN p := pos - 256 ELSE p := 0 END;
++          Texts.OpenReader(R, F.text, p);
++          REPEAT Texts.Read(R, ch);
++            IF ch = 0DX THEN p := Texts.Pos(R) - 1 END
++          UNTIL Texts.Pos(R) = pos
++        END;
++        TextFrames.Show(F, p)
++      END
+     END
+   END ShowPos;
+ 

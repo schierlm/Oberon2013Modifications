@@ -41,6 +41,7 @@ patch -d work <ChangeResolution/ChangeResolution.patch
 patch -d work <LanguageServerProtocolHelper/LSPHelper.patch
 patch -d work <KernelDebugger/RS232.patch
 patch -d work <EditImprovements/Edit.1r.patch
+patch -d work <EditImprovements/Edit.3r.patch
 
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite
@@ -76,6 +77,9 @@ patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch
 patch -d work <HardwareEnumerator/InnerEmulator.patch
 patch -d work <EditImprovements/EditU.0.patch
+cp EditImprovements/Edit.3r.patch work/EditU.3r.patch
+patch -d work <EditImprovements/EditU.3r.patch.patch
+patch -d work <work/EditU.3r.patch
 patch -d work <StartupCommand/StartupCommand.patch
 
 mv work/Display.Mod.txt work/DisplayM.Mod.txt
@@ -120,6 +124,6 @@ patch -d work/rescue <ColorSupport/RescueSystem.patch
 patch -d work/rescue <CacheCoherence/RescueSystem.patch
 patch -d work/debugrescue <RescueSystem/RescueSystem.patch -F 3
 
-rm work/*.orig work/debug/*.orig work/rescue/*.orig work/debugrescue/*.orig
+rm work/*.orig work/*.patch work/debug/*.orig work/rescue/*.orig work/debugrescue/*.orig
 
 echo Done.
