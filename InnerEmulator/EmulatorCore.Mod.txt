@@ -10,7 +10,6 @@ MODULE EmulatorCore;
       waitMillis, clipboardBufferPos, paravirtPointer: INTEGER;
       disk: Files.File;
       notify: DisplayNotify;
-      task: Oberon.Task;
       keyBuffer: ARRAY 16 OF CHAR;
       keyBufferStart, keyBufferEnd, mouseStatus: INTEGER;
       useSerialPort, stopped*, sector0missing: BOOLEAN;
