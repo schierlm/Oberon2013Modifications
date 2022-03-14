@@ -176,7 +176,7 @@
 -    FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
 -    WriteSD(sec, SYSTEM.ADR(magicSector));
 +    IF pvDisk # 0 THEN
-+      sec := sec + (FSoffset - 80000H) DIV 2;
++      sec := sec + (FSoffset - 80000H) DIV 2 + 1;
 +      SYSTEM.PUT(pvDisk, 3FFFFFFFH);
 +      SYSTEM.PUT(pvDisk, 0C0000000H + sec);
 +    ELSE
