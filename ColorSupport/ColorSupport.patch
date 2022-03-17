@@ -81,7 +81,7 @@
      ELSE (*create new text*)
 --- 1/System.Mod.txt
 +++ 2/System.Mod.txt
-@@ -356,11 +356,15 @@
+@@ -356,11 +356,16 @@
    PROCEDURE SetScreenSize*;
      VAR S: Texts.Scanner;
        w, h: INTEGER;
@@ -93,6 +93,7 @@
 -      IF Display.SetSize(w, h) THEN
 +      h := S.i; Texts.Scan(S);
 +      IF (S.class = Texts.Int) & (S.i IN {1,4,8,16,24}) & Display.SetDepth(S.i) THEN
++        IF (w = 0) & (h = 0) THEN w := Oberon.DisplayWidth(0); h := Oberon.DisplayHeight(0) END;
 +        tmp := Display.SetSize(w, h);
 +        Oberon.UpdateScreenSize()
 +      ELSIF Display.SetSize(w, h) THEN
