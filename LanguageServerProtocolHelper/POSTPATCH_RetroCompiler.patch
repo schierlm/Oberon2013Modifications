@@ -2,7 +2,7 @@
 +++ LSPhORS.Mod.txt
 @@ -1,4 +1,4 @@
 -MODULE LSPhORS; (* NW 19.9.93 / 15.3.2017  Scanner in Oberon-07*)
-+MODULE LSPhORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 1.10.21 Extended Oberon with retro elements*)
++MODULE LSPhORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 11.1.22 Extended Oberon with retro elements*)
    IMPORT SYSTEM, Texts, Oberon, RS232, LSPhConstants;
  
  (* Oberon Scanner does lexical analysis. Input is Oberon-Text, output is
@@ -15,47 +15,292 @@
  
    TYPE Ident* = ARRAY IdLen OF CHAR;
  
-@@ -76,7 +76,7 @@
-       IF i < IdLen-1 THEN id[i] := ch; INC(i) END ;
-       Texts.Read(R, ch)
-     UNTIL (ch < "0") & ((lspMode # LSPhConstants.AutoComplete) OR (ch # 3X)) OR (ch > "9") & (ch < "A") OR (ch > "Z") & (ch < "a") OR (ch > "z");
--    id[i] := 0X; 
-+    id[i] := 0X; 
-     IF i < 10 THEN k := KWX[i-1];  (*search for keyword*)
-       WHILE (id # keyTab[k].id) & (k < KWX[i]) DO INC(k) END ;
-       IF k < KWX[i] THEN sym := keyTab[k].sym ELSE sym := ident END
-@@ -208,7 +208,7 @@
+--- LSPhORB.Mod.txt
++++ LSPhORB.Mod.txt
+@@ -1,4 +1,4 @@
+-MODULE LSPhORB;   (*NW 25.6.2014  / AP 4.3.2020 / 8.3.2019  in Oberon-07*)
++MODULE LSPhORB;   (*NW 25.6.2014  / AP 4.3.2020 / 5.3.2019  in Oberon-07 / AP 11.1.22 Extended Oberon with retro elements*)
+   IMPORT Files, LSPhConstants, ORS := LSPhORS;
+   (*Definition of data types Object and Type, which together form the data structure
+     called "symbol table". Contains procedures for creation of Objects, and for search:
+@@ -85,7 +85,7 @@
+   PROCEDURE NewObj*(VAR obj: Object; id, modid: ORS.Ident; class, lspClass: INTEGER);  (*insert new Object with name id*)
+     VAR new, x: Object;
+   BEGIN x := topScope;
+-    WHILE (x.next # NIL) & (x.next.name # id) DO x := x.next END ;
++    WHILE (x.next # NIL) & ((x.next.name # id) OR (x.next.class = Mod) & ~x.next.rdo) DO x := x.next END ;
+     IF x.next = NIL THEN
+       NEW(new); new.name := id; new.class := class; new.next := NIL; new.rdo := FALSE; new.dsc := NIL;
+       new.lspClass := lspClass; new.defEndPos := ORS.Pos(); new.defModId := modid;
+@@ -105,7 +105,7 @@
+     VAR s, x: Object;
+   BEGIN s := topScope;
+     REPEAT x := s.next;
+-      WHILE (x # NIL) & (x.name # ORS.id) DO SymbolMisMatch(x); x := x.next END ;
++      WHILE (x # NIL) & ((x.name # ORS.id) OR (x.class = Mod) & ~x.rdo) DO SymbolMisMatch(x); x := x.next END ;
+       s := s.dsc
+     UNTIL (x # NIL) OR (s = NIL);
+     SymbolMatch(x);
+@@ -115,12 +115,9 @@
+   PROCEDURE thisimport*(mod: Object): Object;
+     VAR obj: Object;
    BEGIN
-     IF lspMode = LSPhConstants.GetModuleInfo THEN RS232.Send(tag); RS232.SendIntRaw(pos) END
-   END ModuleTagPP;
--
+-    IF mod.rdo THEN
+-      IF mod.name[0] # 0X THEN
+-        obj := mod.dsc;
+-        WHILE (obj # NIL) & (obj.name # ORS.id) DO SymbolMisMatch(obj); obj := obj.next END
+-      ELSE obj := NIL
+-      END
++    IF mod.rdo & (mod.name[0] # 0X) THEN
++      obj := mod.dsc;
++      WHILE (obj # NIL) & (obj.name # ORS.id) DO SymbolMisMatch(obj); obj := obj.next END
+     ELSE obj := NIL
+     END ;
+     SymbolMatch(obj);
+@@ -154,7 +151,7 @@
+     RETURN max + 1
+   END NofMethods;
+ 
+-  PROCEDURE NewMethod*(rec: Type; VAR mth, redef: Object; id: ORS.Ident);  (*insert new method with name id*)
++  PROCEDURE NewMethod*(rec: Type; VAR mth, redef: Object; id, modid: ORS.Ident; defEndPos: INTEGER);  (*insert new method with name id*)
+     VAR fld, fld0, new, bot: Object;
+ 
+     PROCEDURE UpdateLinks(rec: Type; new, bot: Object);  (*between field lists of extensions*)
+@@ -180,6 +177,7 @@
+       WHILE (fld # NIL) & (fld.name # id) DO fld := fld.next END ;  (*search id in fields of base types of rec*)
+       IF (fld = NIL) OR (fld.class = Const) THEN
+         NEW(new); new.name := id; new.class := Const; new.rdo := FALSE; new.dsc := NIL; new.next := bot; mth := new;
++        new.lspClass := LSPhConstants.SynProcedure; new.defEndPos := defEndPos; new.defModId := modid;
+         IF fld = NIL THEN new.lev := NofMethods(rec) ELSE new.lev := fld.lev; redef := fld END ;  (*mthno*)
+         IF rec.dsc = bot THEN rec.dsc := new; UpdateLinks(rec, new, bot) ELSE fld0.next := new END
+       ELSE mth := fld; ORS.Mark("mult def")
+@@ -235,7 +233,7 @@
+     IF b < 80H THEN x := b ELSE x := b - 100H END
+   END Read;
+   
+-  PROCEDURE InType(VAR R: Files.Rider; thismod: Object; VAR T: Type; VAR nextSymIdx: INTEGER);
++  PROCEDURE InType(VAR R: Files.Rider; thismod: Object; VAR T: Type);
+     VAR key: LONGINT;
+       ref, class, form, np, readonly: INTEGER;
+       fld, par, obj, mod, last: Object;
+@@ -245,54 +243,23 @@
+     IF ref < 0 THEN T := typtab[-ref]  (*already read*)
+     ELSE NEW(t); T := t; typtab[ref] := t; t.mno := thismod.lev;
+       Read(R, form); t.form := form;
+-      IF form = Pointer THEN InType(R, thismod, t.base, nextSymIdx); t.size := 4
++      IF form = Pointer THEN InType(R, thismod, t.base); t.size := 4
+       ELSIF form = Array THEN
+-        InType(R, thismod, t.base, nextSymIdx); Files.ReadNum(R, t.len); Files.ReadNum(R, t.size)
++        InType(R, thismod, t.base); Files.ReadNum(R, t.len); Files.ReadNum(R, t.size)
+       ELSIF form = Record THEN
+-        InType(R, thismod, t.base, nextSymIdx);
++        InType(R, thismod, t.base);
+         IF t.base.form = NoTyp THEN t.base := NIL; obj := NIL ELSE obj := t.base.dsc END ;
+         Files.ReadNum(R, t.len);  (*TD adr/exno*)
+         Files.ReadNum(R, t.nofpar);  (*ext level*)
+         Files.ReadNum(R, t.size);
+         Read(R, class); last := NIL;
+         WHILE class # 0 DO  (*fields*)
+-  (* GARBAGE FROM PREPATCH BELOW *)
+           NEW(fld); fld.class := class; Files.ReadString(R, fld.name);
+           IF last = NIL THEN t.dsc := fld ELSE last.next := fld END ;
+           last := fld;
+           IF fld.name[0] # 0X THEN
+-            Read(R, key); fld.lspClass := key;
+-            fld.defModId := thismod(Module).orgname;
+-            fld.defEndPos := nextSymIdx; DEC(nextSymIdx);
+-            fld.expo := TRUE; InType(R, thismod, fld.type, nextSymIdx)
+-          ELSE fld.expo := FALSE; fld.type := nilType END ;
+-          Files.ReadNum(R, fld.val); Read(R, class)
+-        END ;
+-        IF last = NIL THEN t.dsc := obj ELSE last.next := obj END
+-      ELSIF form = Proc THEN
+-        InType(R, thismod, t.base, nextSymIdx);
+-        obj := NIL; np := 0; Read(R, class);
+-        WHILE class # 0 DO  (*parameters*)
+-          NEW(par); par.class := class; Read(R, readonly); par.rdo := readonly = 1; 
+-          InType(R, thismod, par.type, nextSymIdx); par.next := obj; obj := par; INC(np); Read(R, class)
+-        END ;
+-        t.dsc := obj; t.nofpar := np; t.size := 4
+-      END ;
+-      Files.ReadString(R, modname);
+-      IF modname[0] #  0X THEN  (*re-import ========*)
+-        Files.ReadInt(R, key); Files.ReadString(R, name);
+-        mod := ThisModule(modname, modname, modname, FALSE, -1, key);
+-        obj := mod.dsc;  (*search type*)
+-        WHILE (obj # NIL) & (obj.name # name) DO obj := obj.next END ;
+-        IF obj # NIL THEN T := obj.type   (*type object found in object list of mod*)
+-        ELSE (*insert new type object in object list of mod*)
+-          NEW(obj); obj.name := name; obj.class := Typ; obj.next := mod.dsc; mod.dsc := obj; obj.type := t;
+-          obj.lspClass := LSPhConstants.SynType; obj.defEndPos := -1;
+-          t.mno := mod.lev; t.typobj := obj; T := t
+-        END ;
+-        typtab[ref] := T
+-  (* GARBAGE FROM PREPATCH ABOVE *)
+-          IF fld.name[0] # 0X THEN fld.expo := TRUE; InType(R, thismod, fld.type); Files.ReadNum(R, fld.val)
++            Read(R, key); fld.lspClass := key; Files.ReadString(R, fld.defModId); IF fld.defModId = "^" THEN fld.defModId := thismod(Module).orgname END; Files.ReadInt(R, fld.defEndPos);
++            fld.expo := TRUE; InType(R, thismod, fld.type); Files.ReadNum(R, fld.val)
+           ELSE (*hidden*) fld.expo := FALSE;
+             IF class = Const THEN (*type-bound procedure*) fld.type := byteType  (*method*)
+             ELSE Files.ReadNum(R, fld.val);
+@@ -317,30 +284,30 @@
+       Files.ReadString(R, modname);
+       IF modname[0] #  0X THEN  (*re-import*)
+         Files.ReadInt(R, key); Files.ReadString(R, name);
+-        mod := ThisModule(modname, modname, FALSE, key);
++        mod := ThisModule(modname, modname, modname, FALSE, -1, key);
+         obj := mod.dsc;  (*search type*)
+         WHILE (obj # NIL) & (obj.name # name) DO obj := obj.next END ;
+         IF obj # NIL THEN T := obj.type   (*type object found in object list of mod*)
+         ELSE (*insert new type object in object list of mod*)
+           NEW(obj); obj.name := name; obj.class := Typ; obj.next := mod.dsc; mod.dsc := obj; obj.type := t;
++          obj.lspClass := LSPhConstants.SynType; obj.defEndPos := -1;
+           t.mno := mod.lev; t.typobj := obj; T := t
+         END ;
+         typtab[ref] := T
+       END
+     END
+   END InType;
+-  
 +
-   PROCEDURE ModuleTagP*(tag: INTEGER);
-   BEGIN ModuleTagPP(tag, Pos())
-   END ModuleTagP;
-@@ -313,7 +313,7 @@
-           ELSIF ch = "#" THEN Texts.Read(R, ch); sym := neq
-           ELSIF ch = "$" THEN HexString; sym := string
-           ELSIF ch = "&" THEN Texts.Read(R, ch); sym := and
--          ELSIF ch = "(" THEN Texts.Read(R, ch); 
-+          ELSIF ch = "(" THEN Texts.Read(R, ch); 
-             IF ch = "*" THEN sym := null; comment(FALSE) ELSE sym := lparen END
-           ELSIF ch = ")" THEN Texts.Read(R, ch); sym := rparen
-           ELSIF ch = "*" THEN Texts.Read(R, ch); sym := times
-@@ -329,7 +329,7 @@
-           END
-         ELSIF ch < ":" THEN Number(sym)
-         ELSIF ch = ":" THEN Texts.Read(R, ch);
--          IF ch = "=" THEN Texts.Read(R, ch); sym := becomes ELSE sym := colon END 
-+          IF ch = "=" THEN Texts.Read(R, ch); sym := becomes ELSE sym := colon END 
-         ELSIF ch = ";" THEN Texts.Read(R, ch); sym := semicolon
-         ELSIF ch = "<" THEN  Texts.Read(R, ch);
-           IF ch = "=" THEN Texts.Read(R, ch); sym := leq ELSE sym := lss END
+   PROCEDURE Import*(VAR modid, modid1, thisModId: ORS.Ident; defEndPos: INTEGER);
+-    VAR key: LONGINT; class, k, nextSymIdx: INTEGER;
+-      obj: Object;  t: Type;
+-      thismod: Object;
++    VAR key: LONGINT; class, k: INTEGER;
++      obj, thismod: Object; t: Type;
+       modname, fname: ORS.Ident;
+       F: Files.File; R: Files.Rider;
+   BEGIN
+     IF modid1 = "SYSTEM" THEN
+-      thismod := ThisModule(modid, modid1, thisModId, TRUE, defEndPos, key); DEC(nofmod);
++      thismod := ThisModule(modid, modid1, thisModId, TRUE, defEndPos,  key); DEC(nofmod);
+       thismod.lev := 0; thismod.dsc := system; thismod.rdo := TRUE
+-    ELSE MakeFileName(fname, modid1, ".smL"); F := Files.Old(fname); nextSymIdx := -10;
++    ELSE MakeFileName(fname, modid1, ".smL"); F := Files.Old(fname);
+       IF F # NIL THEN
+         Files.Set(R, F, 0); Files.ReadInt(R, key); Files.ReadInt(R, key); Files.ReadString(R, modname);
+         thismod := ThisModule(modid, modid1, thisModId, TRUE, defEndPos, key); thismod.rdo := TRUE;
+@@ -349,9 +316,8 @@
+         Read(R, class);
+         WHILE class # 0 DO
+           NEW(obj); obj.class := class; Files.ReadString(R, obj.name);
+-          Read(R, k); obj.lspClass := k;
+-          obj.defModId := modid1; obj.defEndPos := nextSymIdx; DEC(nextSymIdx);
+-          InType(R, thismod, obj.type, nextSymIdx); obj.lev := -thismod.lev;
++          Read(R, k); obj.lspClass := k; Files.ReadString(R, obj.defModId); IF obj.defModId = "^" THEN obj.defModId := modid1 END; Files.ReadInt(R, obj.defEndPos);
++          InType(R, thismod, obj.type); obj.lev := -thismod.lev;
+           IF class = Typ THEN
+             t := obj.type; t.typobj := obj; Read(R, k);  (*fixup bases of previously declared pointer types*)
+             WHILE k # 0 DO typtab[k].base := t; Read(R, k) END
+@@ -372,17 +338,17 @@
+   BEGIN Files.WriteByte(R, x)  (* -128 <= x < 128 *)
+   END Write;
+ 
+-  PROCEDURE OutType(VAR R: Files.Rider; VAR modid: ORS.Ident; t: Type; VAR nextSymIdx: INTEGER);
++  PROCEDURE OutType(VAR R: Files.Rider; VAR modid: ORS.Ident; t: Type);
+     VAR obj, mod, fld, bot: Object;
+ 
+-    PROCEDURE OutPar(VAR R: Files.Rider; VAR modid: ORS.Ident; par: Object; n: INTEGER; VAR nextSymIdx: INTEGER);
++    PROCEDURE OutPar(VAR R: Files.Rider; VAR modid: ORS.Ident; par: Object; n: INTEGER);
+       VAR cl: INTEGER;
+     BEGIN
+       IF n > 0 THEN
+-        OutPar(R, modid, par.next, n-1, nextSymIdx); cl := par.class;
++        OutPar(R, modid, par.next, n-1); cl := par.class;
+         Write(R, cl);
+         IF par.rdo THEN Write(R, 1) ELSE Write(R, 0) END ;
+-        OutType(R, modid, par.type, nextSymIdx)
++        OutType(R, modid, par.type)
+       END
+     END OutPar;
+ 
+@@ -403,42 +369,33 @@
+     ELSE obj := t.typobj;
+       IF obj # NIL THEN Write(R, Ref); t.ref := Ref; INC(Ref) ELSE (*anonymous*) Write(R, 0) END ;
+       Write(R, t.form);
+-      IF t.form = Pointer THEN OutType(R, modid, t.base, nextSymIdx)
+-      ELSIF t.form = Array THEN OutType(R, modid, t.base, nextSymIdx); Files.WriteNum(R, t.len); Files.WriteNum(R, t.size)
++      IF t.form = Pointer THEN OutType(R, modid, t.base)
++      ELSIF t.form = Array THEN OutType(R, modid, t.base); Files.WriteNum(R, t.len); Files.WriteNum(R, t.size)
+       ELSIF t.form = Record THEN
+-        IF t.base # NIL THEN OutType(R, modid, t.base, nextSymIdx); bot := t.base.dsc ELSE OutType(R, modid, noType, nextSymIdx); bot := NIL END ;
+-        IF obj # NIL THEN Files.WriteNum(R, obj.exno) ELSE Write(R, 0) END ;
++        IF t.base # NIL THEN OutType(R, modid, t.base); bot := t.base.dsc ELSE OutType(R, modid, noType); bot := NIL END ;
++        IF obj # NIL THEN
++          IF t.mno > 0 THEN Files.WriteNum(R, t.len) ELSE Files.WriteNum(R, obj.exno) END
++        ELSE Write(R, 0)
++        END ;
+         Files.WriteNum(R, t.nofpar); Files.WriteNum(R, t.size);
+         fld := t.dsc;
+         WHILE fld # bot DO  (*fields*)
+-          IF fld.expo THEN
+-            Write(R, Fld); Files.WriteString(R, fld.name);
+-            Write(R, fld.lspClass); ORS.SymbolFileIndex(nextSymIdx, fld.defEndPos, fld.defModId); DEC(nextSymIdx);
+-            OutType(R, modid, fld.type, nextSymIdx); Files.WriteNum(R, fld.val)  (*offset*)
+-          ELSE FindHiddenPointers(R, fld.type, fld.val)
+-          END ;
+-          fld := fld.next
+-        END ;
+-        Write(R, 0)
+-      ELSIF t.form = Proc THEN OutType(R, modid, t.base, nextSymIdx); OutPar(R, modid, t.dsc, t.nofpar, nextSymIdx); Write(R, 0)
+-      END ;
+-      IF (t.mno > 0) & (obj # NIL) THEN  (*re-export, output name*)
+-        mod := topScope.next;
+-  (* GARBAGE FROM PREPATCH ABOVE *)
+           IF fld.class = Const THEN (*type-bound procedure*) Write(R, Const);
+-            IF fld.expo THEN Files.WriteString(R, fld.name); OutType(R, fld.type);
++            IF fld.expo THEN Files.WriteString(R, fld.name); OutType(R, modid, fld.type);
+               IF t.mno > 0 THEN Files.WriteNum(R, fld.val) ELSE Files.WriteNum(R, fld.exno) END  (*exno*)
+             ELSE (*hidden*) Write(R, 0)
+             END ;
+             Files.WriteNum(R, fld.lev)  (*mthno*)
+           ELSIF fld.expo THEN
+-            Write(R, Fld); Files.WriteString(R, fld.name); OutType(R, fld.type); Files.WriteNum(R, fld.val)  (*offset*)
++            Write(R, Fld); Files.WriteString(R, fld.name);
++            Write(R, fld.lspClass); IF fld.defModId = modid THEN Files.WriteString(R, "^") ELSE Files.WriteString(R, fld.defModId) END; Files.WriteInt(R, fld.defEndPos);
++            OutType(R, modid, fld.type); Files.WriteNum(R, fld.val)  (*offset*)
+           ELSE (*hidden*) FindHiddenFields(R, fld.type, fld.val)
+           END ;
+           fld := fld.next
+         END ;
+         Write(R, 0)
+-      ELSIF t.form IN {Proc, TProc} THEN OutType(R, t.base); OutPar(R, t.dsc, t.nofpar); Write(R, 0)
++      ELSIF t.form IN {Proc, TProc} THEN OutType(R, modid, t.base); OutPar(R, modid, t.dsc, t.nofpar); Write(R, 0)
+       END ;
+       IF (t.mno > 0) & (obj # NIL) THEN  (*re-export, output name*)
+         mod := topScope.next;
+@@ -452,11 +409,11 @@
+   END OutType;
+   
+   PROCEDURE Export*(VAR modid: ORS.Ident; VAR newSF: BOOLEAN; VAR key: LONGINT);
+-    VAR x, sum, oldkey, nextSymIdx: LONGINT;
++    VAR x, sum, oldkey: LONGINT;
+       obj, obj0: Object;
+       filename: ORS.Ident;
+       F, F1: Files.File; R, R1: Files.Rider;
+-  BEGIN Ref := Record + 1; MakeFileName(filename, modid, ".smL"); nextSymIdx := -10;
++  BEGIN Ref := TProc + 1; MakeFileName(filename, modid, ".smL");
+     F := Files.New(filename); Files.Set(R, F, 0);
+     Files.WriteInt(R, 0); (*placeholder*)
+     Files.WriteInt(R, 0); (*placeholder for key to be inserted at the end*)
+@@ -465,9 +422,8 @@
+     WHILE obj # NIL DO
+       IF obj.expo THEN
+         Write(R, obj.class); Files.WriteString(R, obj.name);
+-        Write(R, obj.lspClass);
+-        ORS.SymbolFileIndex(nextSymIdx, obj.defEndPos, obj.defModId); DEC(nextSymIdx);
+-        OutType(R, modid, obj.type, nextSymIdx);
++        Write(R, obj.lspClass); IF obj.defModId = modid THEN Files.WriteString(R, "^") ELSE Files.WriteString(R, obj.defModId) END; Files.WriteInt(R, obj.defEndPos);
++        OutType(R, modid, obj.type);
+         IF obj.class = Typ THEN
+           IF obj.type.form = Record THEN
+             obj0 := topScope.next;  (*check whether this is base of previously declared pointer types*)
 --- LSPhORG.Mod.txt
 +++ LSPhORG.Mod.txt
 @@ -1,7 +1,7 @@
 -MODULE LSPhORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC*)
-+MODULE LSPhORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 1.10.21 Extended Oberon*)
++MODULE LSPhORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 11.1.22 Extended Oberon*)
    IMPORT SYSTEM, Files, ORS := LSPhORS, ORB := LSPhORB;
    (*Code generator for Oberon compiler for RISC processor.
 -     Procedural interface to Parser OSAP; result in array "code".
@@ -78,19 +323,25 @@
      td: ARRAY maxTD OF LONGINT;  (*type descriptors*)
  
    (*instruction assemblers according to formats*)
-@@ -70,7 +67,7 @@
+@@ -65,12 +62,12 @@
+   END incR;
+ 
+   PROCEDURE Put0(op, a, b, c: LONGINT);
+-  BEGIN (*emit format-0 instruction*)
++  BEGIN (*emit format-0 register instruction*)
+     INC(pc)
    END Put0;
  
    PROCEDURE Put1(op, a, b, im: LONGINT);
 -  BEGIN (*emit format-1 instruction,  -10000H <= im < 10000H*)
-+  BEGIN (*emit format-1 instruction, -C16 <= im < C16*)
++  BEGIN (*emit format-1 register instruction, -C16 <= im < C16*)
      INC(pc)
    END Put1;
  
 @@ -92,7 +89,7 @@
  
    PROCEDURE Put1b(r, mno, off, disp: LONGINT);
-   BEGIN (*emit modified format-1 instruction to be fixed up by loader, 0 <= mno < 64, 0 <= off < 256*)
+   BEGIN (*emit modified register instruction to be fixed up by loader, 0 <= mno < 64, 0 <= off < 256*)
 -    code[pc] := (((r+16) * C6 + mno) * C8 + off) * C12 + disp MOD C12; INC(pc)
 +    INC(pc)
    END Put1b;
@@ -109,7 +360,7 @@
    END Put3a;
  
    PROCEDURE PutPair(base, op, a, b, off, format: LONGINT);
-@@ -151,55 +146,18 @@
+@@ -151,48 +146,18 @@
      RETURN cond
    END negated;
  
@@ -127,7 +378,7 @@
    END fix1;
  
    PROCEDURE fix3(at, with: LONGINT);
-   BEGIN (*fix format-3 branch instruction*)
+   BEGIN (*fix branch instruction*)
 -    code[at] := code[at] DIV C24 * C24 + with MOD C24
    END fix3;
  
@@ -151,21 +402,24 @@
 -    RETURN L1
 -  END GARBAGE **)
 -
-   PROCEDURE FixLinkWith(L, x: LONGINT); (*fixup with offset to x*)
-     VAR L1, format: LONGINT; p: INTEGER;
-   BEGIN (*fix chain of format-1 or format-3 instructions*)
--    WHILE L # 0 DO p := code[L];
--      format := p DIV C30 MOD 4; L1 := p MOD C16;
--      IF format = 1 THEN fix1(L, (x-L)*4)
--      ELSIF format = 3 THEN fix3(L, x-L-1)
--      ELSE ORS.Mark("fixup impossible"); L1 := 0
--      END ;
--      L := L1
--    END
+   PROCEDURE FixLinkWith(L, dst: LONGINT);
+     VAR L1: LONGINT;
+   BEGIN (*fix chain of branch instructions*)
+-    WHILE L # 0 DO L1 := code[L] MOD C24; fix3(L, dst-L-1); L := L1 END
    END FixLinkWith;
  
-   PROCEDURE FixLink*(L: LONGINT); (*fixup with offset to pc*)
-@@ -209,21 +167,11 @@
+   PROCEDURE FixLink*(L: LONGINT);
+@@ -202,31 +167,16 @@
+   PROCEDURE FixLinkMixed*(L: LONGINT);
+     VAR L1, format: LONGINT; p: INTEGER;
+   BEGIN (*fix chain of instructions of different formats*)
+-    WHILE L # 0 DO p := code[L];
+-      format := p DIV C30 MOD 4; L1 := p MOD C16;
+-      IF format < 3 THEN fix1(L, (pc-L)*4) ELSE fix3(L, pc-L-1) END ;
+-      L := L1
+-    END
+   END FixLinkMixed;
+ 
    PROCEDURE FixLinkPair(L, adr: LONGINT);
      VAR L1: LONGINT; p, q: INTEGER;
    BEGIN (*fix chain of instruction pairs with an address that is spread across both instructions, 0 <= adr < C24*)
@@ -187,7 +441,7 @@
      RETURN L1
    END merged;
  
-@@ -276,12 +224,12 @@
+@@ -279,12 +229,12 @@
    PROCEDURE loadCond(VAR x: Item);
    BEGIN
      IF x.mode # Cond THEN
@@ -206,7 +460,7 @@
        ELSE ORS.Mark("not Boolean?")
        END
      END
-@@ -1152,7 +1100,8 @@
+@@ -1155,7 +1105,8 @@
    END Condition;
  
    PROCEDURE Open*(v: INTEGER);
@@ -216,7 +470,7 @@
      IF v = 0 THEN pc := 1;
      END
    END Open;
-@@ -1165,16 +1114,11 @@
+@@ -1168,16 +1119,11 @@
    BEGIN entry := pc*4;
    END Header;
  
@@ -235,7 +489,7 @@
    END Exit;
  
    PROCEDURE Final*;
-@@ -1210,7 +1154,9 @@
+@@ -1213,7 +1159,9 @@
        i, comsize, nofimps, nofrefs, size, tdx, base: LONGINT;
        name: ORS.Ident;
        F: Files.File; R: Files.Rider;
@@ -246,7 +500,7 @@
      WHILE obj # NIL DO
        IF (obj.class = ORB.Mod) & (obj.dsc # ORB.system) THEN INC(nofimps)  (*count imports*)
        ELSIF (obj.exno # 0) & (obj.class = ORB.Const) & (obj.type.form = ORB.Proc)
-@@ -1282,10 +1228,11 @@
+@@ -1285,10 +1233,11 @@
        obj := obj.next
      END ;
      Files.WriteInt(R, -1);
@@ -263,9 +517,9 @@
 --- LSPhORP.Mod.txt
 +++ LSPhORP.Mod.txt
 @@ -1,5 +1,5 @@
--MODULE ORP; (*N. Wirth 1.7.97 / 8.3.2020  Oberon compiler for RISC in Oberon-07 / AP 1.10.21 Extended Oberon with retro elements*)
+-MODULE ORP; (*N. Wirth 1.7.97 / 8.3.2020  Oberon compiler for RISC in Oberon-07 / AP 11.1.22 Extended Oberon with retro elements*)
 -  IMPORT Texts, Oberon, ORS, ORB, ORG;
-+MODULE LSPhORP; (*N. Wirth 1.7.97 / 8.3.2020  Oberon compiler for RISC in Oberon-07 / AP 1.10.21 Extended Oberon with retro elements*)
++MODULE LSPhORP; (*N. Wirth 1.7.97 / 8.3.2020  Oberon compiler for RISC in Oberon-07 / AP 11.1.22 Extended Oberon with retro elements*)
 +  IMPORT Texts, Oberon, RS232, LSPhConstants, ORS := LSPhORS, ORB := LSPhORB, ORG := LSPhORG;
    (*Author: Niklaus Wirth, 2014. Oberon-2 extensions by Andreas Pirklbauer, 2020.
      Parser of Oberon-RISC compiler. Uses Scanner ORS to obtain symbols (tokens),
@@ -789,22 +1043,32 @@
      END ;
      varsize := (varsize + 3) DIV 4 * 4;
      ptbase := pbsList;
+@@ -1020,7 +1110,7 @@
+     VAR obj: ORB.Object;
+   BEGIN rec := NIL;
+     IF sym = ORS.var THEN ORS.Get(sym); class := ORB.Par ELSE class := ORB.Var END ;
+-    IF sym = ORS.ident THEN ORS.CopyId(name); ORS.Get(sym) ELSE ORS.Mark("ident?") END ;
++    IF sym = ORS.ident THEN ORS.CopyId(name); ORS.ClassifyIdent(LSPhConstants.SynParameter, ORS.Pos(), modid); ORS.Get(sym) ELSE ORS.Mark("ident?") END ;
+     Check(ORS.colon, ": expected");
+     IF sym = ORS.ident THEN
+       qualident(obj);
 @@ -1042,10 +1132,10 @@
      VAR proc, redef, obj: ORB.Object;
        type, typ, rec: ORB.Type;
        procid, recid: ORS.Ident;
--      parblksize: LONGINT; class: INTEGER;
-+      parblksize, procNamePos: LONGINT; class: INTEGER;
-       int, expo: BOOLEAN;
+-      parblksize: LONGINT; form, class: INTEGER;
+-      int, body, expo: BOOLEAN;
++      parblksize, procNamePos, defEndPos: LONGINT; form, class: INTEGER;
++      int, body, newproc, expo: BOOLEAN;
  
 -    PROCEDURE Body(proc: ORB.Object; parblksize: LONGINT; int: BOOLEAN);
 +    PROCEDURE Body(proc: ORB.Object; parblksize, procNamePos: LONGINT; int: BOOLEAN);
        VAR obj: ORB.Object; x: ORG.Item; locblksize: LONGINT;
      BEGIN Check(ORS.semicolon, "no ;"); locblksize := parblksize;
        Declarations(locblksize); obj := ORB.topScope; proc.type.dsc := obj.next;
-@@ -1054,76 +1144,105 @@
-       ORG.FixLink(proc.type.len);  (*fix forward references generated in ORG*)
-       proc.val := ORG.Here() * 4; proc.type.dsc := obj.next;
+@@ -1054,23 +1144,39 @@
+       ORG.FixLinkMixed(proc.type.len);  (*fix forward references generated in ORG*)
+       proc.val := ORG.Here() * 4; proc.type.dsc := obj.next; DEC(fc);
        ORG.Enter(parblksize, locblksize, int);
 -      IF sym = ORS.begin THEN ORS.Get(sym); StatSequence END ;
 +      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
@@ -834,48 +1098,67 @@
        END
      END Body;
  
--  BEGIN (* ProcedureDecl *) int := FALSE; rec := NIL; ORS.Get(sym);
--    IF sym = ORS.times THEN ORS.Get(sym); int := TRUE END ;
-+  BEGIN (* ProcedureDecl *) int := FALSE; rec := NIL;
+-  BEGIN (* ProcedureDecl *) int := FALSE; body := TRUE; rec := NIL; ORS.Get(sym);
+-    IF sym = ORS.times THEN (*interrupt*) ORS.Get(sym); int := TRUE
++  BEGIN (* ProcedureDecl *) int := FALSE; newproc := FALSE; body := TRUE; rec := NIL;
 +    IF level = 0 THEN ORS.FormatTokenUpdate(31) ELSE ORS.FormatTokenUpdate(21) END;
 +    ORS.ModuleTag(LSPhConstants.ProcedureStart);
 +    ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
 +    ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +    ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +    ORS.Get(sym);
-+    IF sym = ORS.times THEN ORS.FormatTokenUpdate(00); ORS.Get(sym); int := TRUE END ;
++    IF sym = ORS.times THEN (*interrupt*) ORS.FormatTokenUpdate(00); ORS.Get(sym); int := TRUE
+     ELSIF sym = ORS.arrow THEN (*forward*) ORS.Get(sym); body := FALSE
+     END ;
      IF sym = ORS.lparen THEN
-       ORS.Get(sym); Receiver(class, recid, typ, rec);
-       IF level # 0 THEN ORS.Mark("local type-bound procedures not implemented") END
+@@ -1079,18 +1185,26 @@
+     ELSE form := ORB.Proc
      END ;
      IF sym = ORS.ident THEN
 -      ORS.CopyId(procid); ORS.Get(sym); CheckExport(expo);
+-      IF int THEN parblksize := 12 ELSE parblksize := 4 END ;
+-      NEW(type); type.size := ORG.WordSize; type.len := 0; (*len used as heading of fixup chain of forward refs*)
 +      ORS.CopyId(procid); procNamePos := ORS.Pos(); ORS.ClassifyIdent(LSPhConstants.SynProcedure, ORS.Pos(), modid);
-+      IF rec = NIL THEN  (*regular procedure*)
-+        ORB.NewObj(proc, ORS.id, modid, ORB.Const, LSPhConstants.SynProcedure)
+       IF rec = NIL THEN  (*regular procedure*)
+         proc := ORB.FindObj(procid, ORB.topScope.next);
+         IF proc = NIL THEN  (*identifier not found in the symbol table*)
+-          ORB.NewObj(proc, procid, ORB.Const); INC(fc);
++          ORB.NewObj(proc, procid, modid, ORB.Const, LSPhConstants.SynProcedure); INC(fc); newproc := TRUE
++        END;
 +      ELSE (*type-bound procedure*)
-+        ORB.NewMethod(rec, proc, redef, procid, modid)
++        defEndPos := ORS.Pos()
 +      END;
 +      ORS.Get(sym);
 +      CheckExport(expo);
-       IF int THEN parblksize := 12 ELSE parblksize := 4 END ;
-       NEW(type); type.size := ORG.WordSize; type.len := 0; (*len used as heading of fixup chain of forward refs*)
-       IF rec = NIL THEN  (*regular procedure*)
--        ORB.NewObj(proc, procid, ORB.Const);
-         type.form := ORB.Proc; proc.type := type; proc.val := -1; proc.lev := level; proc.expo := expo;
-         IF expo THEN proc.exno := exno; INC(exno) END ;
++      IF int THEN parblksize := 12 ELSE parblksize := 4 END ;
++      NEW(type); type.size := ORG.WordSize; type.len := 0; (*len used as heading of fixup chain of forward refs*)
++      IF rec = NIL THEN  (*regular procedure*)
++        IF newproc THEN
+           type.form := ORB.Proc; proc.type := type; proc.val := -1; proc.lev := level; proc.expo := expo;
+-          IF expo THEN proc.exno := exno; INC(exno) END
+-        END ;
++          IF expo THEN proc.exno := exno; INC(exno) END ;
++        END;
          ORB.OpenScope; INC(level); type.base := ORB.noType;
 -        ProcedureType(type, parblksize); type.dsc := ORB.topScope.next  (*formal parameter list*)
 +        ProcedureType(type, parblksize, TRUE); type.dsc := ORB.topScope.next  (*formal parameter list*)
        ELSE  (*type-bound procedure*)
--        ORB.NewMethod(rec, proc, redef, procid);
-         IF rec.typobj.val > 0 THEN ORS.Mark("invalid method order") ELSE DisallowMethods(rec.base) END ;
-         type.form := ORB.TProc; proc.type := type; proc.val := -1; proc.expo := expo;
-         IF expo THEN proc.exno := exno; INC(exno);
-           IF ~typ.typobj.expo THEN ORS.Mark("receiver must be exported") END ;
--          procid := "@"; ORB.NewObj(obj, procid, ORB.Const); obj.name[0] := 0X; (*dummy to preserve linear order of exno*)
-+          procid := "@"; ORB.NewObj(obj, procid, modid, ORB.Const, LSPhConstants.SynConstant); obj.name[0] := 0X; (*dummy to preserve linear order of exno*)
-           obj.type := proc.type; obj.dsc := proc; obj.exno := proc.exno; obj.expo := FALSE
+         IF rec.base # NIL THEN redef := ORB.FindObj(procid, rec.base.dsc);  (*search in base types of receiver*)
+           IF (redef # NIL) & ((redef.class # ORB.Const) OR (redef.type.form # ORB.TProc)) THEN ORS.Mark("mult def") END
+@@ -1098,20 +1212,20 @@
+         END ;
+         proc := ORB.FindFld(procid, rec);  (*search in fields of receiver proper, but not of its base types*)
+         IF proc = NIL THEN
+-          ORB.NewMethod(rec, proc, redef, procid); INC(fc);
++          ORB.NewMethod(rec, proc, redef, procid, modid, defEndPos); INC(fc);
+           IF rec.typobj.val > 0 THEN ORS.Mark("invalid method order") ELSE DisallowMethods(rec.base) END ;
+           type.form := ORB.TProc; proc.type := type; proc.val := -1; proc.expo := expo;
+           IF expo THEN proc.exno := exno; INC(exno);
+             IF ~typ.typobj.expo THEN ORS.Mark("receiver must be exported") END ;
+-            procid := "@"; ORB.NewObj(obj, procid, ORB.Const); obj.name[0] := 0X; (*dummy to preserve linear order of exno*)
++            procid := "@"; ORB.NewObj(obj, procid, modid, ORB.Const, LSPhConstants.SynConstant); obj.name[0] := 0X; (*dummy to preserve linear order of exno*)
+             obj.type := proc.type; obj.dsc := proc; obj.exno := proc.exno; obj.expo := FALSE
+           END
          END ;
          ORB.OpenScope; INC(level); type.base := ORB.noType;
 -        ORB.NewObj(obj, recid, class);  (*insert receiver as first parameter*)
@@ -887,11 +1170,13 @@
          IF redef # NIL THEN  (*redefined method found*)
            IF redef.expo & typ.typobj.expo & ~proc.expo THEN ORS.Mark("overriding method must be exported")
            ELSIF ~EqualSignatures(redef.type, proc.type) THEN ORS.Mark("must match redefined method")
-           END
+@@ -1123,26 +1237,34 @@
+         ELSIF (proc.expo # expo) OR ~EqualSignatures(proc.type, type) THEN ORS.Mark("must match forward declaration")
          END
        END ;
--      Body(proc, parblksize, int); ORB.CloseScope; DEC(level)
-+      Body(proc, parblksize, procNamePos, int); ORB.CloseScope; DEC(level)
+-      IF body THEN Body(proc, parblksize, int) END ;
++      IF body THEN Body(proc, parblksize, procNamePos, int) END ;
+       ORB.CloseScope; DEC(level)
      ELSE ORS.Mark("proc id expected")
      END
 +    ; ORS.ModuleTagP(LSPhConstants.ProcedureEnd)
@@ -925,7 +1210,7 @@
        ELSE ORS.Mark("id expected")
        END
      UNTIL sym # ORS.comma
-@@ -1131,17 +1250,24 @@
+@@ -1150,17 +1272,24 @@
  
    PROCEDURE Module;
      VAR key: LONGINT;
@@ -954,10 +1239,10 @@
 +        END
        ELSE ORS.Mark("identifier expected")
        END ;
-       Check(ORS.semicolon, "no ;"); level := 0; exno := 1; key := 0; looplev := 0; exitno := 0;
-@@ -1149,31 +1275,40 @@
-       ORG.Open(version); Declarations(dc); ORG.SetDataSize((dc + 3) DIV 4 * 4);
+       Check(ORS.semicolon, "no ;"); level := 0; fc := 0; exno := 1; key := 0; looplev := 0; exitno := 0;
+@@ -1169,31 +1298,40 @@
        WHILE sym = ORS.procedure DO ProcedureDecl; Check(ORS.semicolon, "no ;") END ;
+       IF fc > 0 THEN ORS.Mark("undefined forward declarations") END ;
        ORG.Header;
 -      IF sym = ORS.begin THEN ORS.Get(sym); StatSequence END ;
 +      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
@@ -1004,7 +1289,7 @@
    PROCEDURE Option(VAR S: Texts.Scanner);
    BEGIN newSF := FALSE;
      IF S.nextCh = "/" THEN
-@@ -1213,9 +1348,17 @@
+@@ -1233,9 +1371,17 @@
      END ;
      Oberon.Collect(0); Oberon.Return(res)
    END Compile;
@@ -1017,7 +1302,7 @@
 +    NEW(T); Texts.Open(T, "Tmp.Tmp"); ORS.Init(T, 0); newSF := TRUE; Module
 +  END Analyze;
  
--BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "OR Retro Compiler  8.3.2020 / AP 1.10.21");
+-BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "OR Retro Compiler  8.3.2020 / AP 11.1.22");
 -  Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
 +BEGIN
    NEW(dummy); dummy.class := ORB.Var; dummy.type := ORB.intType;

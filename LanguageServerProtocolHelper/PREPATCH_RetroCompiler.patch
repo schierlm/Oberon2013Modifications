@@ -1,36 +1,29 @@
 (apply this prepatch, then extended oberon prepatch, then original patch, then retrocompiler postpatch)
-(ORB is taken from Extended Oberon)
+(Prepatches does not contain ORP.Mod.txt - use unpatched input file for postpatch!)
 --- LSPhORS.Mod.txt
 +++ LSPhORS.Mod.txt
 @@ -1,4 +1,4 @@
--MODULE ORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 1.10.21 Extended Oberon with retro elements*)
+-MODULE ORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 11.1.22 Extended Oberon with retro elements*)
 +MODULE ORS; (* NW 19.9.93 / 20.3.2017  Scanner in Oberon-07 / AP 1.10.21 Extended Oberon*)
    IMPORT SYSTEM, Texts, Oberon;
  
  (* Oberon Scanner does lexical analysis. Input is Oberon-Text, output is
+--- LSPhORB.Mod.txt
++++ LSPhORB.Mod.txt
+@@ -1,4 +1,4 @@
+-MODULE ORB;   (*NW 25.6.2014  / AP 4.3.2020 / 5.3.2019  in Oberon-07 / AP 11.1.22 Extended Oberon with retro elements*)
++MODULE ORB;   (*NW 25.6.2014  / AP 4.3.2020 / 5.3.2019  in Oberon-07 / AP 13.5.20 Extended Oberon*)
+   IMPORT Files, ORS;
+   (*Definition of data types Object and Type, which together form the data structure
+     called "symbol table". Contains procedures for creation of Objects, and for search:
 --- LSPhORG.Mod.txt
 +++ LSPhORG.Mod.txt
 @@ -1,4 +1,4 @@
--MODULE ORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 1.10.21 Extended Oberon*)
+-MODULE ORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 11.1.22 Extended Oberon*)
 +MODULE ORG; (* N.Wirth, 16.4.2016 / 4.4.2017 / 31.5.2019  Oberon compiler; code generator for RISC / AP 1.11.21 Extended Oberon*)
    IMPORT SYSTEM, Files, ORS, ORB;
    (*Code generator for Oberon compiler for RISC processor.
       Procedural interface to Parser ORP; result in array "code".
-@@ -63,12 +63,12 @@
-   END incR;
- 
-   PROCEDURE Put0(op, a, b, c: LONGINT);
--  BEGIN (*emit format-0 instruction*)
-+  BEGIN (*emit format-0 register instruction*)
-     code[pc] := ((a*C4 + b) * C4 + op) * C16 + c; INC(pc)
-   END Put0;
- 
-   PROCEDURE Put1(op, a, b, im: LONGINT);
--  BEGIN (*emit format-1 instruction, -C16 <= im < C16*)
-+  BEGIN (*emit format-1 register instruction, -C16 <= im < C16*)
-     IF im < 0 THEN INC(op, V) END ;
-     code[pc] := (((a+C6) * C4 + b) * C4 + op) * C16 + im MOD C16; INC(pc)
-   END Put1;
 @@ -160,6 +160,41 @@
      code[at] := code[at] DIV C24 * C24 + with MOD C24
    END fix3;
@@ -70,6 +63,6 @@
 +    RETURN L1
 +  END GARBAGE **)
 +
-   PROCEDURE FixLinkWith(L, x: LONGINT); (*fixup with offset to x*)
-     VAR L1, format: LONGINT; p: INTEGER;
-   BEGIN (*fix chain of format-1 or format-3 instructions*)
+   PROCEDURE FixLinkWith(L, dst: LONGINT);
+     VAR L1: LONGINT;
+   BEGIN (*fix chain of branch instructions*)
