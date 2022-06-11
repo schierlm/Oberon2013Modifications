@@ -262,10 +262,11 @@
          END;
 -        IF L0 # L.next THEN Y1 := curY;
 -          L.next := L0;
+-          WHILE (L.next # F.trailer) & (curY >= botY) DO
+-            L := L.next; curY := curY - lsp
 +        IF (L0 # L.next) OR (Y0 # Y1) THEN Y0 := Y1; Y1 := curY;
 +          UpdateLineHeight(L0, R, F.text); L.next := L0;
-           WHILE (L.next # F.trailer) & (curY >= botY) DO
--            L := L.next; curY := curY - lsp
++          WHILE (L.next # F.trailer) & (curY - L.next.lsp >= botY) DO
 +            L := L.next; curY := curY - L.lsp
            END;
            L.next := F.trailer;
