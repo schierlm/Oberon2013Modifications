@@ -1,0 +1,11 @@
+Template file for ORHighlighter. Format the tokens below (including the square brackets) to configure syntax highlighting.
+
+[Undefined] [String] [Comment] [Keyword] [Module]
+
+[Operator] [ExportOperator]
+[Constant] [ExportedConstant]
+[Type] [ExportedType]
+[Procedure] [ExportedProcedure] [ExportedCommandProcedure]
+[Variable] [ExportedVariable] [WrittenVariable]
+[RecordField] [ExportedRecordField] [WrittenRecordField]
+[Parameter] [WrittenParameter]

@@ -71,7 +71,7 @@ cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspec
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/*.txt work
 cp ColorSupport/*.txt DrawAddons/16Color/Color*.Mod.txt DrawAddons/16Color/*.Tool.txt ColorPalette/*.txt work
-cp ColorTheme/*.txt work
+cp ColorTheme/*.txt LSPUtil/*.txt LSPUtil/VGATemplate.Text work
 
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch

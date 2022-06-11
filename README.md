@@ -67,6 +67,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | **[KernelDebugger](KernelDebugger/README.md)**‡ | Debug and inspect one RISC5 machine from another one via serial link | Apply ORStackInspect; recompile everything including inner core |
 | **[KeyboardTester](KeyboardTester/README.md)** | Test if all keys on your (emulated) keyboard work | None |
 | **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |
+| **[LSPUtil](LSPUtil/README.md)** | Reformat or highlight Oberon source inside the system | LanguageServerProtocolHelper |
 | **[MinimalBootstrapSystem](MinimalBootstrapSystem/README.md)**† | Minimal disk image that can be used to bootstrap/compile the normal system | Recompile everything except inner core |
 | **[MinimalFonts](MinimalFonts/README.md)**† | Minimal Fonts modules with a single font embedded to save space and avoid filesystem access | Recompile `Fonts.Mod` |
 | **[ORInspect](ORInspect/README.md)** | Inspect global module variables and heap pointers | Recompile compiler and all modules you want to inspect |
