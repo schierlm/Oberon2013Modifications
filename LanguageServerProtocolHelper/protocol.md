@@ -60,7 +60,8 @@ GetModuleInfo
 - `ANSWER_ProcedureEnd` (16): Position (INTEGER) where the currently open
   procedure ends (i.e. semicolon). Used for outline and folding ranges.
 - `ANSWER_VarModified` (17): No arguments. The last syntax element was a
-  variable name that is modified (e.g. by `:=` symbol after it).
+  variable name that is modified (e.g. by `:=` symbol after it or by passing
+  it by reference to a procedure).
 - `ANSWER_RecordStart` (18): No arguments. last syntax element was a keyword
   that starts a record.
 - `ANSWER_RecordEnd` (19): No arguments. Last syntax element was a keyword that
@@ -104,6 +105,8 @@ GetModuleInfo
   (String, for re-exports), Offset of end of syntax element (INTEGER). Denotes
   that a symbol has been exported to the symbol file and may be referenced via
   the symbol file index from there.
+- `ANSWER_CommandExported` (36): Last exported element was a command procedure
+  (i.e. an exported no-arg no-return procedure).
 
 ### Syntax Element format
 
@@ -184,6 +187,11 @@ between them, the token after the white space takes precedence.
   this line needs an indentation level lower than the current indentation level.
   In case the token is in the middle of a line, apply the indentation to the
   next line instead.
+- `ANSWER_OutdentThisLineAndComment` (94): Same as previously describe packet, except
+  that in case this token is preceded by a comment on its own line, reduce the
+  indentation level of the comment as well.
+- `ANSWER_TokenIsComment` (95): Mark the previous token as a comment, used by
+  previously described packet.
 
 SwitchEmbeddedMode
 ------------------

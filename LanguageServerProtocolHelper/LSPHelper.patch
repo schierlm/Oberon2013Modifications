@@ -8,7 +8,7 @@
  
  (* Oberon Scanner does lexical analysis. Input is Oberon-Text, output is
    sequence of symbols, i.e identifiers, numbers, strings, and special symbols.
-@@ -28,7 +28,7 @@
+@@ -28,9 +28,10 @@
      to* = 50; by* = 51; semicolon* = 52; end* = 53; bar* = 54;
      else* = 55; elsif* = 56; until* = 57; return* = 58;
      array* = 60; record* = 61; pointer* = 62; const* = 63; type* = 64;
@@ -16,19 +16,23 @@
 +    var* = 65; procedure* = 66; begin* = 67; import* = 68; module* = 69; eot* = 70;
  
    TYPE Ident* = ARRAY IdLen OF CHAR;
++    Callback* = PROCEDURE(tag, beg, end, value: INTEGER);
  
-@@ -41,7 +41,9 @@
+   VAR ival*, slen*: LONGINT;  (*results of Get*)
+     rval*: REAL;
+@@ -41,7 +42,10 @@
      ch: CHAR;  (*last character read*)
      errpos: LONGINT;
      R: Texts.Reader;
 -    W: Texts.Writer;
 +    lspMode*: INTEGER;
++    callback: Callback;
 +    syntaxType, formatType: ARRAY eot+1 OF INTEGER;
 +    lastIdentStart: INTEGER;
      k: INTEGER;
      KWX: ARRAY 10 OF INTEGER;
      keyTab: ARRAY NKW OF
-@@ -58,9 +60,10 @@
+@@ -58,9 +62,10 @@
    PROCEDURE Mark*(msg: ARRAY OF CHAR);
      VAR p: LONGINT;
    BEGIN p := Pos();
@@ -42,7 +46,7 @@
      END ;
      INC(errcnt); errpos := p + 4
    END Mark;
-@@ -71,7 +74,7 @@
+@@ -71,7 +76,7 @@
      REPEAT
        IF i < IdLen-1 THEN id[i] := ch; INC(i) END ;
        Texts.Read(R, ch)
@@ -51,19 +55,27 @@
      id[i] := 0X; 
      IF i < 10 THEN k := KWX[i-1];  (*search for keyword*)
        WHILE (id # keyTab[k].id) & (k < KWX[i]) DO INC(k) END ;
-@@ -191,24 +194,117 @@
+@@ -191,24 +196,135 @@
      END
    END Number;
  
 -  PROCEDURE comment;
-+  PROCEDURE SetMode* (m: INTEGER);
-+  BEGIN lspMode := m
+-  BEGIN Texts.Read(R, ch);
++  PROCEDURE SetMode* (m: INTEGER; cb: Callback);
++  BEGIN lspMode := m; callback := cb;
 +  END SetMode;
 +
 +  PROCEDURE ModuleTag*(tag: INTEGER);
 +  BEGIN
 +    IF lspMode = LSPhConstants.GetModuleInfo THEN RS232.Send(tag) END
 +  END ModuleTag;
++
++  PROCEDURE ModuleTagH*(tag: INTEGER);
++  BEGIN
++    IF lspMode = LSPhConstants.HighlightCallback THEN
++      callback(tag, -1, -1, -1)
++    ELSE ModuleTag(tag) END
++  END ModuleTagH;
 +
 +  PROCEDURE ModuleTagPP*(tag, pos: INTEGER);
 +  BEGIN
@@ -76,7 +88,8 @@
 +
 +  PROCEDURE FormatTokenTag*(tag: INTEGER);
 +  BEGIN
-+    IF lspMode = LSPhConstants.ReFormat THEN RS232.Send(tag) END
++    IF lspMode = LSPhConstants.ReFormat THEN RS232.Send(tag)
++    ELSIF lspMode = LSPhConstants.FormatCallback THEN callback(tag, -1, -1, -1) END
 +  END FormatTokenTag;
 +
 +  PROCEDURE FormatTokenUpdate*(type: INTEGER);
@@ -84,6 +97,8 @@
 +    IF lspMode = LSPhConstants.ReFormat THEN
 +      RS232.Send(LSPhConstants.FormatTokenUpdate);
 +      RS232.Send(type);
++    ELSIF lspMode = LSPhConstants.FormatCallback THEN
++      callback(LSPhConstants.FormatTokenUpdate, -1, -1, type)
 +    END
 +  END FormatTokenUpdate;
 +
@@ -101,6 +116,10 @@
 +        RS232.SendIntRaw(defPos);
 +        RS232.SendStrRaw(defModName);
 +      END;
++      lastIdentStart := -1
++    ELSIF lspMode = LSPhConstants.HighlightCallback THEN
++      ASSERT(lastIdentStart # -1);
++      callback(LSPhConstants.SyntaxElement,lastIdentStart,Pos(),syntaxType);
 +      lastIdentStart := -1
 +    END
 +  END ClassifyIdent;
@@ -129,14 +148,8 @@
 +  END AddCompletion;
 +
 +  PROCEDURE comment(nested: BOOLEAN);
-   BEGIN Texts.Read(R, ch);
-+    IF ~nested & (lspMode = LSPhConstants.GetModuleInfo) THEN
-+      RS232.Send(LSPhConstants.SyntaxElement);
-+      RS232.SendIntRaw(Pos() - 2);
-+    ELSIF ~nested & (lspMode = LSPhConstants.ReFormat) THEN
-+      RS232.Send(LSPhConstants.FormatToken);
-+      RS232.SendIntRaw(Pos() - 2);
-+    END;
++    VAR begpos: INTEGER;
++  BEGIN Texts.Read(R, ch); begpos := Pos() - 2;
      REPEAT
        WHILE ~R.eot & (ch # "*") DO
          IF ch = "(" THEN Texts.Read(R, ch);
@@ -149,12 +162,22 @@
      UNTIL (ch = ")") OR R.eot;
 -    IF ~R.eot THEN Texts.Read(R, ch) ELSE Mark("unterminated comment") END
 +    IF ~nested & (lspMode = LSPhConstants.GetModuleInfo) THEN
++      RS232.Send(LSPhConstants.SyntaxElement);
++      RS232.SendIntRaw(begpos);
 +      RS232.SendIntRaw(Pos() + 1);
 +      RS232.Send(LSPhConstants.SynComment);
 +      RS232.SendIntRaw(-1);
 +    ELSIF ~nested & (lspMode = LSPhConstants.ReFormat) THEN
++      RS232.Send(LSPhConstants.FormatToken);
++      RS232.SendIntRaw(begpos);
 +      RS232.SendIntRaw(Pos() + 1);
 +      RS232.Send(99);
++      RS232.Send(LSPhConstants.TokenIsComment);
++    ELSIF ~nested & (lspMode = LSPhConstants.HighlightCallback) THEN
++      callback(LSPhConstants.SyntaxElement, begpos, Pos() + 1, LSPhConstants.SynComment);
++    ELSIF ~nested & (lspMode = LSPhConstants.FormatCallback) THEN
++      callback(LSPhConstants.FormatToken, begpos, Pos() + 1, 99);
++      callback(LSPhConstants.TokenIsComment, -1, -1, -1)
 +    END;
 +    IF ~R.eot THEN Texts.Read(R, ch) ELSIF ~nested THEN Mark("unterminated comment") END
    END comment;
@@ -173,7 +196,7 @@
        IF R.eot THEN sym := eot
        ELSIF ch < "A" THEN
          IF ch < "0" THEN
-@@ -217,7 +313,7 @@
+@@ -217,7 +333,7 @@
            ELSIF ch = "$" THEN HexString; sym := string
            ELSIF ch = "&" THEN Texts.Read(R, ch); sym := and
            ELSIF ch = "(" THEN Texts.Read(R, ch); 
@@ -182,7 +205,7 @@
            ELSIF ch = ")" THEN Texts.Read(R, ch); sym := rparen
            ELSIF ch = "*" THEN Texts.Read(R, ch); sym := times
            ELSIF ch = "+" THEN Texts.Read(R, ch); sym := plus
-@@ -226,6 +322,8 @@
+@@ -226,6 +342,8 @@
            ELSIF ch = "." THEN Texts.Read(R, ch);
              IF ch = "." THEN Texts.Read(R, ch); sym := upto ELSE sym := period END
            ELSIF ch = "/" THEN Texts.Read(R, ch); sym := rdiv
@@ -191,7 +214,7 @@
            ELSE Texts.Read(R, ch); (* ! % ' *) sym := null
            END
          ELSIF ch < ":" THEN Number(sym)
-@@ -258,17 +356,61 @@
+@@ -258,17 +376,70 @@
          Texts.Read(R, ch)
        END
      UNTIL sym # null
@@ -205,11 +228,19 @@
 +        RS232.Send(syntaxType[sym]);
 +        RS232.SendIntRaw(-1);
 +      END
++    ELSIF lspMode = LSPhConstants.HighlightCallback THEN
++      IF sym = ident THEN
++        lastIdentStart := begpos;
++      ELSIF syntaxType[sym] # 0 THEN
++        callback(LSPhConstants.SyntaxElement, begpos, Pos(), syntaxType[sym]);
++      END
 +    ELSIF (lspMode = LSPhConstants.ReFormat) & (formatType[sym] # 100) THEN
 +      RS232.Send(LSPhConstants.FormatToken);
 +      RS232.SendIntRaw(begpos);
 +      RS232.SendIntRaw(Pos());
 +      RS232.Send(formatType[sym]);
++    ELSIF (lspMode = LSPhConstants.FormatCallback) & (formatType[sym] # 100) THEN
++      callback(LSPhConstants.FormatToken, begpos, Pos(), formatType[sym])
 +    END;
    END Get;
  
@@ -238,24 +269,25 @@
 +  formatType[nil] := 99;
 +  formatType[string] := 99;
 +  formatType[not] := 10;
-+  formatType[lparen] := 10;
++  formatType[lparen] := 90;
 +  formatType[lbrak] := 00;
 +  formatType[lbrace] := 10;
 +  formatType[ident] := 99;
 +  formatType[comma] := 01;
 +  formatType[colon] := 01;
-+  formatType[rparen] := 01;
++  formatType[rparen] := 09;
 +  formatType[rbrak] := 09;
 +  formatType[rbrace] := 01;
 +  formatType[semicolon] := 01;
 +  formatType[const] := 21;
 +  formatType[type] := 21;
 +  formatType[begin] := 21;
++  formatType[var] := 91;
 +  k := 0; lastIdentStart := -1;
    EnterKW(if, "IF");
    EnterKW(do, "DO");
    EnterKW(of, "OF");
-@@ -307,6 +449,33 @@
+@@ -307,6 +478,33 @@
    KWX[6] := k;
    EnterKW(pointer, "POINTER");
    KWX[7] := k; KWX[8] := k;
@@ -733,7 +765,7 @@
    (*Author: Niklaus Wirth, 2014.
      Parser of Oberon-RISC compiler. Uses Scanner ORS to obtain symbols (tokens),
      ORB for definition of data structures and for handling import and export, and
-@@ -8,7 +8,7 @@
+@@ -8,20 +8,19 @@
  
    TYPE PtrBase = POINTER TO PtrBaseDesc;
      PtrBaseDesc = RECORD  (*list of names of pointer base types*)
@@ -742,7 +774,13 @@
      END ;
    
    VAR sym: INTEGER;   (*last symbol read*)
-@@ -21,7 +21,6 @@
+     dc: LONGINT;    (*data counter*)
+     level, exno, version: INTEGER;
+     newSF: BOOLEAN;  (*option flag*)
+-    expression: PROCEDURE (VAR x: ORG.Item);  (*to avoid forward reference*)
++    expression1: PROCEDURE (VAR x: ORG.Item; VAR symAtEnd: BOOLEAN);  (*to avoid forward reference*)
+     Type: PROCEDURE (VAR type: ORB.Type);
+     FormalType: PROCEDURE (VAR typ: ORB.Type; dim: INTEGER);
      modid: ORS.Ident;
      pbsList: PtrBase;   (*list of names of pointer base types*)
      dummy: ORB.Object;
@@ -755,15 +793,20 @@
    BEGIN
      IF sym = ORS.times THEN
 +      ORS.FormatTokenUpdate(01);
-+      ORS.ModuleTag(LSPhConstants.NameExported);
++      ORS.ModuleTagH(LSPhConstants.NameExported);
        expo := TRUE; ORS.Get(sym);
        IF level # 0 THEN ORS.Mark("remove asterisk") END
      ELSE expo := FALSE
-@@ -117,11 +118,12 @@
+@@ -117,11 +118,17 @@
      IF ~guard THEN x.type := ORB.boolType END
    END TypeTest;
  
 -  PROCEDURE selector(VAR x: ORG.Item);
++  PROCEDURE expression(VAR x: ORG.Item);
++  VAR dummy: BOOLEAN;
++  BEGIN expression1(x, dummy)
++  END expression;
++
 +  PROCEDURE selector(VAR x: ORG.Item; VAR symAtEnd: BOOLEAN);
      VAR y: ORG.Item; obj: ORB.Object;
 -  BEGIN
@@ -774,7 +817,7 @@
        IF sym = ORS.lbrak THEN
          REPEAT ORS.Get(sym); expression(y);
            IF x.type.form = ORB.Array THEN
-@@ -132,6 +134,7 @@
+@@ -132,6 +139,7 @@
          Check(ORS.rbrak, "no ]")
        ELSIF sym = ORS.period THEN ORS.Get(sym);
          IF sym = ORS.ident THEN
@@ -782,7 +825,25 @@
            IF x.type.form = ORB.Pointer THEN ORG.DeRef(x); x.type := x.type.base END ;
            IF x.type.form = ORB.Record THEN
              obj := ORB.thisfield(x.type); ORS.Get(sym);
-@@ -225,12 +228,14 @@
+@@ -192,14 +200,15 @@
+   END CompTypes;
+ 
+   PROCEDURE Parameter(par: ORB.Object);
+-    VAR x: ORG.Item; varpar: BOOLEAN;
+-  BEGIN expression(x);
++    VAR x: ORG.Item; varpar, symAtEnd: BOOLEAN;
++  BEGIN expression1(x, symAtEnd);
+     IF par # NIL THEN
+       varpar := par.class = ORB.Par;
+       IF CompTypes(par.type, x.type, varpar) THEN
+         IF ~varpar THEN ORG.ValueParam(x)
+         ELSE (*par.class = Par*)
+           IF ~par.rdo THEN CheckReadOnly(x) END ;
++          IF symAtEnd THEN ORS.ModuleTagH(LSPhConstants.VarModified) END;
+           ORG.VarParam(x, par.type)
+         END
+       ELSIF (x.type.form = ORB.Array) & (par.type.form = ORB.Array) &
+@@ -225,12 +234,14 @@
      IF sym # ORS.rparen THEN
        Parameter(par); n := 1;
        WHILE sym <= ORS.comma DO
@@ -798,11 +859,13 @@
      END ;
      IF n < x.type.nofpar THEN ORS.Mark("too few params")
      ELSIF n > x.type.nofpar THEN ORS.Mark("too many params")
-@@ -239,9 +244,11 @@
+@@ -238,10 +249,12 @@
+   END ParamList;
  
    PROCEDURE StandFunc(VAR x: ORG.Item; fct: LONGINT; restyp: ORB.Type);
-     VAR y: ORG.Item; n, npar: LONGINT;
+-    VAR y: ORG.Item; n, npar: LONGINT;
 -  BEGIN Check(ORS.lparen, "no (");
++    VAR y: ORG.Item; n, npar: LONGINT; symAtEnd: BOOLEAN;
 +  BEGIN
 +    ORS.ModuleTagP(LSPhConstants.CallParamStart); ORS.FormatTokenUpdate(00);
 +    Check(ORS.lparen, "no (");
@@ -812,45 +875,144 @@
      Check(ORS.rparen, "no )");
      IF n = npar THEN
        IF fct = 0 THEN (*ABS*)
-@@ -307,7 +314,7 @@
+@@ -306,22 +319,24 @@
+     END
    END set; 
  
-   PROCEDURE factor(VAR x: ORG.Item);
--    VAR obj: ORB.Object; rx: LONGINT;
-+    VAR obj: ORB.Object; rx: LONGINT; dummy: BOOLEAN;
+-  PROCEDURE factor(VAR x: ORG.Item);
++  PROCEDURE factor(VAR x: ORG.Item; VAR symAtEnd: BOOLEAN);
+     VAR obj: ORB.Object; rx: LONGINT;
    BEGIN (*sync*)
      IF (sym < ORS.char) OR (sym > ORS.ident) THEN ORS.Mark("expression expected");
        REPEAT ORS.Get(sym) UNTIL (sym >= ORS.char) & (sym <= ORS.for) OR (sym >= ORS.then)
-@@ -315,8 +322,9 @@
+     END ;
++    symAtEnd := FALSE;
      IF sym = ORS.ident THEN
-       qualident(obj);  
-       IF obj.class = ORB.SFunc THEN StandFunc(x, obj.val, obj.type)
+-      qualident(obj);  
+-      IF obj.class = ORB.SFunc THEN StandFunc(x, obj.val, obj.type)
 -      ELSE ORG.MakeItem(x, obj, level); selector(x);
-+      ELSE ORG.MakeItem(x, obj, level); selector(x, dummy);
++      qualident(obj); symAtEnd := TRUE;
++      IF obj.class = ORB.SFunc THEN StandFunc(x, obj.val, obj.type); symAtEnd := FALSE
++      ELSE ORG.MakeItem(x, obj, level); selector(x, symAtEnd);
          IF sym = ORS.lparen THEN
 +          ORS.FormatTokenUpdate(00); ORS.ModuleTagP(LSPhConstants.CallParamStart);
            ORS.Get(sym);
            IF (x.type.form = ORB.Proc) & (x.type.base.form # ORB.NoTyp) THEN
              ORG.PrepCall(x, rx); ParamList(x); ORG.Call(x, rx); x.type := x.type.base
-@@ -364,9 +372,9 @@
-   PROCEDURE SimpleExpression(VAR x: ORG.Item);
+           ELSE ORS.Mark("not a function"); ParamList(x)
+-          END
++          END; symAtEnd := FALSE
+         END
+       END
+     ELSIF sym = ORS.int THEN ORG.MakeConstItem(x, ORB.intType, ORS.ival); ORS.Get(sym)
+@@ -329,61 +344,61 @@
+     ELSIF sym = ORS.char THEN ORG.MakeConstItem(x, ORB.charType, ORS.ival); ORS.Get(sym)
+     ELSIF sym = ORS.nil THEN ORS.Get(sym); ORG.MakeConstItem(x, ORB.nilType, 0)
+     ELSIF sym = ORS.string THEN ORG.MakeStringItem(x, ORS.slen); ORS.Get(sym)
+-    ELSIF sym = ORS.lparen THEN ORS.Get(sym); expression(x); Check(ORS.rparen, "no )")
++    ELSIF sym = ORS.lparen THEN ORS.Get(sym); expression1(x, symAtEnd); Check(ORS.rparen, "no )"); symAtEnd := FALSE
+     ELSIF sym = ORS.lbrace THEN ORS.Get(sym); set(x); Check(ORS.rbrace, "no }")
+-    ELSIF sym = ORS.not THEN ORS.Get(sym); factor(x); CheckBool(x); ORG.Not(x)
++    ELSIF sym = ORS.not THEN ORS.Get(sym); factor(x, symAtEnd); CheckBool(x); ORG.Not(x)
+     ELSIF sym = ORS.false THEN ORS.Get(sym); ORG.MakeConstItem(x, ORB.boolType, 0)
+     ELSIF sym = ORS.true THEN ORS.Get(sym); ORG.MakeConstItem(x, ORB.boolType, 1)
+     ELSE ORS.Mark("not a factor"); ORG.MakeConstItem(x, ORB.intType, 0)
+     END
+   END factor;
+ 
+-  PROCEDURE term(VAR x: ORG.Item);
++  PROCEDURE term(VAR x: ORG.Item; VAR symAtEnd: BOOLEAN);
+     VAR y: ORG.Item; op, f: INTEGER;
+-  BEGIN factor(x); f := x.type.form;
++  BEGIN factor(x, symAtEnd); f := x.type.form;
+     WHILE (sym >= ORS.times) & (sym <= ORS.and) DO
+       op := sym; ORS.Get(sym);
+       IF op = ORS.times THEN
+-        IF f = ORB.Int THEN factor(y); CheckInt(y); ORG.MulOp(x, y)
+-        ELSIF f = ORB.Real THEN factor(y); CheckReal(y); ORG.RealOp(op, x, y)
+-        ELSIF f = ORB.Set THEN factor(y); CheckSet(y); ORG.SetOp(op, x, y)
++        IF f = ORB.Int THEN factor(y, symAtEnd); CheckInt(y); ORG.MulOp(x, y)
++        ELSIF f = ORB.Real THEN factor(y, symAtEnd); CheckReal(y); ORG.RealOp(op, x, y)
++        ELSIF f = ORB.Set THEN factor(y, symAtEnd); CheckSet(y); ORG.SetOp(op, x, y)
+         ELSE ORS.Mark("bad type")
+         END
+       ELSIF (op = ORS.div) OR (op = ORS.mod) THEN
+-        CheckInt(x); factor(y); CheckInt(y); ORG.DivOp(op, x, y)
++        CheckInt(x); factor(y, symAtEnd); CheckInt(y); ORG.DivOp(op, x, y)
+       ELSIF op = ORS.rdiv THEN
+-        IF f = ORB.Real THEN factor(y); CheckReal(y); ORG.RealOp(op, x, y)
+-        ELSIF f = ORB.Set THEN factor(y); CheckSet(y); ORG.SetOp(op, x, y)
++        IF f = ORB.Real THEN factor(y, symAtEnd); CheckReal(y); ORG.RealOp(op, x, y)
++        ELSIF f = ORB.Set THEN factor(y, symAtEnd); CheckSet(y); ORG.SetOp(op, x, y)
+         ELSE ORS.Mark("bad type")
+         END
+-      ELSE (*op = and*) CheckBool(x); ORG.And1(x); factor(y); CheckBool(y); ORG.And2(x, y)
++      ELSE (*op = and*) CheckBool(x); ORG.And1(x); factor(y, symAtEnd); CheckBool(y); ORG.And2(x, y)
+       END
+     END
+   END term;
+ 
+-  PROCEDURE SimpleExpression(VAR x: ORG.Item);
++  PROCEDURE SimpleExpression(VAR x: ORG.Item; VAR symAtEnd: BOOLEAN);
      VAR y: ORG.Item; op: INTEGER;
    BEGIN
 -    IF sym = ORS.minus THEN ORS.Get(sym); term(x);
-+    IF sym = ORS.minus THEN ORS.FormatTokenUpdate(10); ORS.Get(sym); term(x);
++    IF sym = ORS.minus THEN ORS.FormatTokenUpdate(90); ORS.Get(sym); term(x, symAtEnd);
        IF x.type.form IN {ORB.Int, ORB.Real, ORB.Set} THEN ORG.Neg(x) ELSE CheckInt(x) END
 -    ELSIF sym = ORS.plus THEN ORS.Get(sym); term(x);
-+    ELSIF sym = ORS.plus THEN ORS.FormatTokenUpdate(10); ORS.Get(sym); term(x);
-     ELSE term(x)
+-    ELSE term(x)
++    ELSIF sym = ORS.plus THEN ORS.FormatTokenUpdate(90); ORS.Get(sym); term(x, symAtEnd);
++    ELSE term(x, symAtEnd)
      END ;
      WHILE (sym >= ORS.plus) & (sym <= ORS.or) DO
-@@ -426,13 +434,15 @@
+       op := sym; ORS.Get(sym);
+-      IF op = ORS.or THEN ORG.Or1(x); CheckBool(x); term(y); CheckBool(y); ORG.Or2(x, y)
+-      ELSIF x.type.form = ORB.Int THEN term(y); CheckInt(y); ORG.AddOp(op, x, y)
+-      ELSIF x.type.form = ORB.Real THEN term(y); CheckReal(y); ORG.RealOp(op, x, y)
+-      ELSE CheckSet(x); term(y); CheckSet(y); ORG.SetOp(op, x, y)
++      IF op = ORS.or THEN ORG.Or1(x); CheckBool(x); term(y, symAtEnd); CheckBool(y); ORG.Or2(x, y)
++      ELSIF x.type.form = ORB.Int THEN term(y, symAtEnd); CheckInt(y); ORG.AddOp(op, x, y)
++      ELSIF x.type.form = ORB.Real THEN term(y, symAtEnd); CheckReal(y); ORG.RealOp(op, x, y)
++      ELSE CheckSet(x); term(y, symAtEnd); CheckSet(y); ORG.SetOp(op, x, y)
+       END
+     END
+   END SimpleExpression;
+ 
+-  PROCEDURE expression0(VAR x: ORG.Item);
++  PROCEDURE expression0(VAR x: ORG.Item; VAR symAtEnd: BOOLEAN);
+     VAR y: ORG.Item; obj: ORB.Object; rel, xf, yf: INTEGER;
+-  BEGIN SimpleExpression(x);
++  BEGIN SimpleExpression(x, symAtEnd);
+     IF (sym >= ORS.eql) & (sym <= ORS.geq) THEN
+-      rel := sym; ORS.Get(sym); SimpleExpression(y); xf := x.type.form; yf := y.type.form;
++      rel := sym; ORS.Get(sym); SimpleExpression(y, symAtEnd); xf := x.type.form; yf := y.type.form;
+       IF x.type = y.type THEN
+         IF (xf IN {ORB.Char, ORB.Int}) THEN ORG.IntRelation(rel, x, y)
+         ELSIF xf = ORB.Real THEN ORG.RealRelation(rel, x, y)
+@@ -413,10 +428,10 @@
+       END ;
+       x.type := ORB.boolType
+     ELSIF sym = ORS.in THEN
+-      ORS.Get(sym); CheckInt(x); SimpleExpression(y); CheckSet(y); ORG.In(x, y) ;
++      ORS.Get(sym); CheckInt(x); SimpleExpression(y, symAtEnd); CheckSet(y); ORG.In(x, y) ;
+       x.type := ORB.boolType
+     ELSIF sym = ORS.is THEN
+-      ORS.Get(sym); qualident(obj); TypeTest(x, obj.type, FALSE) ;
++      ORS.Get(sym); qualident(obj); TypeTest(x, obj.type, FALSE); symAtEnd := TRUE;
+       x.type := ORB.boolType
+     END
+   END expression0;
+@@ -425,14 +440,17 @@
+ 
    PROCEDURE StandProc(pno: LONGINT);
      VAR nap, npar: LONGINT; (*nof actual/formal parameters*)
-       x, y, z: ORG.Item;
+-      x, y, z: ORG.Item;
 -  BEGIN Check(ORS.lparen, "no (");
+-    npar := pno MOD 10; pno := pno DIV 10; expression(x); nap := 1;
++      x, y, z: ORG.Item; symAtEnd: BOOLEAN;
 +  BEGIN ORS.FormatTokenUpdate(00); ORS.ModuleTagP(LSPhConstants.CallParamStart); Check(ORS.lparen, "no (");
-     npar := pno MOD 10; pno := pno DIV 10; expression(x); nap := 1;
++    npar := pno MOD 10; pno := pno DIV 10; expression1(x, symAtEnd); nap := 1;
++    IF symAtEnd & (pno IN {0,1,2,3,5,6,7}) THEN ORS.ModuleTagH(LSPhConstants.VarModified) END;
      IF sym = ORS.comma THEN
 +      ORS.ModuleTagP(LSPhConstants.ParamNext);
        ORS.Get(sym); expression(y); nap := 2; z.type := ORB.noType;
@@ -862,7 +1024,7 @@
      Check(ORS.rparen, "no )");
      IF (npar = nap) OR (pno IN {0, 1}) THEN 
        IF pno IN {0, 1} THEN (*INC, DEC*)
-@@ -462,6 +472,7 @@
+@@ -462,6 +480,7 @@
  
    PROCEDURE StatSequence;
      VAR obj: ORB.Object;
@@ -870,18 +1032,18 @@
        orgtype: ORB.Type; (*original type of case var*)
        x, y, z, w: ORG.Item;
        L0, L1, rx: LONGINT;
-@@ -493,8 +504,9 @@
+@@ -493,8 +512,9 @@
        IF sym = ORS.ident THEN
          qualident(obj); ORG.MakeItem(x, obj, level);
          IF x.mode = ORB.SProc THEN StandProc(obj.val)
 -        ELSE selector(x);
 +        ELSE selector(x, symAtEnd);
            IF sym = ORS.becomes THEN (*assignment*)
-+            IF symAtEnd THEN ORS.ModuleTag(LSPhConstants.VarModified) END;
++            IF symAtEnd THEN ORS.ModuleTagH(LSPhConstants.VarModified) END;
              ORS.Get(sym); CheckReadOnly(x); expression(y);
              IF CompTypes(x.type, y.type, FALSE) THEN
                IF (x.type.form <= ORB.Pointer) OR (x.type.form = ORB.Proc) THEN ORG.Store(x, y)
-@@ -511,6 +523,7 @@
+@@ -511,6 +531,7 @@
              END
            ELSIF sym = ORS.eql THEN ORS.Mark("should be :="); ORS.Get(sym); expression(y)
            ELSIF sym = ORS.lparen THEN (*procedure call*)
@@ -889,7 +1051,7 @@
              ORS.Get(sym);
              IF (x.type.form = ORB.Proc) & (x.type.base.form = ORB.NoTyp) THEN
                ORG.PrepCall(x, rx); ParamList(x); ORG.Call(x, rx)
-@@ -525,27 +538,39 @@
+@@ -525,27 +546,39 @@
          END
        ELSIF sym = ORS.if THEN
          ORS.Get(sym); expression(x); CheckBool(x); ORG.CFJump(x);
@@ -930,11 +1092,11 @@
            ORS.Get(sym); expression(x); CheckBool(x); ORG.CBJump(x, L0)
          ELSE ORS.Mark("missing UNTIL")
          END
-@@ -554,13 +579,17 @@
+@@ -554,13 +587,17 @@
          IF sym = ORS.ident THEN
            qualident(obj); ORG.MakeItem(x, obj, level); CheckInt(x); CheckReadOnly(x);
            IF sym = ORS.becomes THEN
-+            ORS.ModuleTag(LSPhConstants.VarModified);
++            ORS.ModuleTagH(LSPhConstants.VarModified);
              ORS.Get(sym); expression(y); CheckInt(y); ORG.For0(x, y); L0 := ORG.Here();
              Check(ORS.to, "no TO"); expression(z); CheckInt(z); obj.rdo := TRUE;
              IF sym = ORS.by THEN ORS.Get(sym); expression(w); CheckConst(w); CheckInt(w)
@@ -949,7 +1111,7 @@
              ORG.For2(x, y, w); ORG.BJump(L0); ORG.FixLink(L1); obj.rdo := FALSE
            ELSE ORS.Mark(":= expected")
            END
-@@ -571,17 +600,20 @@
+@@ -571,17 +608,20 @@
          IF sym = ORS.ident THEN
            qualident(obj); orgtype := obj.type;
            IF (orgtype.form = ORB.Pointer) OR (orgtype.form = ORB.Record) & (obj.class = ORB.Par) THEN
@@ -970,7 +1132,7 @@
          Check(ORS.end, "no END")
        END ;
        ORG.CheckRegs;
-@@ -593,19 +625,23 @@
+@@ -593,19 +633,23 @@
  
    (* Types and declarations *)
  
@@ -998,7 +1160,7 @@
      END
    END IdentList;
    
-@@ -625,7 +661,7 @@
+@@ -625,7 +669,7 @@
      typ.form := ORB.Array; typ.len := len; type := typ
    END ArrayType;
  
@@ -1007,7 +1169,7 @@
      VAR obj, obj0, new, bot, base: ORB.Object;
        typ, tp: ORB.Type;
        offset, off, n: LONGINT;
-@@ -645,37 +681,50 @@
+@@ -645,37 +689,50 @@
          END
        ELSE ORS.Mark("ident expected")
        END ;
@@ -1061,7 +1223,7 @@
      IF (cl = ORB.Var) & (tp.form >= ORB.Array) THEN cl := ORB.Par; rdo := TRUE END ;
      IF (tp.form = ORB.Array) & (tp.len < 0) OR (tp.form = ORB.Record) THEN
        parsize := 2*ORG.WordSize  (*open array or record, needs second word for length or type tag*)
-@@ -686,17 +735,20 @@
+@@ -686,17 +743,20 @@
        INC(nofpar); obj.class := cl; obj.type := tp; obj.rdo := rdo; obj.lev := level; obj.val := adr;
        adr := adr + parsize; obj := obj.next
      END ;
@@ -1087,7 +1249,7 @@
          Check(ORS.rparen, "no )")
        END ;
        IF sym = ORS.colon THEN  (*function*)
-@@ -726,7 +778,7 @@
+@@ -726,7 +786,7 @@
        FormalType(typ.base, dim+1)
      ELSIF sym = ORS.procedure THEN
        ORS.Get(sym); ORB.OpenScope;
@@ -1096,7 +1258,7 @@
        typ.dsc := ORB.topScope.next; ORB.CloseScope
      ELSE ORS.Mark("identifier expected"); typ := ORB.noType
      END
-@@ -751,7 +803,12 @@
+@@ -751,7 +811,12 @@
        END
      ELSIF sym = ORS.array THEN ORS.Get(sym); ArrayType(type)
      ELSIF sym = ORS.record THEN
@@ -1110,17 +1272,17 @@
      ELSIF sym = ORS.pointer THEN
        ORS.Get(sym); Check(ORS.to, "no TO");
        NEW(type);  type.form := ORB.Pointer; type.size := ORG.WordSize; type.base := ORB.intType;
-@@ -764,7 +821,9 @@
+@@ -764,7 +829,9 @@
            ELSE ORS.Mark("no valid base type")
            END
          ELSE CheckRecLevel(level); (*enter into list of forward references to be fixed in Declarations*)
-+          ORS.ModuleTag(LSPhConstants.ForwardPointer);
++          ORS.ModuleTagH(LSPhConstants.ForwardPointer);
            NEW(ptbase); ORS.CopyId(ptbase.name); ptbase.type := type; ptbase.next := pbsList; pbsList := ptbase
 +          ;ptbase.symPos := ORS.Pos()
          END ;
          ORS.Get(sym)
        ELSE Type(type.base);
-@@ -774,7 +833,7 @@
+@@ -774,7 +841,7 @@
      ELSIF sym = ORS.procedure THEN
        ORS.Get(sym); ORB.OpenScope;
        NEW(type); type.form := ORB.Proc; type.size := ORG.WordSize; dmy := 0;
@@ -1129,7 +1291,7 @@
      ELSE ORS.Mark("illegal type")
      END
    END Type0;
-@@ -783,48 +842,84 @@
+@@ -783,48 +850,84 @@
      VAR obj, first: ORB.Object;
        x: ORG.Item; tp: ORB.Type; ptbase: PtrBase;
        expo: BOOLEAN; id: ORS.Ident;
@@ -1141,7 +1303,7 @@
      IF sym = ORS.const THEN
 +      ORS.ModuleTagPP(LSPhConstants.DeclarationBlockStart, ORS.Pos() - 5);
 +      IF level = 0 THEN ORS.FormatTokenUpdate(31) END;
-+      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++      ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +      ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +      endPos := ORS.Pos();
        ORS.Get(sym);
@@ -1168,7 +1330,7 @@
      IF sym = ORS.type THEN
 +      ORS.ModuleTagPP(LSPhConstants.DeclarationBlockStart, ORS.Pos() - 4);
 +      IF level = 0 THEN ORS.FormatTokenUpdate(31) END;
-+      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++      ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +      ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +      endPos := ORS.Pos();
        ORS.Get(sym);
@@ -1209,7 +1371,7 @@
      IF sym = ORS.var THEN
 +      ORS.ModuleTagPP(LSPhConstants.DeclarationBlockStart, ORS.Pos() - 3);
 +      IF level = 0 THEN ORS.FormatTokenUpdate(31) ELSE ORS.FormatTokenUpdate(21) END;
-+      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++      ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +      ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +      endPos := ORS.Pos();
        ORS.Get(sym);
@@ -1220,7 +1382,7 @@
          obj := first;
          WHILE obj # NIL DO
            obj.type := tp; obj.lev := level;
-@@ -833,8 +928,11 @@
+@@ -833,8 +936,11 @@
            IF obj.expo THEN obj.exno := exno; INC(exno) END ;
            obj := obj.next
          END ;
@@ -1232,7 +1394,7 @@
      END ;
      varsize := (varsize + 3) DIV 4 * 4;
      ptbase := pbsList;
-@@ -850,20 +948,26 @@
+@@ -850,20 +956,29 @@
        type: ORB.Type;
        procid: ORS.Ident;
        x: ORG.Item;
@@ -1244,7 +1406,7 @@
 +  BEGIN (* ProcedureDecl *) int := FALSE;
 +    IF level = 0 THEN ORS.FormatTokenUpdate(31) ELSE ORS.FormatTokenUpdate(21) END;
 +    ORS.ModuleTag(LSPhConstants.ProcedureStart);
-+    ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++    ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +    ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +    ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +    ORS.Get(sym);
@@ -1262,27 +1424,30 @@
        ORB.OpenScope; INC(level); type.base := ORB.noType;
 -      ProcedureType(type, parblksize);  (*formal parameter list*)
 +      ProcedureType(type, parblksize, TRUE);  (*formal parameter list*)
++      IF proc.expo & (type.nofpar = 0) & (type.base = ORB.noType) THEN
++        ORS.ModuleTagH(LSPhConstants.CommandExported)
++      END;
        Check(ORS.semicolon, "no ;"); locblksize := parblksize; 
        Declarations(locblksize);
        proc.val := ORG.Here() * 4; proc.type.dsc := ORB.topScope.next;
-@@ -873,8 +977,15 @@
+@@ -873,8 +988,15 @@
          ORG.FixOne(L); proc.val := ORG.Here() * 4; proc.type.dsc := ORB.topScope.next
        END ;
        ORG.Enter(parblksize, locblksize, int);
 -      IF sym = ORS.begin THEN ORS.Get(sym); StatSequence END ;
-+      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++      ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +      IF sym = ORS.begin THEN
-+        ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++        ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +        ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +        ORS.Get(sym); StatSequence
 +      END ;
        IF sym = ORS.return THEN
-+        ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++        ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +        ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
          ORS.Get(sym); expression(x);
          IF type.base = ORB.noType THEN ORS.Mark("this is not a function")
          ELSIF ~CompTypes(type.base, x.type, FALSE) THEN ORS.Mark("wrong result type")
-@@ -883,47 +994,66 @@
+@@ -883,47 +1005,66 @@
          ORS.Mark("function without result"); type.base := ORB.noType
        END ;
        ORG.Return(type.base.form, x, locblksize, int);
@@ -1353,19 +1518,19 @@
        END ;
        Check(ORS.semicolon, "no ;"); level := 0; exno := 1; key := 0;
        IF sym = ORS.import THEN
-+        ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++        ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +        ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
          ORS.Get(sym); Import;
          WHILE sym = ORS.comma DO ORS.Get(sym); Import END ;
          Check(ORS.semicolon, "; missing")
-@@ -931,29 +1061,38 @@
+@@ -931,29 +1072,38 @@
        ORG.Open(version); Declarations(dc); ORG.SetDataSize((dc + 3) DIV 4 * 4);
        WHILE sym = ORS.procedure DO ProcedureDecl; Check(ORS.semicolon, "no ;") END ;
        ORG.Header;
 -      IF sym = ORS.begin THEN ORS.Get(sym); StatSequence END ;
-+      ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++      ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +      IF sym = ORS.begin THEN
-+        ORS.FormatTokenTag(LSPhConstants.OutdentThisLine);
++        ORS.FormatTokenTag(LSPhConstants.OutdentThisLineAndComment);
 +        ORS.FormatTokenTag(LSPhConstants.IndentNextLine);
 +        ORS.Get(sym); StatSequence
 +      END ;
@@ -1384,10 +1549,10 @@
 +      IF sym # ORS.period THEN ORS.Mark("period missing") ELSE
 +        ORS.Get(sym); IF sym # ORS.eot THEN ORS.Mark("trailing content in file") END
 +      END ;
-+      IF (ORS.errcnt = 0) & (version # 0) & (ORS.lspMode = LSPhConstants.GetModuleInfo) THEN
++      IF (ORS.errcnt = 0) & (version # 0) & ((ORS.lspMode = LSPhConstants.GetModuleInfo) OR (ORS.lspMode >= LSPhConstants.CompileSymbolFile)) THEN
          ORB.Export(modid, newSF, key);
 -        IF newSF THEN Texts.WriteString(W, " new symbol file") END
-+        IF newSF THEN RS232.Send(LSPhConstants.SymbolFileChanged) END
++        IF newSF & (ORS.lspMode = LSPhConstants.GetModuleInfo) THEN RS232.Send(LSPhConstants.SymbolFileChanged) END
        END ;
        IF ORS.errcnt = 0 THEN
          ORG.Close(modid, key, exno);
@@ -1405,24 +1570,30 @@
    PROCEDURE Option(VAR S: Texts.Scanner);
    BEGIN newSF := FALSE;
      IF S.nextCh = "/" THEN
-@@ -993,9 +1132,17 @@
+@@ -993,9 +1143,22 @@
      END ;
      Oberon.Collect(0)
    END Compile;
 +  *)
- 
--BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "OR Compiler  8.3.2020");
--  Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
++
++  PROCEDURE AnalyzeText*(VAR T: Texts.Text; beg: INTEGER);
++  BEGIN
++    ORS.Init(T, beg); newSF := TRUE; Module
++  END AnalyzeText;
++
 +  PROCEDURE Analyze*;
 +    VAR beg, end, time: LONGINT;
 +      T: Texts.Text;
 +  BEGIN
-+    NEW(T); Texts.Open(T, "Tmp.Tmp"); ORS.Init(T, 0); newSF := TRUE; Module
++    NEW(T); Texts.Open(T, "Tmp.Tmp"); AnalyzeText(T, 0)
 +  END Analyze;
-+
+ 
+-BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "OR Compiler  8.3.2020");
+-  Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
 +BEGIN
    NEW(dummy); dummy.class := ORB.Var; dummy.type := ORB.intType;
-+  dummy.lspClass := LSPhConstants.SynVariable; dummy.defEndPos := -1;
-   expression := expression0; Type := Type0; FormalType := FormalType0
+-  expression := expression0; Type := Type0; FormalType := FormalType0
 -END ORP.
++  dummy.lspClass := LSPhConstants.SynVariable; dummy.defEndPos := -1;
++  expression1 := expression0; Type := Type0; FormalType := FormalType0
 +END LSPhORP.

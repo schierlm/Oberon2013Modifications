@@ -4,6 +4,9 @@ MODULE LSPhConstants;
     (* instruction codes *)
     GetModuleInfo* = 100; AutoComplete* = 101; ReFormat* = 102; SwitchEmbeddedMode* = 103; Exit* = 104;
 
+    (* external instructions *)
+    CompileSymbolFile* = 1000; HighlightCallback* = 1001; FormatCallback* = 1002;
+
     (* status codes, where needed *)
     OK* = 0; Invalid* = 1;
 
@@ -15,13 +18,14 @@ MODULE LSPhConstants;
     ForwardPointer* = 26; ForwardPointerFixup* = 27; DefinitionRepeat* = 28;
     DefinitionUsed* = 29; DeclarationBlockStart* = 30; DeclarationBlockEnd* = 31;
     DefinitionListStart* = 32; DefinitionListValue* = 33; DefinitionListEnd*= 34;
-    SymbolFileIndex* = 35;
+    SymbolFileIndex* = 35; CommandExported* = 36;
 
     (* autocomplete answer packets *)
     Completion* = 80;
 
     (* reformat answer packets *)
     FormatToken* = 90; FormatTokenUpdate* = 91; IndentNextLine* = 92; OutdentThisLine*= 93;
+    OutdentThisLineAndComment* = 94; TokenIsComment* = 95;
 
     (* syntax elements *)
     SynOperator* = 1; SynType* = 2; SynKeyword* = 3; SynString* = 4; SynComment* = 5; SynConstant* = 6;

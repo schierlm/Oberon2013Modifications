@@ -38,7 +38,7 @@ MODULE LSPhServer;
         FOR i := 0 TO len-1 DO Rec(x); Files.WriteByte(R, x) END;
         IF code = LSPhConstants.AutoComplete THEN Files.Write(R, 3X) END;
         Files.Register(F);
-        LSPhORS.SetMode(code);
+        LSPhORS.SetMode(code, NIL);
         LSPhORP.Analyze();
         RS232.Send(LSPhConstants.OK)
       ELSIF code = LSPhConstants.SwitchEmbeddedMode THEN
