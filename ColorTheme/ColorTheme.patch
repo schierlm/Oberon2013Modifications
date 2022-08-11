@@ -424,14 +424,13 @@
  BEGIN NEW(TBuf); NEW(DelBuf);
 --- 1/System.Mod.txt
 +++ 2/System.Mod.txt
-@@ -305,6 +305,26 @@
+@@ -305,6 +305,32 @@
      Texts.WriteString(W, "  Tasks"); Texts.WriteInt(W, Oberon.NofTasks, 4); EndLine
    END Watch;
  
 +  PROCEDURE SetColorTheme*;
 +    VAR S: Texts.Scanner;
-+      w, h: INTEGER;
-+      tmp: BOOLEAN;
++      doit: BOOLEAN;
 +      mix: BOOLEAN; fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc: INTEGER;
 +  BEGIN GetArg(S);
 +    IF (S.class = Texts.Char) & (S.c = "*") THEN mix := TRUE; Texts.Scan(S) ELSE mix := FALSE END;
@@ -445,7 +444,14 @@
 +    IF S.class = Texts.Int THEN cmc := S.i; Texts.Scan(S) ELSE cmc := cc END;
 +    IF S.class = Texts.Int THEN sc := S.i; Texts.Scan(S) ELSE sc := cc END;
 +    IF S.class = Texts.Int THEN uc := S.i; Texts.Scan(S) ELSE uc := cc END;
-+    Oberon.SetColorTheme(mix, fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc)
++    IF (S.class = Texts.Char) & (S.c = "@") THEN
++      Texts.Scan(S); doit := (S.class = Texts.Int) & (S.i = Display.Depth)
++    ELSE
++      doit := TRUE
++    END;
++    IF doit THEN
++      Oberon.SetColorTheme(mix, fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc)
++    END
 +  END SetColorTheme;
 +
    PROCEDURE ShowModules*;

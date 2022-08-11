@@ -36,10 +36,9 @@
    END SetColorTheme;
 --- 1/System.Mod.txt
 +++ 2/System.Mod.txt
-@@ -309,20 +309,20 @@
+@@ -309,25 +309,25 @@
      VAR S: Texts.Scanner;
-       w, h: INTEGER;
-       tmp: BOOLEAN;
+       doit: BOOLEAN;
 -      mix: BOOLEAN; fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc: INTEGER;
 +      mix: BOOLEAN; colors: ARRAY 10 OF INTEGER;
    BEGIN GetArg(S);
@@ -54,7 +53,6 @@
 -    IF S.class = Texts.Int THEN cmc := S.i; Texts.Scan(S) ELSE cmc := cc END;
 -    IF S.class = Texts.Int THEN sc := S.i; Texts.Scan(S) ELSE sc := cc END;
 -    IF S.class = Texts.Int THEN uc := S.i; Texts.Scan(S) ELSE uc := cc END;
--    Oberon.SetColorTheme(mix, fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc)
 +    IF S.class = Texts.Int THEN colors[0] := S.i; Texts.Scan(S) ELSE colors[0] := Display.white END;
 +    IF S.class = Texts.Int THEN colors[1] := S.i; Texts.Scan(S) ELSE colors[1] := Display.black END;
 +    IF S.class = Texts.Int THEN colors[2] := S.i; Texts.Scan(S) ELSE colors[2] := colors[0] END;
@@ -65,7 +63,14 @@
 +    IF S.class = Texts.Int THEN colors[7] := S.i; Texts.Scan(S) ELSE colors[7] := colors[6] END;
 +    IF S.class = Texts.Int THEN colors[8] := S.i; Texts.Scan(S) ELSE colors[8] := colors[6] END;
 +    IF S.class = Texts.Int THEN colors[9] := S.i; Texts.Scan(S) ELSE colors[9] := colors[6] END;
-+    Oberon.SetColorTheme(mix, colors)
+     IF (S.class = Texts.Char) & (S.c = "@") THEN
+       Texts.Scan(S); doit := (S.class = Texts.Int) & (S.i = Display.Depth)
+     ELSE
+       doit := TRUE
+     END;
+     IF doit THEN
+-      Oberon.SetColorTheme(mix, fc, bc, mbc, tbc, smc, sbc, cc, cmc, sc, uc)
++      Oberon.SetColorTheme(mix, colors)
+     END
    END SetColorTheme;
  
-   PROCEDURE ShowModules*;

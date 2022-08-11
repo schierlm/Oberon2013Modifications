@@ -34,6 +34,10 @@ rest is filled with defaults as shown):
 In addition, a flag can be configured that the text color should be mixed with the frame background color
 before applying it in `Display.invert` mode. To set the flag, prepend the colors list with an asterisk.
 
+In case you apply a theme as part of a script, you can suffix the color list with an @ symbol and the
+desired color depth, e.g. `@4`: This will apply the theme only if the current color depth is 4 bits
+per pixel.
+
 Installation
 ------------
 
