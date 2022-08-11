@@ -1,5 +1,5 @@
 MODULE KeyTester;
-  IMPORT SYSTEM, Kernel, Modules, Display, Fonts, Viewers, Oberon, MenuViewers, TextFrames;
+  IMPORT SYSTEM, Kernel, Display, Fonts, Viewers, Texts, Oberon, MenuViewers, TextFrames;
 
   CONST
     Menu = "System.Close  System.Copy  System.Grow  KeyTester.Start  KeyTester.Delay0  KeyTester.Delay100  KeyTester.Delay500";
@@ -17,6 +17,23 @@ MODULE KeyTester;
     keys: ARRAY KeyCount OF KeyInfo;
     keylookup: ARRAY 3*256 OF INTEGER;
     delay: INTEGER;
+
+  PROCEDURE Dump*;
+  VAR
+    W: Texts.Writer;
+    value: INTEGER;
+  BEGIN
+    Texts.OpenWriter(W);
+    WHILE TRUE DO
+      IF SYSTEM.BIT(msAdr, 28) THEN
+        SYSTEM.GET(kbdAdr, value);
+        Texts.WriteString(W, "KeyEvent: ");
+        Texts.WriteHex(W, value);
+        Texts.WriteLn(W);
+        Texts.Append(Oberon.Log, W.buf);
+      END
+    END
+  END Dump;
 
   PROCEDURE DrawText(text: ARRAY OF CHAR; x, y: INTEGER);
   VAR
