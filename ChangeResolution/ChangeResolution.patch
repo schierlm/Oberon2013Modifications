@@ -90,3 +90,38 @@
    PROCEDURE ShowFonts*;
      VAR fnt: Fonts.Font;
    BEGIN Texts.WriteString(W, "System.ShowFonts"); Texts.WriteLn(W); fnt := Fonts.root;
+--- GraphicFrames.Mod.txt
++++ GraphicFrames.Mod.txt
+@@ -64,7 +64,7 @@
+     tack*, dotted*, dotted1*: INTEGER;  (*patterns*)
+     newcap: Graphics.Caption;
+     TBuf: Texts.Buffer;
+-    DW, DH, CL: INTEGER;
++    CL: INTEGER;
+     W: Texts.Writer;
+ 
+   (*Exported procedures:
+@@ -100,11 +100,11 @@
+   PROCEDURE FlipCross(X, Y: INTEGER);
+   BEGIN
+     IF X < CL THEN
+-      IF X < 7 THEN X := 7 ELSIF X > DW - 7 THEN X := DW - 7 END
++      IF X < 7 THEN X := 7 ELSIF X > (Display.Width - 8) - 7 THEN X := (Display.Width - 8) - 7 END
+     ELSE
+-      IF X < CL + 7 THEN X := CL + 7 ELSIF X > CL + DW - 7 THEN X := CL + DW - 7 END
++      IF X < CL + 7 THEN X := CL + 7 ELSIF X > CL + (Display.Width - 8) - 7 THEN X := CL + (Display.Width - 8) - 7 END
+     END;
+-    IF Y < 7 THEN Y := 7 ELSIF Y > DH THEN Y := DH - 7 END;
++    IF Y < 7 THEN Y := 7 ELSIF Y > (Display.Height - 8) THEN Y := (Display.Height - 8) - 7 END;
+     Display.CopyPattern(Display.white, Display.cross, X-7, Y-7, Display.invert)
+   END FlipCross;
+ 
+@@ -519,7 +519,7 @@
+     G.mark.next := NIL; G.ticked := TRUE; G.handle := Handle
+   END Open;
+ 
+-BEGIN DW := Display.Width - 8; DH := Display.Height - 8; CL := 0;
++BEGIN CL := 0;
+   Texts.OpenWriter(W);
+   NEW(TBuf); Texts.OpenBuf(TBuf);
+   tack := SYSTEM.ADR($0707 4122 1408 1422 4100$);

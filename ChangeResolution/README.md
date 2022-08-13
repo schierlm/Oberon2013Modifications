@@ -13,11 +13,14 @@ A command `System.SetScreenSize` will read the desired resolution, try to set it
 then inform the system by calling `Oberon.UpdateScreenSize`, which will in turn inform `Input` (to update
 the mouse bounds) and `Viewers` (to resize all open viewers and tracks).
 
+`GraphicFrames.Mod` contains a cached copy of `Display.Width` and `Display.Height`, which will be removed
+by this modification.
+
 Installation
 ------------
 
 - Apply [`ChangeResolution.patch`](ChangeResolution.patch) to `Display.Mod`, `Viewers.Mod`,
-  `Oberon.Mod` and `System.Mod`.
+  `Oberon.Mod`, `System.Mod`, and optionally `GraphicFrames.Mod`.
 
 - Probably use a different `Display´ driver that actually supports multiple resolutions.
 
@@ -29,6 +32,7 @@ Installation
       ORP.Compile TextFrames.Mod/s ~
       ORP.Compile System.Mod/s ~
       ORP.Compile Edit.Mod/s ~
+      ORP.Compile GraphicFrames.Mod/s ~
       ORP.Compile ORS.Mod/s ORB.Mod/s ~
       ORP.Compile ORG.Mod/s ORP.Mod/s ~
 
