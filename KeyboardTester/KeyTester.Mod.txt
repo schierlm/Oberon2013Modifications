@@ -63,7 +63,7 @@ MODULE KeyTester;
       IF keys[i].pressed THEN
           col := Display.black
       END;
-      Display.ReplConst(1-col, xx, yy, ww, hh, Display.replace);
+      Display.ReplConst((Display.black+Display.white)-col, xx, yy, ww, hh, Display.replace);
       Display.ReplConst(col, xx, yy, ww, 1, Display.replace);
       Display.ReplConst(col, xx, yy + hh, ww, 1, Display.replace);
       Display.ReplConst(col, xx, yy, 1, hh, Display.replace);
