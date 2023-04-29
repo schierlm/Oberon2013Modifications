@@ -73,6 +73,8 @@ ORP.Compile ColorPalette.Mod/s PaletteEdit.Mod/s ~
 
 ORP.Compile LSPUtil.Mod/s ORHighlighter.Mod/s ORFormatter.Mod/s ~
 
+ORP.Compile HostTransfer.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~

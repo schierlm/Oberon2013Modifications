@@ -62,6 +62,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | **[EmbeddableCompiler](EmbeddableCompiler/README.md)**† | Version of the Oberon RISC Compiler that does not (directly) depend on Fonts/Texts/Oberon | None |
 | **[FontConversion](FontConversion/README.md)** | Conversions to and between Oberon .Scn.Fnt files | Optionally patch Display.Mod |
 | **[HardwareEnumerator](HardwareEnumerator/README.md)** | Make disk images hardware independent by enumerating hardware at startup | Recompile inner core |
+| **[HostTransfer](HostTransfer/README.md)** | Allow systems within emulators to copy files from/to the host | Hardware Enumerator |
 | **[ImageBuilder](ImageBuilder/README.md)** | Build disk images | None |
 | **[InnerEmulator](InnerEmulator/README.md)** | Emulate a RISC processor on the Oberon system | None (except patience when starting it up) |
 | **[KernelDebugger](KernelDebugger/README.md)**‡ | Debug and inspect one RISC5 machine from another one via serial link | Apply ORStackInspect; recompile everything including inner core |
