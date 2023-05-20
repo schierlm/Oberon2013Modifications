@@ -41,6 +41,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 
 | Name/Link | Short description | Requirements |
 |:--------- |:----------------- |:------------ |
+| **[BiSixelFont](BiSixelFont/README.md)**| Display small images in Text frames | None |
 | **[BugFixes](BugFixes/README.md)** | Fixes for what I consider to be bugs | Optionally recompile inner core |
 | **[CacheCoherence](CacheCoherence/README.md)**| Invalidate code cache after loading modules | Recompile inner core |
 | **[Calculator](Calculator/README.md)**| Simple prefix notation calculator | None |

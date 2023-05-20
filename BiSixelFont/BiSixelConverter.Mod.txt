@@ -1,0 +1,244 @@
+MODULE BiSixelConverter;
+  IMPORT Files, Display, Fonts, Texts, Oberon;
+  CONST BufRow = 84; (*  84 * 12 + 16 = 1024  *)
+
+  TYPE Buffer = POINTER TO BufferDesc;
+
+    BufferDesc = RECORD
+      next: Buffer;
+      data: ARRAY 12 OF ARRAY BufRow OF BYTE;
+    END;
+
+    ConversionContext = RECORD
+      skippedColor: INTEGER;
+      target: Texts.Text;
+    END;
+
+    BufferHandler = PROCEDURE(width: INTEGER; buffer: Buffer; VAR context: ConversionContext);
+
+  VAR W: Texts.Writer;
+
+  PROCEDURE WriteRowPart(pixels: SET; offset: INTEGER; table: ARRAY OF CHAR);
+    VAR val, i: INTEGER;
+  BEGIN val := 0;
+    FOR i := offset + 3 TO offset BY -1 DO
+      val := val * 2;
+      IF i IN pixels THEN INC(val) END
+    END;
+    IF val # 0 THEN Texts.Write(W, table[val-1]) END
+  END WriteRowPart;
+
+  PROCEDURE WriteMixedRow(pixels: SET; advance: BOOLEAN);
+  BEGIN
+    WriteRowPart(pixels, 0, "0123456789ABCDE");
+    WriteRowPart(pixels, 8, "UVWXYZabcdefghi");
+    IF ~advance THEN
+      WriteRowPart(pixels, 4, "FGHIJKLMNOPQRST")
+    ELSIF pixels * { 4 .. 7 } = {} THEN
+      Texts.Write(W, " ")
+    ELSE
+      WriteRowPart(pixels, 4, "jklmnopqrstuvwx")
+    END
+  END WriteMixedRow;
+
+  PROCEDURE WriteFullRows(VAR cnt: INTEGER; single, block: CHAR);
+  BEGIN
+    WHILE cnt >= 12 DO Texts.Write(W, block); DEC(cnt, 12) END;
+    WHILE cnt >= 1 DO Texts.Write(W, single); DEC(cnt) END;
+  END WriteFullRows;
+
+  PROCEDURE MonoHandler(width: INTEGER; buffer: Buffer; VAR context: ConversionContext);
+  VAR i, j, clearCount,fullCount: INTEGER;
+    pixels: SET;
+    curBuf: Buffer;
+  BEGIN clearCount := 0; fullCount := 0; curBuf := buffer;
+    FOR i := 0 TO width - 1 DO
+      IF (i # 0) & (i MOD (BufRow * 8) = 0) THEN curBuf := curBuf.next END;
+      pixels := {};
+      FOR j := 0 TO 11 DO
+        IF ODD(curBuf.data[j][i DIV 8 MOD BufRow] DIV LSL(1, i MOD 8)) THEN
+          INCL(pixels, j)
+        END
+      END;
+      IF pixels = {} THEN
+        WriteFullRows(fullCount, "y", "z");
+        INC(clearCount)
+      ELSIF pixels = {0 .. 11} THEN
+        WriteFullRows(clearCount, " ", 9X);
+        INC(fullCount)
+      ELSE
+        WriteFullRows(clearCount, " ", 9X);
+        WriteFullRows(fullCount, "y", "z");
+        WriteMixedRow(pixels, TRUE)
+      END;
+    END;
+    WriteFullRows(fullCount, "y", "z");
+    Texts.WriteLn(W); Texts.Append(context.target, W.buf)
+  END MonoHandler;
+
+  PROCEDURE ReadShort(VAR R: Files.Rider; VAR short: INTEGER);
+    VAR b0, b1: BYTE;
+  BEGIN
+    Files.ReadByte(R, b0); Files.ReadByte(R, b1); short := b0 + b1 * 100H
+  END ReadShort;
+
+  PROCEDURE LoadPicture(F: Files.File; depth: INTEGER; handler: BufferHandler; VAR context: ConversionContext);
+    VAR x, y, bufY, byteWidth, i, width, height: INTEGER;
+      b: BYTE;
+      run: BOOLEAN;
+      curBuf, firstBuf: Buffer;
+      R: Files.Rider;
+  BEGIN
+    Files.Set(R, F, 0);
+    ReadShort(R, i);
+    ASSERT(i = 0F003H);
+    ReadShort(R, width);
+    ReadShort(R, height);
+    ASSERT(height MOD 12 = 0);
+    ReadShort(R, i);
+    ASSERT(i = depth); (* depth *)
+    IF depth = 1 THEN i := 2 ELSIF depth = 4 THEN i := 16 ELSE ASSERT(FALSE) END;
+    FOR y := 0 TO i * 3 - 1 BY 2 DO ReadShort(R, x) END; (* palette *)
+    byteWidth := (width + 8 DIV depth - 1) DIV (8 DIV depth);
+    (* create buffers *)
+    firstBuf := NIL; x := byteWidth;
+    WHILE x > 0 DO DEC(x, BufRow); NEW(curBuf); curBuf.next := firstBuf; firstBuf := curBuf END;
+    (* convert pixel data *)
+    i := 0; y := 0; bufY := 12;
+    FOR y := height - 1 TO 0 BY -1 DO
+      DEC(bufY); curBuf := firstBuf; x := 0;
+      WHILE x < byteWidth DO
+        IF i = 0 THEN
+          Files.ReadByte(R, b);
+          IF b >= 80H THEN
+            i := 101H - b; run := TRUE;
+            Files.ReadByte(R, b)
+          ELSE
+            i := b + 1; run := FALSE
+          END
+        END;
+        DEC(i);
+        IF ~run THEN Files.ReadByte(R, b) END;
+        curBuf.data[bufY][x MOD BufRow] := b; INC(x);
+        IF x MOD BufRow = 0 THEN curBuf := curBuf.next END;
+      END;
+      IF bufY = 0 THEN handler(width, firstBuf, context); bufY := 12 END;
+    END
+  END LoadPicture;
+
+  PROCEDURE ConvertParse(depth: INTEGER; handler: BufferHandler);
+    VAR beg, end, t: INTEGER;
+      CC: ConversionContext;
+      S: Texts.Scanner;
+      text: Texts.Text;
+      F: Files.File;
+  BEGIN CC.skippedColor := -1;
+    Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+    IF (S.class = Texts.Char) & (S.c = "^") THEN
+      Oberon.GetSelection(text, beg, end, t);
+      IF t >= 0 THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
+    END;
+    IF (S.class = Texts.Int) & (depth = 4) THEN
+      CC.skippedColor := S.i; Texts.Scan(S)
+    END; F := NIL;
+    IF (S.class = Texts.Name)  THEN
+      F := Files.Old(S.s);
+    END;
+    IF F # NIL THEN
+      NEW(CC.target); Texts.Open(CC.target, "");
+      Texts.SetFont(W, Fonts.This("BiSixel.Scn.Fnt")); Texts.SetColor(W, Display.white);
+      LoadPicture(F, depth, handler, CC); Files.Close(F);
+      Texts.Scan(S);
+      IF (S.class = Texts.Name) THEN
+        Texts.Close(CC.target, S.s)
+      ELSE
+        Texts.Delete(CC.target, 0, CC.target.len, W.buf);
+        Texts.Append(Oberon.Log, W.buf);
+      END
+    END
+  END ConvertParse;
+
+  PROCEDURE Convert*; (* command *)
+  BEGIN ConvertParse(1, MonoHandler)
+  END Convert;
+
+  (* 16 color support *)
+
+  PROCEDURE WriteMixedColorRow(colors: ARRAY OF INTEGER; color: INTEGER; advance: BOOLEAN);
+    VAR monoPixels: SET; i: INTEGER;
+  BEGIN monoPixels := {0};
+    FOR i := 0 TO 11 DO
+      IF colors[i] = color THEN INCL(monoPixels, i) END
+    END;
+    Texts.SetColor(W, color);
+    WriteMixedRow(monoPixels, advance)
+  END WriteMixedColorRow;
+
+  PROCEDURE WriteFullColorRows(VAR cnt: INTEGER; color: INTEGER);
+  BEGIN
+    IF color = 16 THEN
+      WriteFullRows(cnt, " ", 9X)
+    ELSIF cnt > 0 THEN
+      Texts.SetColor(W, color);
+      WriteFullRows(cnt, "y", "z")
+    END
+  END WriteFullColorRows;
+
+  PROCEDURE ColorHandler(width: INTEGER; buffer: Buffer; VAR context: ConversionContext);
+  VAR i, j, runColor, runCount, lastColor: INTEGER;
+    writtenColors: SET; b : BYTE; sameColor: BOOLEAN;
+    curBuf: Buffer;
+    colors: ARRAY 12 OF INTEGER;
+  BEGIN
+    runCount := 0; curBuf := buffer;
+    FOR i := 0 TO width - 1 DO
+      IF (i # 0) & (i MOD (BufRow * 2) = 0) THEN curBuf := curBuf.next END;
+      sameColor := TRUE;
+      FOR j := 0 TO 11 DO
+        b := curBuf.data[j][i DIV 2 MOD BufRow];
+        IF ODD(i) THEN b := b DIV 16 END;
+        colors[j] := b MOD 16;
+        IF colors[j] = context.skippedColor THEN colors[j] := 16 END;
+        IF colors[j] # colors[0] THEN sameColor := FALSE END;
+      END;
+      IF sameColor THEN
+        IF (runCount > 0) & (colors[0] = runColor) THEN
+          INC(runCount)
+        ELSE
+          WriteFullColorRows(runCount, runColor);
+          runColor := colors[0];
+          runCount := 1
+        END
+      ELSE
+        WriteFullColorRows(runCount, runColor);
+        writtenColors := {16};
+        lastColor := 16; j := 4;
+        WHILE (j < 8) & (lastColor = 16) DO
+          lastColor := colors[j]; INC(j)
+        END;
+        INCL(writtenColors, lastColor);
+        FOR j := 0 TO 11 DO
+          IF ~(colors[j] IN writtenColors) THEN
+            WriteMixedColorRow(colors, colors[j], FALSE);
+            INCL(writtenColors, colors[j])
+          END
+        END;
+        IF lastColor # 16 THEN
+          WriteMixedColorRow(colors, lastColor, TRUE)
+        ELSE
+          Texts.Write(W, " ")
+        END
+      END
+    END;
+    IF (runCount > 0) & (runColor # 16) THEN
+      WriteFullColorRows(runCount, runColor)
+    END;
+    Texts.WriteLn(W); Texts.Append(context.target, W.buf)
+  END ColorHandler;
+
+  PROCEDURE ConvertColor*; (* command *)
+  BEGIN ConvertParse(4, ColorHandler)
+  END ConvertColor;
+
+BEGIN Texts.OpenWriter(W);
+END BiSixelConverter.

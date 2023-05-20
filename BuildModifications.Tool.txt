@@ -75,6 +75,8 @@ ORP.Compile LSPUtil.Mod/s ORHighlighter.Mod/s ORFormatter.Mod/s ~
 
 ORP.Compile HostTransfer.Mod/s ~
 
+ORP.Compile BiSixelConverter.Mod/s BiSixelFontBuilder.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
