@@ -33,12 +33,12 @@
 +    IF L = end.lin THEN ReplConst(Display.white, F, F.X + beg.x, Y, end.x - beg.x, selH, Display.invert)
      ELSE
 -      ReplConst(Display.white, F, F.X + beg.x, Y, F.left + L.wid - beg.x, L.lsp, Display.invert);
--      Y := Y - L.lsp; L := L.next;
+-      L := L.next; Y := Y - L.lsp;
 +      ReplConst(Display.white, F, F.X + beg.x, Y, F.left + L.wid - beg.x, selH, Display.invert);
 +      L := L.next; Y := Y - lsp;
        WHILE L # end.lin DO
 -        ReplConst(Display.white, F, F.X + F.left, Y, L.wid, L.lsp, Display.invert);
--        Y := Y - L.lsp; L := L.next
+-        L := L.next; Y := Y - L.lsp
 +        ReplConst(Display.white, F, F.X + F.left, Y, L.wid, selH, Display.invert);
 +        L := L.next; Y := Y - lsp
        END;
@@ -47,7 +47,7 @@
      END
    END FlipSelection;
  
-@@ -500,13 +503,13 @@
+@@ -500,17 +503,13 @@
          ELSE
            hchg := FALSE; len := beg - org; wid := Width(R, len)
          END;
@@ -57,14 +57,21 @@
 +        ReplConst(F.col, F, F.X + F.left + wid, curY - dsr, L.wid - wid, lsp, Display.replace);
          DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
 -        org := org + L.len; L := L.next;
-+        org := org + L.len; L := L.next; curY := curY - lsp;
-         WHILE (L # F.trailer) & (org <= end) DO
--          ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
--          IF ll # L.lsp THEN hchg := TRUE END;
+-        WHILE (L # F.trailer) & (org <= end) & (~hchg OR (curY - L.lsp > F.Y + F.bot + dsr)) DO
+-         ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
+-         IF ll # L.lsp THEN hchg := TRUE END;
+-         IF (~hchg OR (curY > F.Y + F.bot + dsr)) THEN
 -          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
+-          DisplayLine(F, L, R, F.X + F.left, curY, 0);
+-          org := org + L.len; L := L.next
+-         ELSE
+-          curY := curY + L.lsp
+-         END
++        org := org + L.len; L := L.next; curY := curY - lsp;
++        WHILE (L # F.trailer) & (org <= end) DO
 +          Display.ReplConst(F.col, F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
-           DisplayLine(F, L, R, F.X + F.left, curY, 0);
-           org := org + L.len; L := L.next
++          DisplayLine(F, L, R, F.X + F.left, curY, 0);
++          org := org + L.len; L := L.next
          END;
 @@ -540,7 +543,10 @@
          org := org + L.len;

@@ -38,19 +38,19 @@
 -      ReplConst(Oberon.SelectionColor, F, F.X + beg.x, Y, F.left + L.wid - beg.x, selH, Display.invert);
 -      L := L.next; Y := Y - lsp;
 +      ReplConst(Oberon.SelectionColor, F, F.X + beg.x, Y, F.left + L.wid - beg.x, L.lsp, Display.invert);
-+      Y := Y - L.lsp; L := L.next;
++      L := L.next; Y := Y - L.lsp;
        WHILE L # end.lin DO
 -        ReplConst(Oberon.SelectionColor, F, F.X + F.left, Y, L.wid, selH, Display.invert);
 -        L := L.next; Y := Y - lsp
 +        ReplConst(Oberon.SelectionColor, F, F.X + F.left, Y, L.wid, L.lsp, Display.invert);
-+        Y := Y - L.lsp; L := L.next
++        L := L.next; Y := Y - L.lsp
        END;
 -      ReplConst(Oberon.SelectionColor, F, F.X + F.left, Y, end.x - F.left, selH, Display.invert)
 +      ReplConst(Oberon.SelectionColor, F, F.X + F.left, Y, end.x - F.left, L.lsp, Display.invert)
      END
    END FlipSelection;
  
-@@ -510,17 +507,17 @@
+@@ -510,17 +507,21 @@
          Texts.OpenReader(R, F.text, org); Texts.Read(R, nextCh);
          ll := L.lsp; curY := curY + L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
          IF ll # L.lsp THEN
@@ -65,14 +65,21 @@
 +        ReplConst(FrameColor(F.col), F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp, Display.replace);
          DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
 -        org := org + L.len; L := L.next; curY := curY - lsp;
-+        org := org + L.len; L := L.next;
-         WHILE (L # F.trailer) & (org <= end) DO
+-        WHILE (L # F.trailer) & (org <= end) DO
 -          Display.ReplConst(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, lsp, Display.replace);
-+          ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
-+          IF ll # L.lsp THEN hchg := TRUE END;
+-          DisplayLine(F, L, R, F.X + F.left, curY, 0);
+-          org := org + L.len; L := L.next
++        org := org + L.len; L := L.next;
++        WHILE (L # F.trailer) & (org <= end) & (~hchg OR (curY - L.lsp > F.Y + F.bot + dsr)) DO
++         ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
++         IF ll # L.lsp THEN hchg := TRUE END;
++         IF (~hchg OR (curY > F.Y + F.bot + dsr)) THEN
 +          Display.ReplConst(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
-           DisplayLine(F, L, R, F.X + F.left, curY, 0);
-           org := org + L.len; L := L.next
++          DisplayLine(F, L, R, F.X + F.left, curY, 0);
++          org := org + L.len; L := L.next
++         ELSE
++          curY := curY + L.lsp
++         END
          END;
 @@ -545,23 +542,20 @@
          Texts.OpenReader(R, F.text, org); Texts.Read(R, nextCh);
