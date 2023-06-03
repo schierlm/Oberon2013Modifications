@@ -1,0 +1,115 @@
+--- 1/Fonts.Mod.txt
++++ 2/Fonts.Mod.txt
+@@ -2,11 +2,12 @@
+   IMPORT SYSTEM, Files, Fonts;
+ 
+   CONST FontFileId = 0DBH;
++    IdxFileId = 01694675H;
+ 
+   TYPE Font* = POINTER TO FontDesc;
+     RasterBlock = POINTER TO RasterBlockDesc;
+     FontDesc* = RECORD
+-      name*: ARRAY 32 OF CHAR;
++      name*, idxName: ARRAY 32 OF CHAR;
+       height*, minX*, maxX*, minY*, maxY*: INTEGER;
+       next*: Font;
+       T1: ARRAY 16 OF INTEGER;
+@@ -52,6 +53,7 @@
+ PROCEDURE LoadRange(F: Font; rangeStart: INTEGER);
+ TYPE RunRec = RECORD beg, end: INTEGER END;
+ VAR rangeEnd, skipBytes, skipBoxesBefore, skipBoxesAfter, usedRuns, totalRuns, beg, end, i, j, k, n, a, a1: INTEGER;
++  boxOffs, glyphOffs, skipRuns: INTEGER;
+   f: Files.File; R: Files.Rider;
+   b, dx, x, y, w, h: BYTE;
+   run: ARRAY 32 OF RunRec;
+@@ -59,8 +61,25 @@
+   a := FindSpace(F.block, 256, 4);
+   SYSTEM.PUT(F.T1[rangeStart DIV 1000H] + (rangeStart DIV 40H MOD 40H) * 4, a);
+   rangeEnd := rangeStart + 64; skipBytes := 0; skipBoxesBefore := 0; skipBoxesAfter := 0;
++  IF F.idxName[0] # 0X THEN
++    f := Files.Old(F.idxName);
++    Files.Set(R, f, 4 + rangeStart DIV 1000H);
++    Files.ReadByte(R, b);
++    ASSERT(b # 0);
++    Files.Set(R, f, b * 512 - 492 + (rangeStart DIV 40H MOD 40H) * 8);
++    ReadInt16(R, skipRuns);
++    ReadInt16(R, boxOffs);
++    Files.ReadInt(R, glyphOffs)
++  ELSE
++    boxOffs := 0; glyphOffs := 0; skipRuns := 0;
++  END;
+   f := Files.Old(F.name);
+   Files.Set(R, f, 14); ReadInt16(R, totalRuns);
++  IF glyphOffs # 0 THEN
++    boxOffs := 14 + 2 + 4 * totalRuns + 10 * boxOffs;
++    DEC(totalRuns, skipRuns);
++    Files.Set(R, f, 14 + 2 + 4 * skipRuns);
++  END;
+   i := 0; usedRuns := 0;
+   WHILE i # totalRuns DO
+     ReadInt16(R, beg); ReadInt16(R, end);
+@@ -69,6 +88,7 @@
+     IF end <= rangeStart THEN
+       skipBoxesBefore := skipBoxesBefore + end - beg;
+     ELSIF beg >= rangeEnd THEN
++      IF (glyphOffs # 0) THEN i := totalRuns - 1 END;
+       skipBoxesAfter := skipBoxesAfter + end - beg;
+     ELSE
+       run[usedRuns].beg := beg; run[usedRuns].end := end;
+@@ -76,6 +96,7 @@
+     END;
+     INC(i)
+   END;
++  IF (glyphOffs # 0) THEN Files.Set(R, f, boxOffs); skipBoxesBefore := 0 END;
+   i := 0;
+   WHILE i # skipBoxesBefore DO
+     RdInt16(R, dx); RdInt16(R, x); RdInt16(R, y);
+@@ -100,6 +121,7 @@
+     END;
+     INC(i)
+   END;
++  IF (glyphOffs # 0) THEN Files.Set(R, f, glyphOffs); skipBoxesAfter := 0 END;
+   i := 0;
+   WHILE i # skipBoxesAfter DO
+     RdInt16(R, b); RdInt16(R, b); RdInt16(R, b);
+@@ -178,7 +200,7 @@
+ 
+ PROCEDURE This*(name: ARRAY OF CHAR): Font;
+   VAR F: Font;
+-    f: Files.File; R: Files.Rider;
++    f, iF: Files.File; R: Files.Rider;
+     minY, b: BYTE;
+     a, beg, end, i, i1, i2, NofRuns, k: INTEGER;
+ BEGIN F := root;
+@@ -195,6 +217,31 @@
+         ReadInt16(R, F.height); ReadInt16(R, F.minX); ReadInt16(R, F.maxX);
+         RdInt16(R, minY); ReadInt16(R, F.maxY); ReadInt16(R, NofRuns);
+         IF minY >= 80H THEN F.minY := minY - 100H ELSE F.minY := minY END;
++        iF := NIL; k := 0; WHILE (k < 32) & (name[k] # 0X) DO F.idxName[k] := name[k]; INC(k) END;
++        IF (k > 4) & (name[k-4] = ".") & (name[k-3] = "F") & (name[k-2] = "n") & (name[k-1] = "t") THEN
++          F.idxName[k-3] := "u"; F.idxName[k-2] := "F"; F.idxName[k-1] := "i"; F.idxName[k] := 0X;
++          iF := Files.Old(F.idxName);
++          IF iF # NIL THEN
++            Files.Set(R, iF, 0); Files.ReadInt(R, k);
++            IF k # IdxFileId THEN
++              iF := NIL
++            ELSE
++              NofRuns := 0; a := 1;
++              FOR i := 0 TO 15 DO Files.ReadByte(R, b); F.T1[i] := b END;
++              FOR i := 0 TO 15 DO
++                IF F.T1[i] # 0 THEN
++                  Files.Set(R, iF, F.T1[i] * 512 - 492);
++                  F.T1[i] := FindSpace(F.block, 256, 4);
++                  FOR i1 := 0 TO 40H - 1 DO
++                    Files.ReadInt(R, k); Files.ReadInt(R, k);
++                    IF k # -1 THEN SYSTEM.PUT(F.T1[i] + i1 * 4, a) END
++                  END
++                END
++              END
++            END
++          END
++        END;
++        IF iF = NIL THEN F.idxName[0] := 0X END;
+         k := 0;
+         WHILE k # NofRuns DO
+           ReadInt16(R, beg); ReadInt16(R, end); i := beg;

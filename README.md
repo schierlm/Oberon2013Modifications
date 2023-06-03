@@ -88,6 +88,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | **[StackOverflowProtector](StackOverflowProtector/README.md)** | Trigger TRAP 9 at stack overflows | Recompile inner core |
 | **[StartupCommand](StartupCommand/README.md)** | Run a command (from System.Tool) when Oberon starts | Recompile System.Mod |
 | **[TrapBacktrace](TrapBacktrace/README.md)** | Print a backtrace on TRAP and ABORT | Optionally update the boot loader |
+| **[UnicodeFontIndex](UnicodeFontIndex/README.md)** | Speed up partial loading of Unicode fonts | Recompile `Fonts.Mod` |
 | **[UTF8CharsetLite](UTF8CharsetLite/README.md)** | UTF-8 support, limited to special Unicode text viewers | Recompile `Fonts.Mod` |
 | **[UTF8Charset](UTF8Charset/README.md)**† | Display UTF-8 characters in a Text viewer | Recompile outer core and compiler |
 | **[VariableLinespace](VariableLinespace/README.md)** | Support lines of different height in the same Text viewer | Recompile `TextFrames.Mod` |

@@ -46,6 +46,7 @@ patch -d work <EditImprovements/Edit.3r.patch
 mkdir work/utf8lite
 cp work/Fonts.Mod.txt work/TextFrames.Mod.txt work/utf8lite
 patch -d work/utf8lite < UTF8Charset/UTF8Charset.patch -t >/dev/null || true
+patch --no-backup-if-mismatch -d work/utf8lite < UnicodeFontIndex/UnicodeFontIndex.patch
 mv work/utf8lite/Fonts.Mod.txt work/FontsU.Mod.txt
 mv work/utf8lite/TextFrames.Mod.txt work/TextFramesU.Mod.txt
 patch -d work <UTF8CharsetLite/UTF8CharsetLite.patch
@@ -72,6 +73,7 @@ cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemoryS
 cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/*.txt work
 cp ColorSupport/*.txt DrawAddons/16Color/Color*.Mod.txt DrawAddons/16Color/*.Tool.txt ColorPalette/*.txt work
 cp ColorTheme/*.txt LSPUtil/*.txt LSPUtil/VGATemplate.Text HostTransfer/*.txt BiSixelFont/*.txt work
+cp UnicodeFontIndex/*.txt work
 
 patch -d work <HardwareEnumerator/KeyTester.patch
 patch -d work <HardwareEnumerator/DrawAddons.patch

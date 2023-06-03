@@ -77,6 +77,8 @@ ORP.Compile HostTransfer.Mod/s ~
 
 ORP.Compile BiSixelConverter.Mod/s BiSixelFontBuilder.Mod/s ~
 
+ORP.Compile UnicodeFontIndex.Mod/s ~
+
 DEBUG VERSION ONLY:
 ORP.Compile ORStackInspect.Mod/s ~
 ORP.Compile RS232.Mod/s DebugStub.Mod/s DebugStubTest.Mod/s ~
