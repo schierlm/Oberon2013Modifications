@@ -17,7 +17,7 @@ MODULE Splines;  (*NW 3.11.90 / 1.2.92*)
   VAR method*: Graphics.Method;
 
   PROCEDURE mark(f: GraphicFrames.Frame; col, x0, y0: INTEGER; sp: Spline);
-    VAR i, n, x, y: INTEGER;
+    VAR i, n: INTEGER;
   BEGIN i := 1;
     IF sp.open THEN n := sp.n ELSE n := sp.n-1 END ;
     WHILE i < n DO
@@ -32,11 +32,11 @@ MODULE Splines;  (*NW 3.11.90 / 1.2.92*)
 
   PROCEDURE Dot(f: GraphicFrames.Frame; col, x, y, mode: INTEGER);
   BEGIN
-    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (x+7 < f.Y1) THEN Display.Dot(col, x, y, mode) END
+    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN Display.Dot(col, x, y, mode) END
   END Dot;
 
   PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; lim: REAL);
-    VAR t: REAL; x, y: LONGINT;
+    VAR t: REAL;
   BEGIN t := 0.0;
     REPEAT
       Dot(f, col, FLOOR(((p.a * t + p.b) * t + p.c) * t + p.d),

@@ -16,6 +16,10 @@ compile a compiler with floating point support on the compiler that does not hav
 (probably because that is the way how floating point support was added to the compiler
 in the first place).
 
+[`Splines.patch`](Splines.patch) can be used to compile [DrawAddons](../DrawAddons/README.md)
+modification on a system without floating point; expect some rough approximations and
+overflow artifacts when drawing Splines, though.
+
 
 Removing Floating Point
 -----------------------

@@ -1,0 +1,181 @@
+Conventions used:
+  * Variables that are of type REAL become type INTEGER(*FIX*), storing the float
+    value multiplied by V1 (4096) as an integer
+  * FLT becomes FLTf, FLOOR becomes FLOORf; all multiplications and divisions
+    between two fixed point numbers need to be adjusted by factor V1
+  * 4096 is a compromise between frequent overflows and precision. Feel free
+    to adjust, won't expect much better results.
+
+--- Splines.Mod.txt
++++ Splines.Mod.txt
+@@ -1,7 +1,7 @@
+ MODULE Splines;  (*NW 3.11.90 / 1.2.92*)
+   IMPORT Display, Files, Oberon, Graphics, GraphicFrames;
+ 
+-  CONST N = 20;
++  CONST N = 20; V1 = 4096;
+ 
+   TYPE Spline* = POINTER TO SplineDesc;
+ 
+@@ -10,8 +10,8 @@
+       u*, v*: ARRAY N OF INTEGER
+     END ;
+ 
+-    RealVector = ARRAY N OF REAL;
+-    Poly = RECORD a, b, c, d, t: REAL END;
++    RealVector = ARRAY N OF INTEGER(*FIX*);
++    Poly = RECORD a, b, c, d, t: INTEGER(*FIX*) END;
+     PolyVector = ARRAY N OF Poly;
+ 
+   VAR method*: Graphics.Method;
+@@ -35,13 +35,23 @@
+     IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN Display.Dot(col, x, y, mode) END
+   END Dot;
+ 
+-  PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; lim: REAL);
+-    VAR t: REAL;
+-  BEGIN t := 0.0;
++  PROCEDURE FLTf(v: INTEGER): INTEGER;
++  BEGIN
++  RETURN v * V1
++  END FLTf;
++
++  PROCEDURE FLOORf(v: INTEGER): INTEGER;
++  BEGIN
++  RETURN v DIV V1
++  END FLOORf;
++
++  PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; lim: INTEGER(*FIX*));
++    VAR t: INTEGER(*FIX*);
++  BEGIN t := FLTf(0);
+     REPEAT
+-      Dot(f, col, FLOOR(((p.a * t + p.b) * t + p.c) * t + p.d),
+-        FLOOR(((q.a * t + q.b) * t + q.c) * t + q.d), 0);
+-      t := t + 1.0
++      Dot(f, col, FLOORf(((p.a * t DIV V1 + p.b) * t DIV V1 + p.c) * t DIV V1 + p.d),
++        FLOORf(((q.a * t DIV V1 + q.b) * t DIV V1 + q.c) * t DIV V1 + q.d), 0);
++      t := t + V1;
+     UNTIL t >= lim
+   END ShowPoly;
+ 
+@@ -49,65 +59,65 @@
+     VAR i: INTEGER;
+   BEGIN (*a, b, c of tri-diag matrix T; solve Ty' = y for y', assign y' to y*)
+     i := 1;
+-    WHILE i < n DO y[i] := y[i] - c[i-1]*y[i-1]; INC(i) END ;
+-    i := n-1; y[i] := y[i]/a[i];
+-    WHILE i > 0 DO DEC(i); y[i] := (y[i] - b[i]*y[i+1])/a[i] END
++    WHILE i < n DO y[i] := y[i] - c[i-1]*y[i-1] DIV V1; INC(i) END ;
++    i := n-1; y[i] := y[i]*V1 DIV a[i];
++    WHILE i > 0 DO DEC(i); y[i] := (y[i]* V1 - b[i]*y[i+1]) DIV a[i] END
+   END SolveTriDiag;
+ 
+   PROCEDURE OpenSpline(VAR x, y, d: RealVector; n: INTEGER);
+-    VAR i: INTEGER; d1, d2: REAL;
++    VAR i: INTEGER; d1, d2: INTEGER(*FIX*);
+       a, b, c: RealVector;
+   BEGIN (*from x, y compute d = y'*)
+-    b[0] := 1.0/(x[1] - x[0]); a[0] := 2.0*b[0]; c[0] := b[0];
+-    d1 := (y[1] - y[0])*3.0*b[0]*b[0]; d[0] := d1; i := 1;
++    b[0] := V1 * V1 DIV (x[1] - x[0]); a[0] := 2*b[0]; c[0] := b[0];
++    d1 := (y[1] - y[0])*3*b[0] DIV V1 * b[0] DIV V1; d[0] := d1; i := 1;
+     WHILE i < n-1 DO
+-      b[i] := 1.0/(x[i+1] - x[i]);
+-      a[i] := 2.0*(c[i-1] + b[i]);
++      b[i] := V1 * V1 DIV (x[i+1] - x[i]);
++      a[i] := 2*(c[i-1] + b[i]);
+       c[i] := b[i];
+-      d2 := (y[i+1] - y[i])*3.0*b[i]*b[i];
++      d2 := (y[i+1] - y[i])*3*b[i] DIV V1 * b[i] DIV V1;
+       d[i] := d1 + d2; d1 := d2; INC(i)
+     END ;
+-    a[i] := 2.0*b[i-1]; d[i] := d1; i := 0;
+-    WHILE i < n-1 DO c[i] := c[i]/a[i]; a[i+1] := a[i+1] - c[i]*b[i]; INC(i) END ;
++    a[i] := 2*b[i-1]; d[i] := d1; i := 0;
++    WHILE i < n-1 DO c[i] := c[i]* V1 DIV a[i]; a[i+1] := a[i+1] - c[i]*b[i] DIV V1; INC(i) END ;
+     SolveTriDiag(a, b, c, d, n)
+   END OpenSpline;
+ 
+   PROCEDURE ClosedSpline(VAR x, y, d: RealVector; n: INTEGER);
+-    VAR i: INTEGER; d1, d2, hn, dn: REAL;
++    VAR i: INTEGER; d1, d2, hn, dn: INTEGER(*FIX*);
+       a, b, c, w: RealVector;
+   BEGIN (*from x, y compute d = y'*)
+-    hn := 1.0/(x[n-1] - x[n-2]);
+-    dn := (y[n-1] - y[n-2])*3.0*hn*hn;
+-    b[0] := 1.0/(x[1] - x[0]);
+-    a[0] := 2.0*b[0] + hn;
++    hn := V1 * V1 DIV (x[n-1] - x[n-2]);
++    dn := (y[n-1] - y[n-2])*3*hn DIV V1 *hn DIV V1;
++    b[0] := V1 * V1 DIV (x[1] - x[0]);
++    a[0] := 2*b[0] + hn;
+     c[0] := b[0];
+-    d1 := (y[1] - y[0])*3.0*b[0]*b[0]; d[0] := dn + d1;
+-    w[0] := 1.0; i := 1;
++    d1 := (y[1] - y[0])*3*b[0] DIV V1 *b[0] DIV V1; d[0] := dn + d1;
++    w[0] := V1; i := 1;
+     WHILE i < n-2 DO
+-      b[i] := 1.0/(x[i+1] - x[i]);
+-      a[i] := 2.0*(c[i-1] + b[i]);
++      b[i] := V1 * V1 DIV (x[i+1] - x[i]);
++      a[i] := 2*(c[i-1] + b[i]);
+       c[i] := b[i];
+-      d2 := (y[i+1] - y[i])*3.0*b[i]*b[i]; d[i] := d1 + d2; d1 := d2;
+-      w[i] := 0.0; INC(i)
++      d2 := (y[i+1] - y[i])*3*b[i] DIV V1 *b[i] DIV V1; d[i] := d1 + d2; d1 := d2;
++      w[i] := FLTf(0); INC(i)
+     END ;
+-    a[i] := 2.0*b[i-1] + hn; d[i] := d1 + dn;
+-    w[i] := 1.0; i := 0;
+-    WHILE i < n-2 DO c[i] := c[i]/a[i]; a[i+1] := a[i+1] - c[i]*b[i]; INC(i) END ;
++    a[i] := 2*b[i-1] + hn; d[i] := d1 + dn;
++    w[i] := V1; i := 0;
++    WHILE i < n-2 DO c[i] := c[i] * V1 DIV a[i]; a[i+1] := a[i+1] - c[i]*b[i] DIV V1; INC(i) END ;
+     SolveTriDiag(a, b, c, d, n-1); SolveTriDiag(a, b, c, w, n-1);
+-    d1 := (d[0] + d[i])/(w[0] + w[i] + x[i+1] - x[i]); i := 0;
+-    WHILE i < n-1 DO d[i] := d[i] - d1*w[i]; INC(i) END ;
++    d1 := (d[0] + d[i]) * V1 DIV (w[0] + w[i] + x[i+1] - x[i]); i := 0;
++    WHILE i < n-1 DO d[i] := d[i] - d1*w[i] DIV V1; INC(i) END ;
+     d[i] := d[0]
+   END ClosedSpline;
+ 
+   PROCEDURE CompSpline(f: GraphicFrames.Frame; col, x0, y0: INTEGER; sp: Spline);
+-    VAR i, n: INTEGER; dx, dy, ds: REAL;
++    VAR i, n: INTEGER; dx, dy, ds: INTEGER(*FIX*);
+       x, xd, y, yd, s: RealVector;
+       p, q: PolyVector;
+   BEGIN (*from u, v compute x, y, s*)
+-    x[0] := FLT(sp.u[0] + x0); y[0] := FLT(sp.v[0] + y0); s[0] := 0.0; n := sp.n; i := 1;
++    x[0] := FLTf(sp.u[0] + x0); y[0] := FLTf(sp.v[0] + y0); s[0] := 0; n := sp.n; i := 1;
+     WHILE i < n DO
+-      x[i] := FLT(sp.u[i] + x0); dx := x[i] - x[i-1];
+-      y[i] := FLT(sp.v[i] + y0); dy := y[i] - y[i-1];
++      x[i] := FLTf(sp.u[i] + x0); dx := x[i] - x[i-1];
++      y[i] := FLTf(sp.v[i] + y0); dy := y[i] - y[i-1];
+       s[i] := ABS(dx) + ABS(dy) + s[i-1]; INC(i)
+     END ;
+     IF sp.open THEN OpenSpline(s, x, xd, n); OpenSpline(s, y, yd, n)
+@@ -115,16 +125,16 @@
+     END ;
+     (*compute coefficients from x, y, xd, yd, s*)  i := 0;
+     WHILE i < n-1 DO
+-      ds := 1.0/(s[i+1] - s[i]);
+-      dx := (x[i+1] - x[i])*ds;
+-      p[i].a := ds*ds*(xd[i] + xd[i+1] - 2.0*dx);
+-      p[i].b := ds*(3.0*dx - 2.0*xd[i] -xd[i+1]);
++      ds := V1*V1 DIV (s[i+1] - s[i]);
++      dx := (x[i+1] - x[i])*ds DIV V1;
++      p[i].a := ds*ds DIV V1*(xd[i] + xd[i+1] - 2*dx) DIV V1;
++      p[i].b := ds*(3*dx - 2*xd[i] -xd[i+1]) DIV V1;
+       p[i].c := xd[i];
+       p[i].d := x[i];
+       p[i].t := s[i];
+-      dy := ds*(y[i+1] - y[i]);
+-      q[i].a := ds*ds*(yd[i] + yd[i+1] - 2.0*dy);
+-      q[i].b := ds*(3.0*dy - 2.0*yd[i] - yd[i+1]);
++      dy := ds*(y[i+1] - y[i]) DIV V1;
++      q[i].a := ds*ds DIV V1 * (yd[i] + yd[i+1] - 2*dy) DIV V1;
++      q[i].b := ds*(3*dy - 2*yd[i] - yd[i+1]) DIV V1;
+       q[i].c := yd[i];
+       q[i].d := y[i];
+       q[i].t := s[i]; INC(i)
