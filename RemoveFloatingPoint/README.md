@@ -20,6 +20,11 @@ in the first place).
 modification on a system without floating point; expect some rough approximations and
 overflow artifacts when drawing Splines, though.
 
+Alternatively, [`SimpleSoftFloat.patch`](SimpleSoftFloat.patch) comes with a very crude
+software floating point emulation (providing only about 4 significant digits on division)
+and patches both `Splines.Mod` and `RealCalc.Mod` to use it. Splines is slower than the
+previous patch, but I did not notice any precision artifacts.
+
 
 Removing Floating Point
 -----------------------

@@ -1,0 +1,420 @@
+--- /dev/null
++++ Unreal.Mod.txt
+@@ -0,0 +1,129 @@
++MODULE Unreal;
++  IMPORT Texts;
++
++  CONST MinMantissa = 10000000H; MaxMantissa = 1FFFFFFFH; PreDivide = 4000H; PreDivideBits = 14;
++
++  TYPE Value* = RECORD m, e: INTEGER END;
++
++  PROCEDURE Normalize(VAR v: Value);
++  BEGIN
++    WHILE ((v.m > 0) & (v.m < MinMantissa DIV 40H)) OR ((v.m < 0) & (v.m > -MinMantissa DIV 40H)) DO
++      v.m := v.m * 40H; v.e := v.e - 6
++    END;
++    WHILE ((v.m > 0) & (v.m < MinMantissa)) OR ((v.m < 0) & (v.m > -MinMantissa)) DO
++      v.m := v.m * 2; DEC(v.e)
++    END;
++    WHILE (v.m > MaxMantissa) OR (v.m < -MaxMantissa) DO
++      v.m := v.m DIV 2; INC(v.e)
++    END;
++  END Normalize;
++
++  PROCEDURE New*(VAR result: Value; int: INTEGER);
++  BEGIN result.m := int; result.e := 0; Normalize(result)
++  END New;
++
++  PROCEDURE Negate*(VAR v: Value);
++  BEGIN v.m := -v.m
++  END Negate;
++
++  PROCEDURE Sign*(v: Value): INTEGER;
++    VAR s: INTEGER;
++  BEGIN
++    IF v.m > 0 THEN s := 1
++    ELSIF v.m < 0 THEN s := -1
++    ELSE s := 0
++    END
++  RETURN s
++  END Sign;
++
++  PROCEDURE Add*(VAR a: Value; b: Value);
++    VAR t: Value;
++  BEGIN
++    IF a.e > b.e THEN
++      t := b;
++      Add(t, a);
++      a := t
++    ELSE
++      WHILE a.e < b.e DO
++        a.m := a.m DIV 2; INC(a.e)
++      END;
++      a.m := a.m + b.m;
++      Normalize(a)
++    END
++  END Add;
++
++  PROCEDURE Multiply*(VAR a: Value; b: Value);
++  BEGIN
++    a.m := (a.m DIV PreDivide) * (b.m DIV PreDivide);
++    a.e := a.e + b.e + PreDivideBits * 2;
++    Normalize(a)
++  END Multiply;
++
++  PROCEDURE Divide*(VAR a: Value; b: Value);
++    VAR bm: INTEGER;
++  BEGIN bm := b.m;
++    IF bm < 0 THEN bm := -bm; a.m := -a.m END;
++    IF bm DIV PreDivide # 0 THEN
++      a.m := a.m DIV (bm DIV PreDivide)
++    END;
++    a.e := a.e - b.e - PreDivideBits;
++    Normalize(a)
++  END Divide;
++
++  PROCEDURE Compare*(a, b: Value) : INTEGER;
++  VAR result, sa, sb: INTEGER;
++  BEGIN result := 0;
++    sa := Sign(a); sb := Sign(b);
++    IF sa # sb THEN result := sa - sb
++    ELSIF sa = 0 THEN result := 0
++    ELSIF a.e # b.e THEN result := (a.e - b.e) * sa
++    ELSIF a.m > b.m THEN result := 1
++    ELSIF a.m < b.m THEN result := -1
++    END
++  RETURN result
++  END Compare;
++
++  PROCEDURE Floor*(v: Value): INTEGER;
++    VAR r, e: INTEGER;
++  BEGIN r := v.m; e := v.e;
++    WHILE e > 0 DO r := r * 2; DEC(e) END;
++    WHILE e < 0 DO r := r DIV 2; INC(e) END
++  RETURN r
++  END Floor;
++
++  PROCEDURE TenTo*(VAR result: Value; n: INTEGER); (* compute 10^n *)
++    VAR p: Value;
++  BEGIN New(result, 1); New(p, 10);
++    WHILE n > 0 DO
++      IF ODD(n) THEN Multiply(result, p) END;
++      Multiply(p, p); n := n DIV 2
++    END
++  END TenTo;
++
++  PROCEDURE WriteUnreal*(VAR W: Texts.Writer; v: Value);
++    VAR e, i, m: INTEGER;
++      d: ARRAY 16 OF CHAR;
++      v1, v2, v3: Value;
++  BEGIN
++    IF v.m = 0 THEN
++      Texts.WriteString(W, "  0 ");
++    ELSE Texts.Write(W, " "); v1 := v;
++      e := (v.e + 28) * 77 DIV 256 - 6; (*decimal exponent*)
++      IF v.m < 0 THEN Texts.Write(W, "-"); Negate(v1) ELSE Texts.Write(W, " ") END;
++      IF e >= 0 THEN TenTo(v2, e); Divide(v1, v2) ELSE TenTo(v2, -e); Multiply(v1, v2) END;
++      New(v2, 1); New(v3, 2); Divide(v2, v3); Add(v2, v1); (* v2 := x + 0.5 *)
++      m := Floor(v2);
++      IF m >= 10000000 THEN INC(e); m := m DIV 10 END;
++      i := 0;
++      REPEAT
++        d[i] := CHR(m MOD 10 + 30H); m := m DIV 10; INC(i)
++      UNTIL m = 0;
++      DEC(i); Texts.Write(W, d[i]); Texts.Write(W, ".");
++      WHILE i > 0 DO DEC(i); Texts.Write(W, d[i]) END;
++      Texts.Write(W, "E"); INC(e, 6);
++      IF e < 0 THEN Texts.Write(W, "-"); e := -e ELSE Texts.Write(W, "+") END;
++      Texts.Write(W, CHR(e DIV 10 + 30H)); Texts.Write(W, CHR(e MOD 10 + 30H))
++    END
++  END WriteUnreal;
++
++END Unreal.
+--- RealCalc.Mod.txt
++++ RealCalc.Mod.txt
+@@ -1,13 +1,13 @@
+ MODULE RealCalc;
+-  IMPORT Texts, Oberon;
++  IMPORT Texts, Oberon, Unreal;
+ 
+   VAR
+     s: Texts.Scanner;
+     log: Texts.Writer;
+ 
+-  PROCEDURE ReadReal() : REAL;
++  PROCEDURE ReadReal(VAR result: Unreal.Value);
+     VAR
+-      val : REAL;
++      val, v2: Unreal.Value;
+       beg, end, time: INTEGER;
+       t: Texts.Text;
+   BEGIN
+@@ -20,51 +20,53 @@
+     END;
+     IF s.class = Texts.Char THEN
+       IF s.c = "+" THEN
+-        val := ReadReal() + ReadReal();
++        ReadReal(val); ReadReal(v2); Unreal.Add(val, v2)
+       ELSIF s.c = "-" THEN
+-        val := ReadReal() - ReadReal();
++       ReadReal(val); ReadReal(v2); Unreal.Negate(v2); Unreal.Add(val, v2)
+       ELSIF s.c = "~" THEN
+-        val := - ReadReal();
++        ReadReal(val); Unreal.Negate(val)
+       ELSIF s.c = "*" THEN
+-        val := ReadReal() * ReadReal();
++        ReadReal(val); ReadReal(v2); Unreal.Multiply(val, v2)
+       ELSIF s.c = "/" THEN
+-        val := ReadReal() / ReadReal();
++        ReadReal(val); ReadReal(v2); Unreal.Divide(val, v2)
+       ELSIF s.c = "#" THEN
+-        val := ABS(ReadReal());
++        ReadReal(val); IF Unreal.Sign(val) = -1 THEN Unreal.Negate(val) END
+       ELSIF s.c = "<" THEN
+-        val := FLT(FLOOR(ReadReal()));
++        ReadReal(val); Unreal.New(val, Unreal.Floor(val))
+       ELSE
+-        val := 0.0;
++        Unreal.New(val, 0);
+         Texts.WriteString(log, "Invalid operator ");
+         Texts.Write(log, s.c);
+         Texts.WriteLn(log);
+       END
+     ELSIF s.class = Texts.Int THEN
+-      val := FLT(s.i);
+-    ELSIF s.class = Texts.Real THEN
+-      val := s.x;
++      Unreal.New(val, s.i)
+     ELSE
+-        val := 0.0;
++        Unreal.New(val, 0);
+         Texts.WriteString(log, "Invalid token");
+         Texts.WriteLn(log);
+     END;
+-    RETURN val
++    result := val;
+   END ReadReal;
+ 
+   PROCEDURE Real*();
++    VAR r: Unreal.Value;
+   BEGIN
+     Texts.OpenWriter(log);
+     Texts.OpenScanner(s, Oberon.Par.text, Oberon.Par.pos);
+-    Texts.WriteReal(log, ReadReal(), 20);
++    ReadReal(r);
++    Unreal.WriteUnreal(log, r);
+     Texts.WriteLn(log);
+     Texts.Append(Oberon.Log, log.buf);
+   END Real;
+ 
+   PROCEDURE Floor*();
++    VAR r: Unreal.Value;
+   BEGIN
+     Texts.OpenWriter(log);
+     Texts.OpenScanner(s, Oberon.Par.text, Oberon.Par.pos);
+-    Texts.WriteInt(log, FLOOR(ReadReal()), 15);
++    ReadReal(r);
++    Texts.WriteInt(log, Unreal.Floor(r), 15);
+     Texts.WriteLn(log);
+     Texts.Append(Oberon.Log, log.buf);
+   END Floor;
+--- Splines.Mod.txt
++++ Splines.Mod.txt
+@@ -1,5 +1,5 @@
+ MODULE Splines;  (*NW 3.11.90 / 1.2.92*)
+-  IMPORT Display, Files, Oberon, Graphics, GraphicFrames;
++  IMPORT Display, Files, Oberon, Graphics, GraphicFrames, Unreal;
+ 
+   CONST N = 20;
+ 
+@@ -10,8 +10,8 @@
+       u*, v*: ARRAY N OF INTEGER
+     END ;
+ 
+-    RealVector = ARRAY N OF REAL;
+-    Poly = RECORD a, b, c, d, t: REAL END;
++    RealVector = ARRAY N OF Unreal.Value;
++    Poly = RECORD a, b, c, d, t: Unreal.Value END;
+     PolyVector = ARRAY N OF Poly;
+ 
+   VAR method*: Graphics.Method;
+@@ -35,96 +35,119 @@
+     IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN Display.Dot(col, x, y, mode) END
+   END Dot;
+ 
+-  PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; lim: REAL);
+-    VAR t: REAL;
+-  BEGIN t := 0.0;
++  PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; lim: Unreal.Value);
++    VAR t, x, y, one: Unreal.Value;
++  BEGIN Unreal.New(t, 0); Unreal.New(one, 1);
+     REPEAT
+-      Dot(f, col, FLOOR(((p.a * t + p.b) * t + p.c) * t + p.d),
+-        FLOOR(((q.a * t + q.b) * t + q.c) * t + q.d), 0);
+-      t := t + 1.0
+-    UNTIL t >= lim
++      x := p.a; Unreal.Multiply(x, t); Unreal.Add(x, p.b); Unreal.Multiply(x, t); Unreal.Add(x, p.c); Unreal.Multiply(x, t); Unreal.Add(x, p.d);
++      y := q.a; Unreal.Multiply(y, t); Unreal.Add(y, q.b); Unreal.Multiply(y, t); Unreal.Add(y, q.c); Unreal.Multiply(y, t); Unreal.Add(y, q.d);
++      Dot(f, col, Unreal.Floor(x), Unreal.Floor(y), 0);
++      Unreal.Add(t, one)
++    UNTIL Unreal.Compare(t,lim) >= 0
+   END ShowPoly;
+ 
+   PROCEDURE SolveTriDiag(VAR a, b, c, y: RealVector; n: INTEGER);
+-    VAR i: INTEGER;
++    VAR i: INTEGER; t: Unreal.Value;
+   BEGIN (*a, b, c of tri-diag matrix T; solve Ty' = y for y', assign y' to y*)
+     i := 1;
+-    WHILE i < n DO y[i] := y[i] - c[i-1]*y[i-1]; INC(i) END ;
+-    i := n-1; y[i] := y[i]/a[i];
+-    WHILE i > 0 DO DEC(i); y[i] := (y[i] - b[i]*y[i+1])/a[i] END
++    WHILE i < n DO t := c[i-i]; Unreal.Multiply(t, y[i-1]); Unreal.Negate(t); Unreal.Add(y[i], t); INC(i) END ;
++    i := n-1; Unreal.Divide(y[i],a[i]);
++    WHILE i > 0 DO DEC(i); t := b[i]; Unreal.Multiply(t, y[i+1]);
++      Unreal.Negate(t); Unreal.Add(y[i], t); Unreal.Divide(y[i],a[i])
++    END
+   END SolveTriDiag;
+ 
+   PROCEDURE OpenSpline(VAR x, y, d: RealVector; n: INTEGER);
+-    VAR i: INTEGER; d1, d2: REAL;
++    VAR i: INTEGER; d1, d2, t: Unreal.Value;
+       a, b, c: RealVector;
+   BEGIN (*from x, y compute d = y'*)
+-    b[0] := 1.0/(x[1] - x[0]); a[0] := 2.0*b[0]; c[0] := b[0];
+-    d1 := (y[1] - y[0])*3.0*b[0]*b[0]; d[0] := d1; i := 1;
++   
++    t := x[0]; Unreal.Negate(t); Unreal.Add(t, x[1]); Unreal.New(b[0], 1); Unreal.Divide(b[0], t);
++    Unreal.New(a[0], 2); Unreal.Multiply(a[0], b[0]); c[0] := b[0];
++    d1 := y[0]; Unreal.Negate(d1); Unreal.Add(d1, y[1]); Unreal.New(t, 3); Unreal.Multiply(d1, t);
++    Unreal.Multiply(d1, b[0]); Unreal.Multiply(d1, b[0]); d[0] := d1; i := 1;
+     WHILE i < n-1 DO
+-      b[i] := 1.0/(x[i+1] - x[i]);
+-      a[i] := 2.0*(c[i-1] + b[i]);
++      Unreal.New(b[i], 1); t:= x[i]; Unreal.Negate(t); Unreal.Add(t, x[i+1]); Unreal.Divide(b[i], t);
++      Unreal.New(a[i], 2); t := c[i-1]; Unreal.Add(t, b[i]); Unreal.Multiply(a[i], t);
+       c[i] := b[i];
+-      d2 := (y[i+1] - y[i])*3.0*b[i]*b[i];
+-      d[i] := d1 + d2; d1 := d2; INC(i)
++      t := y[i]; Unreal.Negate(t); Unreal.Add(t, y[i+1]);
++      Unreal.New(d2, 3); Unreal.Multiply(d2, t); Unreal.Multiply(d2, b[i]); Unreal.Multiply(d2, b[i]);
++      d[i] := d1; Unreal.Add(d[i], d2); d1 := d2; INC(i)
+     END ;
+-    a[i] := 2.0*b[i-1]; d[i] := d1; i := 0;
+-    WHILE i < n-1 DO c[i] := c[i]/a[i]; a[i+1] := a[i+1] - c[i]*b[i]; INC(i) END ;
++    Unreal.New(a[i], 2); Unreal.Multiply(a[i], b[i-1]); d[i] := d1; i := 0;
++    WHILE i < n-1 DO Unreal.Divide(c[i], a[i]); t := c[i]; Unreal.Multiply(t, b[i]); Unreal.Add(a[i+1], t); INC(i) END ;
+     SolveTriDiag(a, b, c, d, n)
+   END OpenSpline;
+ 
+   PROCEDURE ClosedSpline(VAR x, y, d: RealVector; n: INTEGER);
+-    VAR i: INTEGER; d1, d2, hn, dn: REAL;
++    VAR i: INTEGER; d1, d2, hn, dn, t: Unreal.Value;
+       a, b, c, w: RealVector;
+   BEGIN (*from x, y compute d = y'*)
+-    hn := 1.0/(x[n-1] - x[n-2]);
+-    dn := (y[n-1] - y[n-2])*3.0*hn*hn;
+-    b[0] := 1.0/(x[1] - x[0]);
+-    a[0] := 2.0*b[0] + hn;
++    Unreal.New(hn, 1); t := x[n-2]; Unreal.Negate(t); Unreal.Add(t, x[n-1]);Unreal.Divide(hn, t);
++    dn := y[n-2]; Unreal.Negate(dn); Unreal.Add(dn, y[n-1]); Unreal.New(t, 3); Unreal.Multiply(dn, t);
++    Unreal.Multiply(dn, hn); Unreal.Multiply(dn, hn);
++    Unreal.New(b[0], 1); t := x[0]; Unreal.Negate(t); Unreal.Add(t, x[1]); Unreal.Divide(b[0], t);
++    Unreal.New(a[0], 2); Unreal.Multiply(a[0], b[0]); Unreal.Add(a[0], hn);
+     c[0] := b[0];
+-    d1 := (y[1] - y[0])*3.0*b[0]*b[0]; d[0] := dn + d1;
+-    w[0] := 1.0; i := 1;
++    d1 := y[0]; Unreal.Negate(d1); Unreal.Add(d1, y[1]); Unreal.New(t, 3); Unreal.Multiply(d1, t);
++    Unreal.Multiply(d1, b[0]); Unreal.Multiply(d1, b[0]); d[0] := dn; Unreal.Add(d[0], d1);
++    Unreal.New(w[0], 1); i := 1;
+     WHILE i < n-2 DO
+-      b[i] := 1.0/(x[i+1] - x[i]);
+-      a[i] := 2.0*(c[i-1] + b[i]);
++      Unreal.New(b[i], 1); t := x[i]; Unreal.Negate(t); Unreal.Add(t, x[i+1]); Unreal.Divide(b[i], t);
++      Unreal.New(a[i], 2); t := c[i-1]; Unreal.Add(t, b[i]); Unreal.Multiply(a[i], t);
+       c[i] := b[i];
+-      d2 := (y[i+1] - y[i])*3.0*b[i]*b[i]; d[i] := d1 + d2; d1 := d2;
+-      w[i] := 0.0; INC(i)
++      d2 := y[i]; Unreal.Negate(d2); Unreal.Add(d2, y[i+1]); Unreal.New(t, 3); Unreal.Multiply(d2, t);
++      Unreal.Multiply(d2, b[i]); Unreal.Multiply(d2, b[i]);
++      d[i] := d1; Unreal.Add(d[i], d2); d1 := d2;
++      Unreal.New(w[i], 0); INC(i)
++    END ;
++    Unreal.New(a[i], 2); Unreal.Multiply(a[i], b[i-1]); Unreal.Add(a[i], hn); d[i] := d1; Unreal.Add(d[i], dn);
++    Unreal.New(w[i], 1); i := 0;
++    WHILE i < n-2 DO Unreal.Divide(c[i],a[i]);
++      t := c[i]; Unreal.Multiply(t, b[i]); Unreal.Negate(t); Unreal.Add(a[i+1], t); INC(i)
+     END ;
+-    a[i] := 2.0*b[i-1] + hn; d[i] := d1 + dn;
+-    w[i] := 1.0; i := 0;
+-    WHILE i < n-2 DO c[i] := c[i]/a[i]; a[i+1] := a[i+1] - c[i]*b[i]; INC(i) END ;
+     SolveTriDiag(a, b, c, d, n-1); SolveTriDiag(a, b, c, w, n-1);
+-    d1 := (d[0] + d[i])/(w[0] + w[i] + x[i+1] - x[i]); i := 0;
+-    WHILE i < n-1 DO d[i] := d[i] - d1*w[i]; INC(i) END ;
++    d1 := d[0]; Unreal.Add(d1, d[i]);
++    t := x[i]; Unreal.Negate(t); Unreal.Add(t, w[0]); Unreal.Add(t, w[i]); Unreal.Add(t, x[i+1]); Unreal.Divide(d1, t); i := 0;
++    WHILE i < n-1 DO t := d1; Unreal.Multiply(t, w[i]); Unreal.Negate(t); Unreal.Add(d[i], t); INC(i) END ;
+     d[i] := d[0]
+   END ClosedSpline;
+ 
+   PROCEDURE CompSpline(f: GraphicFrames.Frame; col, x0, y0: INTEGER; sp: Spline);
+-    VAR i, n: INTEGER; dx, dy, ds: REAL;
++    VAR i, n: INTEGER; dx, dy, ds, t, tt: Unreal.Value;
+       x, xd, y, yd, s: RealVector;
+       p, q: PolyVector;
+   BEGIN (*from u, v compute x, y, s*)
+-    x[0] := FLT(sp.u[0] + x0); y[0] := FLT(sp.v[0] + y0); s[0] := 0.0; n := sp.n; i := 1;
++    Unreal.New(x[0], sp.u[0] + x0); Unreal.New(y[0], sp.v[0] + y0); Unreal.New(s[0], 0); n := sp.n; i := 1;
+     WHILE i < n DO
+-      x[i] := FLT(sp.u[i] + x0); dx := x[i] - x[i-1];
+-      y[i] := FLT(sp.v[i] + y0); dy := y[i] - y[i-1];
+-      s[i] := ABS(dx) + ABS(dy) + s[i-1]; INC(i)
++      Unreal.New(x[i], sp.u[i] + x0); dx := x[i-1]; Unreal.Negate(dx); Unreal.Add(dx, x[i]);
++      Unreal.New(y[i], sp.v[i] + y0); dy := y[i-1]; Unreal.Negate(dy); Unreal.Add(dy, y[i]);
++      IF Unreal.Sign(dx) = -1 THEN Unreal.Negate(dx) END;
++      IF Unreal.Sign(dy) = -1 THEN Unreal.Negate(dy) END;
++      s[i] := dx; Unreal.Add(s[i], dy); Unreal.Add(s[i], s[i-1]); INC(i)
+     END ;
+     IF sp.open THEN OpenSpline(s, x, xd, n); OpenSpline(s, y, yd, n)
+     ELSE ClosedSpline(s, x, xd, n); ClosedSpline(s, y, yd, n)
+     END ;
+     (*compute coefficients from x, y, xd, yd, s*)  i := 0;
+     WHILE i < n-1 DO
+-      ds := 1.0/(s[i+1] - s[i]);
+-      dx := (x[i+1] - x[i])*ds;
+-      p[i].a := ds*ds*(xd[i] + xd[i+1] - 2.0*dx);
+-      p[i].b := ds*(3.0*dx - 2.0*xd[i] -xd[i+1]);
++      Unreal.New(ds, 1); t := s[i]; Unreal.Negate(t); Unreal.Add(t, s[i+1]); Unreal.Divide(ds, t);
++      dx := x[i]; Unreal.Negate(dx); Unreal.Add(dx, x[i+1]); Unreal.Multiply(dx, ds);
++      Unreal.New(t, -2);  Unreal.Multiply(t, dx); Unreal.Add(t, xd[i]); Unreal.Add(t, xd[i+1]);
++      p[i].a := ds; Unreal.Multiply(p[i].a, ds); Unreal.Multiply(p[i].a, t);
++      Unreal.New(t, 2); Unreal.Multiply(t, xd[i]); Unreal.Add(t, xd[i+1]); Unreal.Negate(t);
++      Unreal.New(tt, 3); Unreal.Multiply(tt, dx); Unreal.Add(t, tt);
++      p[i].b := ds; Unreal.Multiply(p[i].b, t);
+       p[i].c := xd[i];
+       p[i].d := x[i];
+       p[i].t := s[i];
+-      dy := ds*(y[i+1] - y[i]);
+-      q[i].a := ds*ds*(yd[i] + yd[i+1] - 2.0*dy);
+-      q[i].b := ds*(3.0*dy - 2.0*yd[i] - yd[i+1]);
++      t := y[i]; Unreal.Negate(t); Unreal.Add(t, y[i+1]);
++      dy := ds; Unreal.Multiply(dy, t);
++      Unreal.New(t, -2); Unreal.Multiply(t, dy); Unreal.Add(t, yd[i]); Unreal.Add(t, yd[i+1]);
++      q[i].a := ds; Unreal.Multiply(q[i].a, ds); Unreal.Multiply(q[i].a, t);
++      Unreal.New(t, 2); Unreal.Multiply(t, yd[i]); Unreal.Add(t, yd[i+1]); Unreal.Negate(t);
++      Unreal.New(tt, 3); Unreal.Multiply(tt, dy); Unreal.Add(t, tt);
++      q[i].b := ds; Unreal.Multiply(q[i].b, t);
+       q[i].c := yd[i];
+       q[i].d := y[i];
+       q[i].t := s[i]; INC(i)
+@@ -132,7 +155,10 @@
+     p[i].t := s[i]; q[i].t := s[i];
+     (*display polynomials*)
+     i := 0;
+-    WHILE i < n-1 DO ShowPoly(f, col, p[i], q[i], p[i+1].t - p[i].t); INC(i) END
++    WHILE i < n-1 DO
++      t := p[i].t; Unreal.Negate(t); Unreal.Add(t, p[i+1].t);
++      ShowPoly(f, col, p[i], q[i], t); INC(i)
++    END
+   END CompSpline;
+ 
+   PROCEDURE New*;
