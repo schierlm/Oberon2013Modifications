@@ -58,7 +58,7 @@ MODULE KeyTester;
     hh := keys[i].h * Factor - Space;
     IF (keys[i].h = 2) & (keys[i].y MOD 4 = 0) THEN INC(hh,Space-2) END;
     IF (keys[i].h = 2) & (keys[i].y MOD 4 = 2) THEN DEC(yy,2); INC(hh,2) END;
-    IF (keys[i].w > 0) & (xx + ww < F.W) & (yy > 0) THEN
+    IF (keys[i].w > 0) & (xx + ww < F.W) & (yy > F.Y) THEN
       col := Display.white;
       IF keys[i].pressed THEN
           col := Display.black
