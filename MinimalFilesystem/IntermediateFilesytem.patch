@@ -1,0 +1,69 @@
+--- 1/FileDir.Mod.txt
++++ 2/FileDir.Mod.txt
+@@ -15,6 +15,9 @@
+         N = DirPgSize DIV 2;
+         DirMark*    = 9B1EA38DH;
+         HeaderMark* = 9BA71D86H;
++        MinHdrMark* = 9BA71D85H;
++        MinHleMark* = 9BA71D84H;
++        MinRootAdr* = 1024 * 29;
+         FillerSize = 52;
+ 
+   TYPE DiskAdr      = INTEGER;
+@@ -345,8 +348,55 @@
+         END
+       END
+     END TraverseDir;
++
++    PROCEDURE CopyFiles;
++      VAR adr, inxhint, skip, i, j, cnt: INTEGER; a: FileHeader; d: DataSector; inx: IndexSector;
++    BEGIN adr := MinRootAdr; Kernel.GetSector(adr, a); inxhint := 0;
++      IF (a.mark = MinHdrMark) OR (a.mark = MinHleMark) THEN
++        FOR i := 0 TO SectorSize - 1 DO d[i] := 0 END;
++        Kernel.PutSector(DirRootAdr, d);
++        Kernel.GetSector(DirRootAdr, a);
++        a.mark := DirMark;
++        Kernel.PutSector(DirRootAdr, a);
++        Kernel.GetSector(adr, a);
++        WHILE (a.mark = MinHdrMark) OR (a.mark = MinHleMark) DO
++          skip := a.ext[0];
++          IF a.mark = MinHdrMark THEN
++            a.mark := HeaderMark;
++            cnt := 0;
++            FOR i := 0 TO SecTabSize - 1 DO
++              IF cnt <= a.aleng THEN a.sec[i] := adr + cnt * 29; INC(cnt) ELSE a.sec[i] := 0 END
++            END;
++            FOR i := 0 TO ExTabSize - 1 DO
++              IF cnt <= a.aleng THEN
++                Kernel.AllocSector(inxhint, a.ext[i]);
++                FOR j := 0 TO IndexSize - 1 DO
++                  IF cnt <= a.aleng THEN
++                    inx[j] := adr + cnt * 29; INC(cnt);
++                  ELSE
++                    inx[j] := 0;
++                  END
++                END;
++                Kernel.PutSector(a.ext[i], inx);
++                inxhint := a.ext[i]
++              ELSE
++                a.ext[i] := 0
++              END
++            END;
++            ASSERT(cnt = a.aleng + 1);
++            Kernel.PutSector(adr, a);
++            Insert(a.name, adr)
++          ELSE
++            a.mark := 0;
++            Kernel.PutSector(adr, a)
++          END;
++          INC(adr, skip);
++          Kernel.GetSector(adr, a)
++        END
++      END
++    END CopyFiles;
+ 
+-  BEGIN k := 0; TraverseDir(A, k, DirRootAdr); MarkSectors(A, k)
++  BEGIN CopyFiles; k := 0; TraverseDir(A, k, DirRootAdr); MarkSectors(A, k)
+   END Init; 
+   
+ END FileDir.

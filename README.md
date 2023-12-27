@@ -71,6 +71,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | **[LanguageServerProtocolHelper](LanguageServerProtocolHelper/README.md)** | Backend service for an Oberon LSP Server | None |
 | **[LSPUtil](LSPUtil/README.md)** | Reformat or highlight Oberon source inside the system | LanguageServerProtocolHelper |
 | **[MinimalBootstrapSystem](MinimalBootstrapSystem/README.md)**† | Minimal disk image that can be used to bootstrap/compile the normal system | Recompile everything except inner core |
+| **[MinimalFilesystem](MinimalFilesystem/README.md)**† | Minimalistic filesystem code storing just a sequence of files with delete markers | Recompile inner core and rebuild filesystem |
 | **[MinimalFonts](MinimalFonts/README.md)**† | Minimal Fonts modules with a single font embedded to save space and avoid filesystem access | Recompile `Fonts.Mod` |
 | **[ORInspect](ORInspect/README.md)** | Inspect global module variables and heap pointers | Recompile compiler and all modules you want to inspect |
 | **[ORStackInspect](ORStackInspect/README.md)**‡ | Inspect stack variables when printing a backtrace | Apply DoubleTrap, TrapBacktrace, ZeroLocalVariables and ORInspect; recompile everything including inner core |

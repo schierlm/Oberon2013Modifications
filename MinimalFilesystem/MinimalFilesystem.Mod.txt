@@ -1,0 +1,103 @@
+MODULE MinimalFilesystem;
+  IMPORT SYSTEM, Kernel, FileDir, Files, Display, Fonts;
+
+  VAR nextAdr: INTEGER;
+
+  PROCEDURE TrimAllSectorsAfter(sec: INTEGER);
+  VAR i: INTEGER; magicSector: ARRAY 1024 OF BYTE;
+  BEGIN (* Kernel.TrimAllSectorsAfter(sec) *)
+    magicSector[0] := ORD("!"); magicSector[504] := ORD("!");
+    magicSector[1] := ORD("!"); magicSector[505] := ORD("!");
+    magicSector[2] := ORD("T"); magicSector[506] := ORD("T");
+    magicSector[3] := ORD("R"); magicSector[507] := ORD("R");
+    magicSector[4] := ORD("I"); magicSector[508] := ORD("I");
+    magicSector[5] := ORD("M"); magicSector[509] := ORD("M");
+    magicSector[6] := ORD("!"); magicSector[510] := ORD("!");
+    magicSector[7] := ORD("!"); magicSector[511] := ORD("!");
+    FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
+    FOR i := 512 TO 1023 DO magicSector[i] := magicSector[i-512] END;
+    Kernel.PutSector(sec + 29, magicSector);
+  END TrimAllSectorsAfter;
+
+  PROCEDURE DrawText(text: ARRAY OF CHAR; x, y: INTEGER);
+  VAR
+    dx, xx, yy, t1, t2, patAdr, i: INTEGER;
+  BEGIN
+    i := 0;
+    WHILE text[i] # 0X DO
+      Fonts.GetPat(Fonts.Default, text[i], dx, xx, yy, t1, t2, patAdr);
+      Display.CopyPattern(Display.white, patAdr, x + xx, y + yy, Display.replace);
+      INC(x, dx);
+      INC(i)
+    END
+  END DrawText;
+
+  PROCEDURE ShowRestartMessage;
+  BEGIN
+    Display.ReplConst(Display.white, 20, 20, 170, 30, Display.replace);
+    Display.ReplConst(Display.black, 22, 22, 166, 26, Display.replace);
+    DrawText("Compact finished. Please restart.", 30, 30);
+    Kernel.Install(SYSTEM.ADR(ShowRestartMessage), 0);
+    REPEAT SYSTEM.PUT(-64, Kernel.Time() + 1000) UNTIL FALSE
+  END ShowRestartMessage;
+
+  PROCEDURE EnumAll(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+  VAR i, j, cnt: INTEGER;
+    hdr: FileDir.FileHeader;
+    buf: FileDir.DataSector;
+    f: Files.File;
+    R: Files.Rider;
+    pos, len: INTEGER;
+  BEGIN cont := TRUE;
+    Kernel.GetSector(adr, hdr);
+    hdr.mark := FileDir.MinHdrMark;
+    FOR i := 0 TO FileDir.ExTabSize - 1 DO hdr.ext[i] := 0 END;
+    FOR i := 0 TO FileDir.SecTabSize - 1 DO hdr.sec[i] := 0 END;
+    cnt := 1; WHILE cnt <= hdr.aleng DO cnt := cnt * 2 END;
+    hdr.ext[0] := cnt * 29;
+    Kernel.PutSector(nextAdr, hdr); INC(nextAdr, 29);
+    f := Files.Old(name);
+    ASSERT(f # NIL);
+    len := 0;
+    Files.Set(R, f, FileDir.SectorSize - FileDir.HeaderSize);
+    FOR i := 1 TO cnt - 1  DO
+      FOR j := 0 TO FileDir.SectorSize - 1 DO Files.ReadByte(R, buf[j]) END;
+      Kernel.PutSector(nextAdr, buf); INC(nextAdr, 29);
+    END;
+    Files.Close(f);
+  END EnumAll;
+
+  PROCEDURE Create*;
+  VAR i: INTEGER;
+    buf: FileDir.DataSector;
+  BEGIN nextAdr := FileDir.MinRootAdr;
+    FileDir.Enumerate("", EnumAll);
+    FOR i := 0 TO FileDir.SectorSize - 1 DO buf[i] := 0 END;
+    Kernel.PutSector(nextAdr, buf)
+  END Create;
+
+  PROCEDURE Compact*;
+    VAR i, readAdr, writeAdr: INTEGER;
+      hdr: FileDir.FileHeader;
+      buf: FileDir.DataSector;
+  BEGIN readAdr := FileDir.MinRootAdr; writeAdr := FileDir.MinRootAdr;
+    Kernel.GetSector(readAdr, hdr);
+    WHILE (hdr.mark = FileDir.MinHleMark) OR (hdr.mark = FileDir.MinHdrMark) DO
+      IF hdr.mark = FileDir.MinHdrMark THEN
+        IF readAdr # writeAdr THEN
+          Kernel.PutSector(writeAdr, hdr);
+          IF hdr.ext[0] > 29 THEN
+            FOR i := 29 TO hdr.ext[0] - 29 BY 29 DO
+              Kernel.GetSector(readAdr + i, buf);
+              Kernel.PutSector(writeAdr + i, buf)
+            END
+          END
+        END;
+        INC(writeAdr, hdr.ext[0])
+      END;
+      INC(readAdr, hdr.ext[0]); Kernel.GetSector(readAdr, hdr)
+    END;
+    FOR i := 0 TO FileDir.SectorSize - 1 DO buf[i] := 0 END;
+    Kernel.PutSector(writeAdr, buf); TrimAllSectorsAfter(writeAdr); ShowRestartMessage
+  END Compact;
+END MinimalFilesystem.
