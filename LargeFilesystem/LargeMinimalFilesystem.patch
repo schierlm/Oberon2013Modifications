@@ -1,0 +1,247 @@
+--- 1/FileDir.Mod.txt
++++ 1/FileDir.Mod.txt
+@@ -1,14 +1,14 @@
+ MODULE FileDir;   (*NW 12.1.86 / 23.8.90 / 15.8.2013*)
+   IMPORT SYSTEM, Kernel;
+ 
+-  CONST FnLength*   = 32;
++  CONST FnLength*   = 64;
+         SecTabSize* = 64;
+-        ExTabSize*  = 12;
+-        SectorSize* = 1024;
++        ExTabSize*  = 128;
++        SectorSize* = 4096;
+         IndexSize*  = SectorSize DIV 4;
+-        HeaderSize* = 352;
++        HeaderSize* = 848;
+         DirRootAdr* = 29;
+-        DirPgSize*  = 24;
++        DirPgSize*  = 56;
+         DirMark*    = 9B1EA38DH;
+         HeaderMark* = 9BA71D86H;
+         MinHdrMark* = 9BA71D85H;
+@@ -56,12 +56,12 @@
+   PROCEDURE Search*(name: FileName; VAR A: DiskAdr);
+     VAR dadr: INTEGER; a: FileHeader;
+   BEGIN dadr := MinRootAdr; A := 0;
+-    Kernel.GetSector(dadr, a);
++    Kernel.Get4kSector(dadr, a);
+     WHILE (A = 0) & ((a.mark = MinHleMark) OR (a.mark = MinHdrMark)) DO
+       IF (a.mark = MinHdrMark) & (a.name = name) THEN 
+         A := dadr
+       ELSE
+-        INC(dadr, a.ext[0]); Kernel.GetSector(dadr, a)
++        INC(dadr, a.ext[0]); Kernel.Get4kSector(dadr, a)
+       END
+     END;
+   END Search;
+@@ -79,7 +79,7 @@
+     VAR j: INTEGER; dadr: DiskAdr;
+       a: FileHeader; continue: BOOLEAN; pfx: CHAR;
+   BEGIN dadr := MinRootAdr; continue := TRUE;
+-    Kernel.GetSector(dadr, a);
++    Kernel.Get4kSector(dadr, a);
+     WHILE continue & ((a.mark = MinHleMark) OR (a.mark = MinHdrMark)) DO 
+       IF (a.mark = MinHdrMark) THEN
+         j := 0;
+@@ -87,7 +87,7 @@
+         UNTIL (a.name[j-1] # pfx) OR (pfx = 0X);
+         IF pfx = 0X THEN proc(a.name, dadr, continue) END    
+       END;
+-      INC(dadr, a.ext[0]); Kernel.GetSector(dadr, a)
++      INC(dadr, a.ext[0]); Kernel.Get4kSector(dadr, a)
+     END;
+   END Enumerate;
+ 
+--- 1/Files.Mod.txt
++++ 1/Files.Mod.txt
+@@ -67,7 +67,7 @@
+   PROCEDURE MarkEnd;
+     VAR hdr: FileDir.FileHeader; 
+   BEGIN
+-    hdr.mark := 0; Kernel.PutSector(nextFreeSector, hdr)
++    hdr.mark := 0; Kernel.Put4kSector(nextFreeSector, hdr)
+   END MarkEnd;
+ 
+   PROCEDURE Old*(name: ARRAY OF CHAR): File;
+@@ -86,7 +86,7 @@
+         IF f = NIL THEN (*file not yet present*)
+           NEW(buf); buf.apos := 0; buf.next := buf; buf.mod := FALSE;
+           F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(buf.data));
+-          Kernel.GetSector(header, buf.data); ASSERT(F.mark = FileDir.MinHdrMark);
++          Kernel.Get4kSector(header, buf.data); ASSERT(F.mark = FileDir.MinHdrMark);
+           NEW(f); f.aleng := F.aleng; f.bleng := F.bleng; f.date := F.date;
+           IF f.aleng = 0 THEN buf.lim := f.bleng ELSE buf.lim := SS END ;
+           f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf; f.registered := TRUE;
+@@ -113,7 +113,7 @@
+       NEW(f); f.aleng := 0; f.bleng := HS; f.modH := TRUE;
+       f.registered := FALSE; f.date := F.date;
+       f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf; f.startsec := nextFreeSector;
+-      Kernel.PutSector(f.startsec, F^); INC(nextFreeSector, 29); MarkEnd
++      Kernel.Put4kSector(f.startsec, F^); INC(nextFreeSector, 29); MarkEnd
+     END
+     RETURN f
+   END New;
+@@ -124,7 +124,7 @@
+ 
+   PROCEDURE ReadBuf(f: File; buf: Buffer; pos: INTEGER);
+   BEGIN 
+-    Kernel.GetSector(f.startsec + 29 * pos, buf.data);
++    Kernel.Get4kSector(f.startsec + 29 * pos, buf.data);
+     IF pos < f.aleng THEN buf.lim := SS ELSE buf.lim := f.bleng END ;
+     buf.apos := pos; buf.mod := FALSE
+   END ReadBuf;
+@@ -134,7 +134,7 @@
+     IF buf.apos = 0 THEN
+       UpdateHeader(f, SYSTEM.VAL(FileDir.FileHeader, buf.data)); f.modH := FALSE
+     END;
+-    Kernel.PutSector(f.startsec + 29 * buf.apos, buf.data); buf.mod := FALSE
++    Kernel.Put4kSector(f.startsec + 29 * buf.apos, buf.data); buf.mod := FALSE
+   END WriteBuf;
+ 
+   PROCEDURE Buf(f: File; pos: INTEGER): Buffer;
+@@ -168,8 +168,8 @@
+       buf := buf.next
+     UNTIL buf = f.firstbuf;
+     IF f.modH THEN
+-      Kernel.GetSector(f.startsec, head); UpdateHeader(f, head);
+-      Kernel.PutSector(f.startsec, head); f.modH := FALSE
++      Kernel.Get4kSector(f.startsec, head); UpdateHeader(f, head);
++      Kernel.Put4kSector(f.startsec, head); f.modH := FALSE
+     END
+   END Unbuffer;
+ 
+@@ -178,9 +178,9 @@
+   BEGIN
+     FileDir.Search(name, adr);
+     WHILE adr # 0 DO
+-      Kernel.GetSector(adr, hd);
++      Kernel.Get4kSector(adr, hd);
+       hd.mark := FileDir.MinHleMark;
+-      Kernel.PutSector(adr, hd);
++      Kernel.Put4kSector(adr, hd);
+       FileDir.Search(name, adr);
+     END
+   END DeleteAll;
+@@ -192,9 +192,9 @@
+       Unbuffer(f);
+       IF ~f.registered THEN
+         DeleteAll(f.name);
+-        Kernel.GetSector(f.startsec, hd);
++        Kernel.Get4kSector(f.startsec, hd);
+         hd.mark := FileDir.MinHdrMark;
+-        Kernel.PutSector(f.startsec, hd);
++        Kernel.Put4kSector(f.startsec, hd);
+         f.registered := TRUE; f.next := root; root := SYSTEM.VAL(INTEGER, f)
+       END
+     END
+@@ -230,7 +230,7 @@
+         DeleteAll(newbuf);
+         FileDir.Search(oldbuf, adr);
+         IF adr # 0 THEN
+-          Kernel.GetSector(adr, head); head.name := newbuf; Kernel.PutSector(adr, head)
++          Kernel.Get4kSector(adr, head); head.name := newbuf; Kernel.Put4kSector(adr, head)
+         ELSE res := 2
+         END
+       END
+@@ -351,7 +351,7 @@
+     IF hdr.ext[0] < (f.aleng + 1) * 29 THEN
+       old := hdr.mark;
+       hdr.mark := FileDir.MinHleMark;
+-      Kernel.PutSector(f.startsec, hdr^);
++      Kernel.Put4kSector(f.startsec, hdr^);
+       hdr.mark := old;
+       old := hdr.ext[0] DIV 29; ASSERT(SYSTEM.H(0) = 0);
+       WHILE hdr.ext[0] < (f.aleng + 1) * 29 DO
+@@ -363,8 +363,8 @@
+       ELSE
+         IF old > 1 THEN
+           FOR i := 29 TO (old - 1) * 29 BY 29 DO
+-            Kernel.GetSector(f.startsec + i, data);
+-            Kernel.PutSector(nextFreeSector + i, data);
++            Kernel.Get4kSector(f.startsec + i, data);
++            Kernel.Put4kSector(nextFreeSector + i, data);
+           END
+         END;
+         f.startsec := nextFreeSector;
+@@ -456,9 +456,9 @@
+     VAR hdr : FileDir.FileHeader;
+   BEGIN root := 0; Kernel.Init; FileDir.Init;
+     nextFreeSector := FileDir.MinRootAdr;
+-    Kernel.GetSector(nextFreeSector, hdr);
++    Kernel.Get4kSector(nextFreeSector, hdr);
+     WHILE (hdr.mark = FileDir.MinHleMark) OR (hdr.mark = FileDir.MinHdrMark) DO
+-      INC(nextFreeSector, hdr.ext[0]); Kernel.GetSector(nextFreeSector, hdr)
++      INC(nextFreeSector, hdr.ext[0]); Kernel.Get4kSector(nextFreeSector, hdr)
+     END
+   END Init;
+ 
+--- 1/MinimalFilesystem.Mod.txt
++++ 2/MinimalFilesystem.Mod.txt
+@@ -4,7 +4,7 @@
+   VAR nextAdr: INTEGER;
+ 
+   PROCEDURE TrimAllSectorsAfter(sec: INTEGER);
+-  VAR i: INTEGER; magicSector: ARRAY 1024 OF BYTE;
++  VAR i, j: INTEGER; magicSector: ARRAY 4096 OF BYTE;
+   BEGIN (* Kernel.TrimAllSectorsAfter(sec) *)
+     magicSector[0] := ORD("!"); magicSector[504] := ORD("!");
+     magicSector[1] := ORD("!"); magicSector[505] := ORD("!");
+@@ -15,8 +15,10 @@
+     magicSector[6] := ORD("!"); magicSector[510] := ORD("!");
+     magicSector[7] := ORD("!"); magicSector[511] := ORD("!");
+     FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
+-    FOR i := 512 TO 1023 DO magicSector[i] := magicSector[i-512] END;
+-    Kernel.PutSector(sec + 29, magicSector);
++	  FOR j := 1 TO 7 DO
++      FOR i := 0 TO 511 DO magicSector[i + j * 512] := magicSector[i] END
++	  END;
++    Kernel.Put4kSector(sec + 29, magicSector);
+   END TrimAllSectorsAfter;
+ 
+   PROCEDURE DrawText(text: ARRAY OF CHAR; x, y: INTEGER);
+@@ -41,6 +43,7 @@
+     REPEAT SYSTEM.PUT(-64, Kernel.Time() + 1000) UNTIL FALSE
+   END ShowRestartMessage;
+ 
++(*
+   PROCEDURE EnumAll(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+   VAR i, j, cnt: INTEGER;
+     hdr: FileDir.FileHeader;
+@@ -75,29 +78,30 @@
+     FOR i := 0 TO FileDir.SectorSize - 1 DO buf[i] := 0 END;
+     Kernel.PutSector(nextAdr, buf)
+   END Create;
++*)
+ 
+   PROCEDURE Compact*;
+     VAR i, readAdr, writeAdr: INTEGER;
+       hdr: FileDir.FileHeader;
+       buf: FileDir.DataSector;
+   BEGIN readAdr := FileDir.MinRootAdr; writeAdr := FileDir.MinRootAdr;
+-    Kernel.GetSector(readAdr, hdr);
++    Kernel.Get4kSector(readAdr, hdr);
+     WHILE (hdr.mark = FileDir.MinHleMark) OR (hdr.mark = FileDir.MinHdrMark) DO
+       IF hdr.mark = FileDir.MinHdrMark THEN
+         IF readAdr # writeAdr THEN
+-          Kernel.PutSector(writeAdr, hdr);
++          Kernel.Put4kSector(writeAdr, hdr);
+           IF hdr.ext[0] > 29 THEN
+             FOR i := 29 TO hdr.ext[0] - 29 BY 29 DO
+-              Kernel.GetSector(readAdr + i, buf);
+-              Kernel.PutSector(writeAdr + i, buf)
++              Kernel.Get4kSector(readAdr + i, buf);
++              Kernel.Put4kSector(writeAdr + i, buf)
+             END
+           END    
+         END;
+         INC(writeAdr, hdr.ext[0])
+       END;
+-      INC(readAdr, hdr.ext[0]); Kernel.GetSector(readAdr, hdr)
++      INC(readAdr, hdr.ext[0]); Kernel.Get4kSector(readAdr, hdr)
+     END;
+     FOR i := 0 TO FileDir.SectorSize - 1 DO buf[i] := 0 END;
+-    Kernel.PutSector(writeAdr, buf); TrimAllSectorsAfter(writeAdr); ShowRestartMessage
++    Kernel.Put4kSector(writeAdr, buf); TrimAllSectorsAfter(writeAdr); ShowRestartMessage
+   END Compact;
+ END MinimalFilesystem.

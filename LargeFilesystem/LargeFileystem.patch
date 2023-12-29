@@ -1,0 +1,456 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -1,12 +1,18 @@
+ MODULE Kernel;  (*NW/PR  11.4.86 / 27.12.95 / 4.2.2014*)
+   IMPORT SYSTEM;
+-  CONST SectorLength* = 1024;
++  CONST Sector1kLength* = 1024; Sector4kLength* = 4096;
+     timer = -64; spiData = -48; spiCtrl = -44;
+     CARD0 = 1; SPIFAST = 4;
+     FSoffset = 80000H; (*256MB in 512-byte blocks*)
+-    mapsize = 10000H; (*1K sectors, 64MB*)
+-
+-  TYPE Sector* = ARRAY SectorLength OF BYTE;
++    mapsize = 100000H; (*4K sectors, 4GB*)
++    mapPartCount = 10H;
++    mapPartSize = mapsize DIV 32 DIV mapPartCount;
++
++  TYPE Sector1k* = ARRAY Sector1kLength OF BYTE;
++    Sector4k* = ARRAY Sector4kLength OF BYTE;
++    Sector1kTimes4 = ARRAY 4 OF Sector1k;
++    SecMapPart = POINTER TO SecMapPartDesc;
++	SecMapPartDesc = RECORD m : ARRAY mapPartSize OF SET END;
+ 
+   VAR allocated*, NofSectors*: INTEGER;
+     heapOrg*, heapLim*: INTEGER; 
+@@ -14,7 +20,7 @@
+     clock: INTEGER;
+     list0, list1, list2, list3: INTEGER;  (*lists of free blocks of size n*256, 128, 64, 32 bytes*)
+     data: INTEGER; (*SPI data in*)
+-    sectorMap: ARRAY mapsize DIV 32 OF SET;
++    sectorMapParts: ARRAY mapPartCount OF SecMapPart;
+     
+ (* ---------- New: heap allocation ----------*)
+ 
+@@ -196,41 +202,69 @@
+ 
+   PROCEDURE InitSecMap*;
+     VAR i: INTEGER;
+-  BEGIN NofSectors := 0; sectorMap[0] := {0 .. 31}; sectorMap[1] := {0 .. 31};
+-    FOR i := 2 TO mapsize DIV 32 - 1 DO sectorMap[i] := {} END
++  BEGIN NofSectors := 0;
++    FOR i := 0 TO mapPartCount - 1 DO sectorMapParts[i] := NIL END
+   END InitSecMap;
+ 
+   PROCEDURE MarkSector*(sec: INTEGER);
+-  BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+-    INCL(sectorMap[sec DIV 32], sec MOD 32); INC(NofSectors)
++    VAR part: INTEGER;
++  BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0); part := sec DIV 32 DIV mapPartSize;
++    IF (sectorMapParts[part] = NIL) THEN NEW(sectorMapParts[part]) END;
++    INCL(sectorMapParts[part].m[sec DIV 32 MOD mapPartSize], sec MOD 32); INC(NofSectors)
+   END MarkSector;
+ 
+   PROCEDURE FreeSector*(sec: INTEGER);
+   BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+-    EXCL(sectorMap[sec DIV 32], sec MOD 32); DEC(NofSectors)
++    EXCL(sectorMapParts[sec DIV 32 DIV mapPartSize].m[sec DIV 32 MOD mapPartSize], sec MOD 32); DEC(NofSectors)
+   END FreeSector;
+ 
+   PROCEDURE AllocSector*(hint: INTEGER; VAR sec: INTEGER);
+-    VAR s: INTEGER;
++    VAR s, part: INTEGER;
+   BEGIN (*find free sector, starting after hint*)
+     hint := hint DIV 29; ASSERT(SYSTEM.H(0) = 0); s := hint;
+     REPEAT INC(s);
+       IF s = mapsize THEN s := 1 END ;
+-    UNTIL ~(s MOD 32 IN sectorMap[s DIV 32]);
+-    INCL(sectorMap[s DIV 32], s MOD 32); INC(NofSectors); sec := s * 29
++      part := s DIV 32 DIV mapPartSize;
++      IF (sectorMapParts[part] = NIL) THEN NEW(sectorMapParts[part]) END;
++    UNTIL ~(s MOD 32 IN sectorMapParts[part].m[s DIV 32 MOD mapPartSize]);
++    INCL(sectorMapParts[part].m[s DIV 32 MOD mapPartSize], s MOD 32); INC(NofSectors); sec := s * 29
+   END AllocSector;
+ 
+-  PROCEDURE GetSector*(src: INTEGER; VAR dst: Sector);
++  PROCEDURE Get1kSector*(src: INTEGER; VAR dst: Sector1k);
+   BEGIN src := src DIV 29; ASSERT(SYSTEM.H(0) = 0);
+     src := src * 2 + FSoffset;
+     ReadSD(src, SYSTEM.ADR(dst)); ReadSD(src+1, SYSTEM.ADR(dst)+512) 
+-  END GetSector;
++  END Get1kSector;
+   
+-  PROCEDURE PutSector*(dst: INTEGER; VAR src: Sector);
++  PROCEDURE Put1kSector*(dst: INTEGER; VAR src: Sector1k);
+   BEGIN dst := dst DIV 29; ASSERT(SYSTEM.H(0) =  0);
+     dst := dst * 2 + FSoffset;
+     WriteSD(dst, SYSTEM.ADR(src)); WriteSD(dst+1, SYSTEM.ADR(src)+512)
+-  END PutSector;
++  END Put1kSector;
++
++  PROCEDURE Get4kSector0(src: INTEGER; VAR dst: Sector1kTimes4);
++  VAR i: INTEGER;
++  BEGIN
++    FOR i := 0 TO 3 DO
++      Get1kSector(src * 4 + (80 + i) * 29, dst[i])
++    END
++  END Get4kSector0;
++
++  PROCEDURE Get4kSector*(src: INTEGER; VAR dst: Sector4k);
++  BEGIN Get4kSector0(src, SYSTEM.VAL(Sector1kTimes4, dst))
++  END Get4kSector;
++
++  PROCEDURE Put4kSector0(dst: INTEGER; VAR src: Sector1kTimes4);
++  VAR i: INTEGER;
++  BEGIN
++    FOR i := 0 TO 3 DO
++      Put1kSector(dst * 4 + (80 + i) * 29, src[i])
++    END
++  END Put4kSector0;
++
++  PROCEDURE Put4kSector*(dst: INTEGER; VAR src: Sector4k);
++  BEGIN Put4kSector0(dst, SYSTEM.VAL(Sector1kTimes4, src))
++  END Put4kSector;
+ 
+ (*-------- Miscellaneous procedures----------*)
+ 
+--- 1/FileDir.Mod.txt
++++ 2/FileDir.Mod.txt
+@@ -4,14 +4,14 @@
+   (*File Directory is a B-tree with its root page at DirRootAdr.
+     Each entry contains a file name and the disk address of the file's head sector*)
+ 
+-  CONST FnLength*    = 32;
++  CONST FnLength*    = 64;
+         SecTabSize*   = 64;
+-        ExTabSize*   = 12;
+-        SectorSize*   = 1024;
++        ExTabSize*   = 128;
++        SectorSize*   = 4096;
+         IndexSize*   = SectorSize DIV 4;
+-        HeaderSize*  = 352;
++        HeaderSize*  = 848;
+         DirRootAdr*  = 29;
+-        DirPgSize*   = 24;
++        DirPgSize*   = 56;
+         N = DirPgSize DIV 2;
+         DirMark*    = 9B1EA38DH;
+         HeaderMark* = 9BA71D86H;
+@@ -58,7 +58,7 @@
+     VAR i, L, R: INTEGER; dadr: DiskAdr;
+       a: DirPage;
+   BEGIN dadr := DirRootAdr; A := 0;
+-    REPEAT Kernel.GetSector(dadr, a); ASSERT(a.mark = DirMark);
++    REPEAT Kernel.Get4kSector(dadr, a); ASSERT(a.mark = DirMark);
+       L := 0; R := a.m; (*binary search*)
+       WHILE L < R DO
+         i := (L+R) DIV 2;
+@@ -83,14 +83,14 @@
+       u: DirEntry;
+       a: DirPage;
+ 
+-  BEGIN (*~h*) Kernel.GetSector(dpg0, a); ASSERT(a.mark = DirMark);
++  BEGIN (*~h*) Kernel.Get4kSector(dpg0, a); ASSERT(a.mark = DirMark);
+     L := 0; R := a.m; (*binary search*)
+     WHILE L < R DO
+       i := (L+R) DIV 2;
+       IF name <= a.e[i].name THEN R := i ELSE L := i+1 END
+     END ;
+     IF (R < a.m) & (name = a.e[R].name) THEN
+-      a.e[R].adr := fad; Kernel.PutSector(dpg0, a)  (*replace*)
++      a.e[R].adr := fad; Kernel.Put4kSector(dpg0, a)  (*replace*)
+     ELSE (*not on this page*)
+       IF R = 0 THEN dpg1 := a.p0 ELSE dpg1 := a.e[R-1].p END ;
+       IF dpg1 = 0 THEN (*not in tree, insert*)
+@@ -111,11 +111,11 @@
+           IF R < N THEN (*insert in left half*)
+             v := a.e[N-1]; i := N-1;
+             WHILE i > R DO DEC(i); a.e[i+1] := a.e[i] END ;
+-            a.e[R] := u; Kernel.PutSector(dpg0, a);
++            a.e[R] := u; Kernel.Put4kSector(dpg0, a);
+             Kernel.AllocSector(dpg0, dpg0); i := 0;
+             WHILE i < N DO a.e[i] := a.e[i+N]; INC(i) END
+           ELSE (*insert in right half*)
+-            Kernel.PutSector(dpg0, a);
++            Kernel.Put4kSector(dpg0, a);
+             Kernel.AllocSector(dpg0, dpg0); DEC(R, N); i := 0;
+             IF R = 0 THEN v := u
+             ELSE v := a.e[N];
+@@ -126,7 +126,7 @@
+           END ;
+           a.p0 := v.p; v.p := dpg0
+         END ;
+-        Kernel.PutSector(dpg0, a)
++        Kernel.Put4kSector(dpg0, a)
+       END
+     END
+   END insert;
+@@ -138,10 +138,10 @@
+   BEGIN h := FALSE;
+     insert(name, DirRootAdr, h, U, fad);
+     IF h THEN (*root overflow*)
+-      Kernel.GetSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
+-      Kernel.AllocSector(DirRootAdr, oldroot); Kernel.PutSector(oldroot, a);
++      Kernel.Get4kSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
++      Kernel.AllocSector(DirRootAdr, oldroot); Kernel.Put4kSector(oldroot, a);
+       a.mark := DirMark; a.m := 1; a.p0 := oldroot; a.e[0] := U;
+-      Kernel.PutSector(DirRootAdr, a)
++      Kernel.Put4kSector(DirRootAdr, a)
+     END
+   END Insert;
+ 
+@@ -153,10 +153,10 @@
+     VAR i, k: INTEGER;
+         dpg1: DiskAdr;
+         a, b: DirPage;  (*a := underflowing page, b := neighbouring page*)
+-  BEGIN Kernel.GetSector(dpg0, a); ASSERT(a.mark = DirMark);
++  BEGIN Kernel.Get4kSector(dpg0, a); ASSERT(a.mark = DirMark);
+     (*h & a.m = N-1 & dpg0 = c.e[s-1].p*)
+     IF s < c.m THEN (*b := page to the right of a*)
+-      dpg1 := c.e[s].p; Kernel.GetSector(dpg1, b); ASSERT(b.mark = DirMark);
++      dpg1 := c.e[s].p; Kernel.Get4kSector(dpg1, b); ASSERT(b.mark = DirMark);
+       k := (b.m-N+1) DIV 2; (*k = no. of items available on page b*)
+       a.e[N-1] := c.e[s]; a.e[N-1].p := b.p0;
+       IF k > 0 THEN
+@@ -165,17 +165,17 @@
+         c.e[s] := b.e[i]; b.p0 := c.e[s].p;
+         c.e[s].p := dpg1; b.m := b.m - k; i := 0;
+         WHILE i < b.m DO b.e[i] := b.e[i+k]; INC(i) END ;
+-        Kernel.PutSector(dpg1, b); a.m := N-1+k; h := FALSE
++        Kernel.Put4kSector(dpg1, b); a.m := N-1+k; h := FALSE
+       ELSE (*merge pages a and b, discard b*) i := 0;
+         WHILE i < N DO a.e[i+N] := b.e[i]; INC(i) END ;
+         i := s; DEC(c.m);
+         WHILE i < c.m DO c.e[i] := c.e[i+1]; INC(i) END ;
+         a.m := 2*N; h := c.m < N
+       END ;
+-      Kernel.PutSector(dpg0, a)
++      Kernel.Put4kSector(dpg0, a)
+     ELSE (*b := page to the left of a*) DEC(s);
+       IF s = 0 THEN dpg1 := c.p0 ELSE dpg1 := c.e[s-1].p END ;
+-      Kernel.GetSector(dpg1, b); ASSERT(b.mark = DirMark);
++      Kernel.Get4kSector(dpg1, b); ASSERT(b.mark = DirMark);
+       k := (b.m-N+1) DIV 2; (*k = no. of items available on page b*)
+       IF k > 0 THEN
+         i := N-1;
+@@ -185,13 +185,13 @@
+         WHILE i > 0 DO DEC(i); a.e[i] := b.e[i+b.m+1] END ;
+         c.e[s] := b.e[b.m]; a.p0 := c.e[s].p;
+         c.e[s].p := dpg0; a.m := N-1+k; h := FALSE;
+-        Kernel.PutSector(dpg0, a)
++        Kernel.Put4kSector(dpg0, a)
+       ELSE (*merge pages a and b, discard a*)
+         c.e[s].p := a.p0; b.e[N] := c.e[s]; i := 0;
+         WHILE i < N-1 DO b.e[i+N+1] := a.e[i]; INC(i) END ;
+         b.m := 2*N; DEC(c.m); h := c.m < N
+       END ;
+-      Kernel.PutSector(dpg1, b)
++      Kernel.Put4kSector(dpg1, b)
+     END
+   END underflow;
+ 
+@@ -209,16 +209,16 @@
+     PROCEDURE del(VAR a: DirPage; R: INTEGER; dpg1: DiskAdr; VAR h: BOOLEAN);
+       VAR dpg2: DiskAdr;  (*global: a, R*)
+           b: DirPage;
+-    BEGIN Kernel.GetSector(dpg1, b); ASSERT(b.mark = DirMark); dpg2 := b.e[b.m-1].p;
++    BEGIN Kernel.Get4kSector(dpg1, b); ASSERT(b.mark = DirMark); dpg2 := b.e[b.m-1].p;
+       IF dpg2 # 0 THEN del(a, R, dpg2, h);
+-        IF h THEN underflow(b, dpg2, b.m, h); Kernel.PutSector(dpg1, b) END
++        IF h THEN underflow(b, dpg2, b.m, h); Kernel.Put4kSector(dpg1, b) END
+       ELSE
+         b.e[b.m-1].p := a.e[R].p; a.e[R] := b.e[b.m-1];
+-        DEC(b.m); h := b.m < N; Kernel.PutSector(dpg1, b)
++        DEC(b.m); h := b.m < N; Kernel.Put4kSector(dpg1, b)
+       END
+     END del;
+ 
+-  BEGIN (*~h*) Kernel.GetSector(dpg0, a); ASSERT(a.mark = DirMark);
++  BEGIN (*~h*) Kernel.Get4kSector(dpg0, a); ASSERT(a.mark = DirMark);
+     L := 0; R := a.m; (*binary search*)
+     WHILE L < R DO
+       i := (L+R) DIV 2;
+@@ -233,10 +233,10 @@
+       ELSE del(a, R, dpg1, h);
+         IF h THEN underflow(a, dpg1, R, h) END
+       END ;
+-      Kernel.PutSector(dpg0, a)
++      Kernel.Put4kSector(dpg0, a)
+     ELSIF dpg1 # 0 THEN
+       delete(name, dpg1, h, fad);
+-      IF h THEN underflow(a, dpg1, R, h); Kernel.PutSector(dpg0, a) END
++      IF h THEN underflow(a, dpg1, R, h); Kernel.Put4kSector(dpg0, a) END
+     ELSE (*not in tree*) fad := 0
+     END
+   END delete;
+@@ -247,10 +247,10 @@
+   BEGIN h := FALSE;
+     delete(name, DirRootAdr, h, fad);
+     IF h THEN (*root underflow*)
+-      Kernel.GetSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
++      Kernel.Get4kSector(DirRootAdr, a); ASSERT(a.mark = DirMark);
+       IF (a.m = 0) & (a.p0 # 0) THEN
+-        newroot := a.p0; Kernel.GetSector(newroot, a); ASSERT(a.mark = DirMark);
+-        Kernel.PutSector(DirRootAdr, a) (*discard newroot*)
++        newroot := a.p0; Kernel.Get4kSector(newroot, a); ASSERT(a.mark = DirMark);
++        Kernel.Put4kSector(DirRootAdr, a) (*discard newroot*)
+       END
+     END
+   END Delete;
+@@ -261,7 +261,7 @@
+                       VAR continue: BOOLEAN);
+     VAR i, j: INTEGER; pfx, nmx: CHAR;
+       dpg1: DiskAdr; a: DirPage;
+-  BEGIN Kernel.GetSector(dpg, a); ASSERT(a.mark = DirMark); i := 0;
++  BEGIN Kernel.Get4kSector(dpg, a); ASSERT(a.mark = DirMark); i := 0;
+     WHILE (i < a.m) & continue DO
+       j := 0;
+       REPEAT pfx := prefix[j]; nmx := a.e[i].name[j]; INC(j)
+@@ -313,16 +313,16 @@
+         DEC(R); x := A[0]; A[0] := A[R]; A[R] := x; sift(A, L, R)
+       END ;
+       WHILE L < k DO
+-        Kernel.GetSector(A[L], hd); ASSERT(hd.mark = HeaderMark);
++        Kernel.Get4kSector(A[L], hd); ASSERT(hd.mark = HeaderMark);
+         IF hd.aleng < SecTabSize THEN j := hd.aleng + 1;
+           REPEAT DEC(j); Kernel.MarkSector(hd.sec[j]) UNTIL j = 0
+         ELSE j := SecTabSize;
+           REPEAT DEC(j); Kernel.MarkSector(hd.sec[j]) UNTIL j = 0;
+-          n := (hd.aleng - SecTabSize) DIV 256; i := 0;
++          n := (hd.aleng - SecTabSize) DIV IndexSize; i := 0;
+           WHILE i <= n DO
+             Kernel.MarkSector(hd.ext[i]);
+-            Kernel.GetSector(hd.ext[i], B); (*index sector*)
+-            IF i < n THEN j := 256 ELSE j := (hd.aleng - SecTabSize) MOD 256 + 1 END ;
++            Kernel.Get4kSector(hd.ext[i], B); (*index sector*)
++            IF i < n THEN j := IndexSize ELSE j := (hd.aleng - SecTabSize) MOD IndexSize + 1 END ;
+             REPEAT DEC(j); Kernel.MarkSector(B[j]) UNTIL j = 0;
+             INC(i)
+           END
+@@ -333,7 +333,7 @@
+ 
+     PROCEDURE TraverseDir(VAR A: ARRAY OF DiskAdr; VAR k: INTEGER; dpg: DiskAdr);
+       VAR i: INTEGER; a: DirPage;
+-    BEGIN Kernel.GetSector(dpg, a); ASSERT(a.mark = DirMark); Kernel.MarkSector(dpg); i := 0;
++    BEGIN Kernel.Get4kSector(dpg, a); ASSERT(a.mark = DirMark); Kernel.MarkSector(dpg); i := 0;
+       WHILE i < a.m DO
+         A[k] := a.e[i].adr; INC(k); INC(i);
+         IF k = 2000 THEN MarkSectors(A, k); k := 0 END
+--- 1/Files.Mod.txt
++++ 2/Files.Mod.txt
+@@ -93,7 +93,7 @@
+         IF f = NIL THEN (*file not yet present*)
+           NEW(buf); buf.apos := 0; buf.next := buf; buf.mod := FALSE;
+           F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(buf.data));
+-          Kernel.GetSector(header, buf.data); ASSERT(F.mark = FileDir.HeaderMark);
++          Kernel.Get4kSector(header, buf.data); ASSERT(F.mark = FileDir.HeaderMark);
+           NEW(f); f.aleng := F.aleng; f.bleng := F.bleng; f.date := F.date;
+           IF f.aleng = 0 THEN buf.lim := f.bleng ELSE buf.lim := SS END ;
+           f.firstbuf := buf; f.nofbufs := 1; f.name := namebuf; f.registered := TRUE;
+@@ -101,7 +101,7 @@
+           k := (f.aleng + (XS-STS)) DIV XS; i := 0;
+           WHILE i < k DO
+             NEW(inxpg); inxpg.adr := F.ext[i]; inxpg.mod := FALSE;
+-            Kernel.GetSector(inxpg.adr, inxpg.sec); f.ext[i] := inxpg; INC(i)
++            Kernel.Get4kSector(inxpg.adr, inxpg.sec); f.ext[i] := inxpg; INC(i)
+           END ;
+           WHILE i < FileDir.ExTabSize DO f.ext[i] := NIL; INC(i) END ;
+           f.sechint := header; f.modH := FALSE; f.next := root; root := SYSTEM.VAL(INTEGER, f)
+@@ -148,7 +148,7 @@
+     IF pos < STS THEN sec := f.sec[pos]
+     ELSE sec := f.ext[(pos-STS) DIV XS].sec[(pos-STS) MOD XS]
+     END ;
+-    Kernel.GetSector(sec, buf.data);
++    Kernel.Get4kSector(sec, buf.data);
+     IF pos < f.aleng THEN buf.lim := SS ELSE buf.lim := f.bleng END ;
+     buf.apos := pos; buf.mod := FALSE
+   END ReadBuf;
+@@ -176,7 +176,7 @@
+         f.modH := TRUE; inx.mod := TRUE; inx.sec[k] := secadr; f.sechint := secadr
+       END
+     END ;
+-    Kernel.PutSector(secadr, buf.data); buf.mod := FALSE
++    Kernel.Put4kSector(secadr, buf.data); buf.mod := FALSE
+   END WriteBuf;
+ 
+   PROCEDURE Buf(f: File; pos: INTEGER): Buffer;
+@@ -219,12 +219,12 @@
+         IF inx.adr = 0 THEN
+           Kernel.AllocSector(f.sechint, inx.adr); f.sechint := inx.adr; f.modH := TRUE
+         END ;
+-        Kernel.PutSector(inx.adr, inx.sec); inx.mod := FALSE
++        Kernel.Put4kSector(inx.adr, inx.sec); inx.mod := FALSE
+       END
+     END ;
+     IF f.modH THEN
+-      Kernel.GetSector(f.sec[0], head); UpdateHeader(f, head);
+-      Kernel.PutSector(f.sec[0], head); f.modH := FALSE
++      Kernel.Get4kSector(f.sec[0], head); UpdateHeader(f, head);
++      Kernel.Put4kSector(f.sec[0], head); f.modH := FALSE
+     END
+   END Unbuffer;
+ 
+@@ -251,7 +251,7 @@
+       IF a <= STS THEN i := a;
+       ELSE i := STS; DEC(a, i); j := (a-1) MOD XS; k := (a-1) DIV XS;
+         WHILE k >= 0 DO
+-          Kernel.GetSector(f.ext[k].adr, ind);
++          Kernel.Get4kSector(f.ext[k].adr, ind);
+           REPEAT DEC(j); Kernel.FreeSector(ind[j]) UNTIL j = 0;
+           Kernel.FreeSector(f.ext[k].adr); j := XS; DEC(k)
+         END
+@@ -281,7 +281,7 @@
+         FileDir.Delete(oldbuf, adr);
+         IF adr # 0 THEN
+           FileDir.Insert(newbuf, adr);
+-          Kernel.GetSector(adr, head); head.name := newbuf; Kernel.PutSector(adr, head)
++          Kernel.Get4kSector(adr, head); head.name := newbuf; Kernel.Put4kSector(adr, head)
+         ELSE res := 2
+         END
+       END
+--- 1/System.Mod.txt
++++ 1/System.Mod.txt
+@@ -191,7 +191,7 @@
+     IF (name[i0] = 0X) & (pat[j0] = 0X) THEN (*found*)
+       Texts.WriteString(W, name);
+       IF pat[j0+1] = "!" THEN (*option*)
+-        Kernel.GetSector(adr, hp);
++        Kernel.Get4kSector(adr, hp);
+         Texts.Write(W, 9X); Texts.WriteClock(W, hp.date);
+         Texts.WriteInt(W, hp.aleng*FileDir.SectorSize + hp.bleng - FileDir.HeaderSize, 8); (*length*)
+         (*Texts.WriteHex(W, adr)*)
+@@ -301,7 +301,7 @@
+     Texts.WriteString(W, "  Heap speace"); Texts.WriteInt(W, Kernel.allocated, 8);
+     Texts.WriteInt(W, Kernel.allocated * 100 DIV (Kernel.heapLim - Kernel.heapOrg), 4); Texts.Write(W, "%"); EndLine;
+     Texts.WriteString(W, "  Disk sectors "); Texts.WriteInt(W, Kernel.NofSectors, 4);
+-    Texts.WriteInt(W, Kernel.NofSectors * 100 DIV 10000H, 4); Texts.Write(W, "%"); EndLine;
++    Texts.WriteInt(W, Kernel.NofSectors * 100 DIV 100000H, 4); Texts.Write(W, "%"); EndLine;
+     Texts.WriteString(W, "  Tasks"); Texts.WriteInt(W, Oberon.NofTasks, 4); EndLine
+   END Watch;
+ 
+--- 1/ORL.Mod.txt
++++ 2/ORL.Mod.txt
+@@ -254,19 +254,19 @@
+     VAR i, secno: LONGINT; b: BYTE;
+       F: Files.File; R: Files.Rider;
+       S: Texts.Scanner;
+-      buf: ARRAY Kernel.SectorLength OF BYTE;
++      buf: ARRAY Kernel.Sector1kLength OF BYTE;
+   BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S); res := -1;
+     IF S.class = Texts.Name THEN
+       Texts.WriteString(W, "  loading "); Texts.WriteString(W, S.s); F := Files.Old(S.s);
+       IF F # NIL THEN Texts.WriteString(W, " onto boot area"); Texts.WriteInt(W, Files.Length(F), 7);
+         secno := BootSec; i := 0; Files.Set(R, F, 0); Files.ReadByte(R, b); res := noerr;
+         WHILE ~R.eof DO buf[i] := b; INC(i);
+-          IF i = Kernel.SectorLength THEN Kernel.PutSector(secno*29, buf); INC(secno); i := 0 END ;
++          IF i = Kernel.Sector1kLength THEN Kernel.Put1kSector(secno*29, buf); INC(secno); i := 0 END ;
+           Files.ReadByte(R, b)
+         END ;
+         IF i > 0 THEN
+-          WHILE i < Kernel.SectorLength DO buf[i] := 0; INC(i) END ;
+-          Kernel.PutSector(secno*29, buf)
++          WHILE i < Kernel.Sector1kLength DO buf[i] := 0; INC(i) END ;
++          Kernel.Put1kSector(secno*29, buf)
+         END
+       ELSE Texts.WriteString(W, " not found")
+       END

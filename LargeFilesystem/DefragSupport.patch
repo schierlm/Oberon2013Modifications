@@ -1,0 +1,218 @@
+--- 1/Kernel.Mod.txt
++++ 2/Kernel.Mod.txt
+@@ -207,12 +207,16 @@
+   END InitSecMap;
+ 
+   PROCEDURE LastUsedSector*(): INTEGER;
+-  VAR i, j, secno: INTEGER;
++  VAR i, j, part, secno: INTEGER;
+   BEGIN
+     i := mapsize DIV 32 - 1;
+-    WHILE sectorMap[i] = {} DO DEC(i) END;
++    WHILE(sectorMapParts[i DIV mapPartSize] = NIL) DO
++      DEC(i, mapPartSize)
++    ELSIF sectorMapParts[i DIV mapPartSize].m[i MOD mapPartSize] = {} DO
++      DEC(i)
++    END;
+     FOR j := 0 TO 31 DO
+-      IF j IN sectorMap[i] THEN secno := i * 32 + j END;
++      IF j IN sectorMapParts[i DIV mapPartSize].m[i MOD mapPartSize] THEN secno := i * 32 + j END;
+     END;
+   RETURN secno * 29
+   END LastUsedSector;
+--- 1/DefragFiles.Mod.txt
++++ 2/DefragFiles.Mod.txt
+@@ -14,10 +14,13 @@
+         res, apos, bpos: INTEGER
+       END;
+ 
++    PIndexSec = POINTER TO IndexSec;
++    IndexSec =  RECORD sec: FileDir.IndexSector END;
++
+     IndexRecord =
+       RECORD adr: DiskAdr;
+         mod, nil: BOOLEAN;
+-        sec: FileDir.IndexSector
++        secP: PIndexSec;
+       END;
+ 
+     FileDesc =
+@@ -69,7 +72,7 @@
+     ASSERT(header # 0);
+     onlyBuf.apos := 0; onlyBuf.mod := FALSE;
+     F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(onlyBuf.data));
+-    Kernel.GetSector(header, onlyBuf.data); ASSERT(F.mark = FileDir.HeaderMark);
++    Kernel.Get4kSector(header, onlyBuf.data); ASSERT(F.mark = FileDir.HeaderMark);
+     onlyFile.aleng := F.aleng; onlyFile.bleng := F.bleng;
+     IF onlyFile.aleng = 0 THEN onlyBuf.lim := onlyFile.bleng ELSE onlyBuf.lim := SS END;
+     onlyFile.name := namebuf; onlyFile.registered := TRUE;
+@@ -77,7 +80,8 @@
+     k := (onlyFile.aleng + (XS-STS)) DIV XS; i := 0;
+     WHILE i < k DO
+       onlyFile.ext[i].nil := FALSE; onlyFile.ext[i].adr := F.ext[i]; onlyFile.ext[i].mod := FALSE;
+-      Kernel.GetSector(onlyFile.ext[i].adr, onlyFile.ext[i].sec); INC(i)
++      IF onlyFile.ext[i].secP = NIL THEN NEW(onlyFile.ext[i].secP) END;
++      Kernel.Get4kSector(onlyFile.ext[i].adr, onlyFile.ext[i].secP.sec); INC(i)
+     END;
+     WHILE i < FileDir.ExTabSize DO onlyFile.ext[i].nil := TRUE; INC(i) END;
+     onlyFile.sechint := header; onlyFile.modH := FALSE;
+@@ -116,9 +120,9 @@
+     VAR sec: DiskAdr;
+   BEGIN ASSERT(fileOpen);
+     IF pos < STS THEN sec := onlyFile.sec[pos]
+-    ELSE sec := onlyFile.ext[(pos-STS) DIV XS].sec[(pos-STS) MOD XS]
++    ELSE sec := onlyFile.ext[(pos-STS) DIV XS].secP.sec[(pos-STS) MOD XS]
+     END;
+-    Kernel.GetSector(sec, onlyBuf.data);
++    Kernel.Get4kSector(sec, onlyBuf.data);
+     IF pos < onlyFile.aleng THEN onlyBuf.lim := SS ELSE onlyBuf.lim := onlyFile.bleng END ;
+     onlyBuf.apos := pos; onlyBuf.mod := FALSE
+   END ReadBuf;
+@@ -137,16 +141,17 @@
+         UpdateHeader(SYSTEM.VAL(FileDir.FileHeader, onlyBuf.data)); onlyFile.modH := FALSE
+       END
+     ELSE i := (onlyBuf.apos - STS) DIV XS;
++      IF onlyFile.ext[i].secP = NIL THEN NEW(onlyFile.ext[i].secP) END;
+       IF onlyFile.ext[i].nil THEN
+-        onlyFile.ext[i].nil := FALSE; onlyFile.ext[i].adr := 0; onlyFile.ext[i].sec[0] := 0; onlyFile.modH := TRUE
++        onlyFile.ext[i].nil := FALSE; onlyFile.ext[i].adr := 0; onlyFile.ext[i].secP.sec[0] := 0; onlyFile.modH := TRUE
+       END;
+-      k := (onlyBuf.apos - STS) MOD XS; secadr := onlyFile.ext[i].sec[k];
++      k := (onlyBuf.apos - STS) MOD XS; secadr := onlyFile.ext[i].secP.sec[k];
+       IF secadr = 0 THEN
+         Kernel.AllocSector(onlyFile.sechint, secadr);
+-        onlyFile.modH := TRUE; onlyFile.ext[i].mod := TRUE; onlyFile.ext[i].sec[k] := secadr; onlyFile.sechint := secadr
++        onlyFile.modH := TRUE; onlyFile.ext[i].mod := TRUE; onlyFile.ext[i].secP.sec[k] := secadr; onlyFile.sechint := secadr
+       END
+     END;
+-    Kernel.PutSector(secadr, onlyBuf.data); onlyBuf.mod := FALSE
++    Kernel.Put4kSector(secadr, onlyBuf.data); onlyBuf.mod := FALSE
+   END WriteBuf;
+ 
+   PROCEDURE GetBuf(pos: INTEGER);
+@@ -168,12 +173,12 @@
+         IF onlyFile.ext[i].adr = 0 THEN
+           Kernel.AllocSector(onlyFile.sechint, onlyFile.ext[i].adr); onlyFile.sechint := onlyFile.ext[i].adr; onlyFile.modH := TRUE
+         END;
+-        Kernel.PutSector(onlyFile.ext[i].adr, onlyFile.ext[i].sec); onlyFile.ext[i].mod := FALSE
++        Kernel.Put4kSector(onlyFile.ext[i].adr, onlyFile.ext[i].secP.sec); onlyFile.ext[i].mod := FALSE
+       END; INC(i)
+     END ;
+     IF onlyFile.modH THEN
+-      Kernel.GetSector(onlyFile.sec[0], head); UpdateHeader(head);
+-      Kernel.PutSector(onlyFile.sec[0], head); onlyFile.modH := FALSE
++      Kernel.Get4kSector(onlyFile.sec[0], head); UpdateHeader(head);
++      Kernel.Put4kSector(onlyFile.sec[0], head); onlyFile.modH := FALSE
+     END
+   END Unbuffer;
+ 
+@@ -217,7 +222,8 @@
+     VAR i, k: INTEGER;
+   BEGIN ASSERT(fileOpen); k := (onlyFile.aleng - STS) DIV XS;
+     onlyFile.ext[k].nil := FALSE; onlyFile.ext[k].adr := 0; onlyFile.ext[k].mod := TRUE; i := XS;
+-    REPEAT DEC(i); onlyFile.ext[k].sec[i] := 0 UNTIL i = 0
++    IF onlyFile.ext[k].secP = NIL THEN NEW(onlyFile.ext[k].secP) END;
++    REPEAT DEC(i); onlyFile.ext[k].secP.sec[i] := 0 UNTIL i = 0
+   END NewExt;
+ 
+   PROCEDURE WriteByte*(VAR r: Rider; x: BYTE);
+--- 1/Defragger.Mod.txt
++++ 2/Defragger.Mod.txt
+@@ -1,7 +1,7 @@
+ MODULE Defragger;
+   IMPORT SYSTEM, Kernel, FileDir, DefragFiles, Display, Fonts;
+ 
+-  CONST FileInfoPerSector = 28;
++  CONST FileInfoPerSector = 60;
+ 
+   TYPE
+     FileInfoSector = RECORD
+@@ -39,7 +39,7 @@
+   END ShowRestartMessage;
+ 
+   PROCEDURE Trim*;
+-  BEGIN Kernel.TrimAllSectorsAfter(Kernel.LastUsedSector())
++  BEGIN Kernel.TrimAllSectorsAfter(Kernel.LastUsedSector() * 4 + 83 * 29)
+   END Trim;
+ 
+   PROCEDURE EnumAll(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+@@ -50,7 +50,7 @@
+     fileInfo.lengths[fileInfo.count] := len;
+     INC(fileInfo.count);
+     IF fileInfo.count = FileInfoPerSector THEN
+-      Kernel.PutSector(fileInfo.sector, fileInfo);
++      Kernel.Put4kSector(fileInfo.sector, fileInfo);
+       INC(fileInfo.sector, 29);
+       fileInfo.count := 0
+     END
+@@ -70,10 +70,10 @@
+     fileInfo.firstSector := Kernel.LastUsedSector() + 29; fileInfo.count := 0;
+     fileInfo.sector := fileInfo.firstSector;
+     FileDir.Enumerate("", EnumAll);
+-    Kernel.PutSector(fileInfo.sector, fileInfo);
++    Kernel.Put4kSector(fileInfo.sector, fileInfo);
+     lastUsedSector := fileInfo.sector;
+     currSector := lastUsedSector + 29; fileno := 0; pos := 0;
+-    Kernel.GetSector(fileInfo.firstSector, fileInfo);
++    Kernel.Get4kSector(fileInfo.firstSector, fileInfo);
+     WHILE fileno < fileInfo.count DO
+       DefragFiles.Old(fileInfo.names[fileno]);
+       len := 0;
+@@ -82,7 +82,7 @@
+       WHILE ~R.eof DO
+         INC(pos); INC(len);
+         IF pos = FileDir.SectorSize THEN
+-          Kernel.PutSector(currSector, buf);
++          Kernel.Put4kSector(currSector, buf);
+           INC(currSector, 29);
+           pos := 0
+         END;
+@@ -92,23 +92,23 @@
+       ASSERT(fileInfo.lengths[fileno] = len);
+       INC(fileno);
+       IF fileno = FileInfoPerSector THEN
+-        Kernel.GetSector(fileInfo.sector + 29, fileInfo);
++        Kernel.Get4kSector(fileInfo.sector + 29, fileInfo);
+         fileno := 0
+       END
+     END;
+     IF pos # 0 THEN
+       WHILE pos < FileDir.SectorSize DO buf[pos] := 0; INC(pos) END;
+-      Kernel.PutSector(currSector, buf);
++      Kernel.Put4kSector(currSector, buf);
+     END;
+     FOR pos := 0 TO FileDir.SectorSize - 1 DO buf[pos] := 0 END;
+-    Kernel.PutSector(FileDir.DirRootAdr, buf);
+-    Kernel.GetSector(FileDir.DirRootAdr, dp);
++    Kernel.Put4kSector(FileDir.DirRootAdr, buf);
++    Kernel.Get4kSector(FileDir.DirRootAdr, dp);
+     dp.mark := FileDir.DirMark;
+-    Kernel.PutSector(FileDir.DirRootAdr, dp);
+-    Kernel.InitSecMap;
++    Kernel.Put4kSector(FileDir.DirRootAdr, dp);
++    Kernel.InitSecMap; Kernel.MarkSector(0); Kernel.MarkSector(FileDir.DirRootAdr);
+     currSector := lastUsedSector + 29; fileno := 0; pos := 0;
+-    Kernel.GetSector(fileInfo.firstSector, fileInfo);
+-    Kernel.GetSector(currSector, buf); INC(currSector, 29);
++    Kernel.Get4kSector(fileInfo.firstSector, fileInfo);
++    Kernel.Get4kSector(currSector, buf); INC(currSector, 29);
+     WHILE fileno < fileInfo.count DO
+       len := fileInfo.lengths[fileno];
+       DefragFiles.New(fileInfo.names[fileno]);
+@@ -117,14 +117,14 @@
+         DefragFiles.WriteByte(R, buf[pos]);
+         INC(pos); DEC(len);
+         IF pos = FileDir.SectorSize THEN
+-          Kernel.GetSector(currSector, buf); INC(currSector, 29);
++          Kernel.Get4kSector(currSector, buf); INC(currSector, 29);
+           pos := 0;
+         END;
+       END;
+       DefragFiles.Register();
+       INC(fileno);
+       IF fileno = FileInfoPerSector THEN
+-        Kernel.GetSector(fileInfo.sector + 29, fileInfo);
++        Kernel.Get4kSector(fileInfo.sector + 29, fileInfo);
+         fileno := 0
+       END
+     END;

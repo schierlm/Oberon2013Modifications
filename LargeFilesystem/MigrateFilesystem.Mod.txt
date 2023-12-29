@@ -1,0 +1,88 @@
+MODULE MigrateFilesystem;
+  IMPORT SYSTEM, Kernel, FileDir, Files;
+
+   CONST
+        NewFnLength   = 64;
+        NewSecTabSize = 64;
+        NewExTabSize  = 128;
+        NewSectorSize = 4096;
+        NewHeaderSize = 848;
+        NewMinHdrMark = 9BA71D85H;
+        NewMinRootAdr = 1024 * 29;
+
+  TYPE NewDiskAdr      = INTEGER;
+    NewSector         = ARRAY NewSectorSize OF BYTE;
+    OldSectors        = ARRAY NewSectorSize DIV Kernel.SectorLength OF Kernel.Sector;
+    NewFileName       = ARRAY NewFnLength OF CHAR;
+    NewSectorTable    = ARRAY NewSecTabSize OF NewDiskAdr;
+    NewExtensionTable = ARRAY NewExTabSize OF NewDiskAdr;
+    NewDataSector = ARRAY NewSectorSize OF BYTE;
+    NewFileHeader =
+      RECORD (*first page of each file on disk*)
+        mark: INTEGER;
+        name: NewFileName;
+        aleng, bleng, date: INTEGER;
+        ext:  NewExtensionTable;
+        sec: NewSectorTable;
+        fill: ARRAY NewSectorSize - NewHeaderSize OF BYTE;
+      END ;
+
+  VAR nextAdr: INTEGER;
+
+  PROCEDURE Load*;
+  BEGIN (* no-op *)
+  END Load;
+
+  PROCEDURE PutNewSector0(dst: INTEGER; VAR src: OldSectors);
+  VAR i: INTEGER;
+  BEGIN
+    FOR i := 0 TO 3 DO
+      Kernel.PutSector(dst * 4 + (80 + i) * 29, src[i])
+    END
+  END PutNewSector0;
+
+  PROCEDURE PutNewSector(dst: INTEGER; VAR src: NewSector);
+  BEGIN PutNewSector0(dst, SYSTEM.VAL(OldSectors, src))
+  END PutNewSector;
+
+  PROCEDURE EnumAll(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+  VAR i, j, cnt, len: INTEGER;
+    ohdr: FileDir.FileHeader;
+    nhdr: NewFileHeader;
+    nbuf: NewDataSector;
+    f: Files.File;
+    R: Files.Rider;
+  BEGIN cont := TRUE;
+    Kernel.GetSector(adr, ohdr);
+    nhdr.mark := NewMinHdrMark;
+    FOR i := 0 TO FileDir.FnLength -1 DO nhdr.name[i] := ohdr.name[i] END;
+    FOR i := FileDir.FnLength TO NewFnLength - 1 DO nhdr.name[i] := 0X END;
+    len := ohdr.aleng * FileDir.SectorSize + ohdr.bleng - FileDir.HeaderSize + NewHeaderSize;
+    nhdr.aleng := len DIV NewSectorSize;
+    nhdr.bleng := len MOD NewSectorSize;
+    nhdr.date := ohdr.date;
+    FOR i := 0 TO NewExTabSize - 1 DO nhdr.ext[i] := 0 END;
+    FOR i := 0 TO NewSecTabSize - 1 DO nhdr.sec[i] := 0 END;
+    cnt := 1; WHILE cnt <= nhdr.aleng DO cnt := cnt * 2 END;
+    nhdr.ext[0] := cnt * 29;
+    f := Files.Old(name);
+    ASSERT(f # NIL);
+    Files.Set(R, f, 0);
+    FOR i := 0 TO NewSectorSize - NewHeaderSize - 1 DO Files.ReadByte(R, nhdr.fill[i]) END;
+    PutNewSector(nextAdr, nhdr); INC(nextAdr, 29);
+    FOR i := 1 TO cnt - 1  DO
+      FOR j := 0 TO NewSectorSize - 1 DO Files.ReadByte(R, nbuf[j]) END;
+      PutNewSector(nextAdr, nbuf); INC(nextAdr, 29);
+    END;
+    Files.Close(f);
+  END EnumAll;
+
+  PROCEDURE Migrate*;
+  VAR i: INTEGER; nbuf: NewDataSector;
+  BEGIN nextAdr := NewMinRootAdr;
+    FileDir.Enumerate("", EnumAll);
+    FOR i := 0 TO NewSectorSize - 1 DO nbuf[i] := 0 END;
+    PutNewSector(nextAdr, nbuf)
+  END Migrate;
+
+END MigrateFilesystem.
