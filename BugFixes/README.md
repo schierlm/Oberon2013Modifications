@@ -65,6 +65,18 @@ Fix 6: Fix scroll cursor corrupting the IO memory area
 When dragging the mouse pointer to the top of the screen while scrolling, the scroll cursor
 was drawn partially outside the screen and could corrupt the IO memory area.
 
+
+Fix 7: Fix wrapped memory displacement when accessing heap objects larger than 512 KB
+-------------------------------------------------------------------------------------
+
+When running on a system with more than 1 MB of RAM, heap objects can be larger than 512 KB.
+But you'd rather avoid it, since relative memory access instructions only support a displacement
+of 512 KB. The original compiler just wrapped the displacement, resulting in memory corruption.
+
+This fix makes displacements larger than 512 KB a compile time error, forcing the user to rewrite
+their code instead of a hard to debug memory corruption at runtime.
+
+
 Installation
 ------------
 
@@ -79,6 +91,8 @@ Installation
 - Apply [`CompileSetLiterals.patch`](CompileSetLiterals.patch) to `ORG.Mod`
 
 - Apply [`FixScrollCursorCorruption.patch`](FixScrollCursorCorruption.patch) to `TextFrames.Mod`
+
+- Apply [`FixWrappedMemoryDisplacement.patch`](FixWrappedMemoryDisplacement.patch) to `ORG.Mod`
 
 - Recompile the changed modules and rebuild the inner core:
 

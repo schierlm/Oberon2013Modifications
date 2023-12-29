@@ -11,6 +11,7 @@ patch -d work <BugFixes/NoMemoryCorruptionAfterMemoryAllocationFailure.patch
 patch -d work <BugFixes/IllegalAccessInGC.patch
 patch -d work <BugFixes/CompileSetLiterals.patch
 patch -d work <BugFixes/FixScrollCursorCorruption.patch
+patch -d work <BugFixes/FixWrappedMemoryDisplacement.patch
 for i in FileDir Files; do
 	cp work/$i.Mod.txt work/Image$i.Mod.txt
 done
@@ -97,7 +98,7 @@ mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
 cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/debug
 
-sed -i 's/maxCode = 8500; /maxCode = 8800; /' work/debug/ORG.Mod.txt
+sed -i 's/maxCode = 8500; /maxCode = 8900; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
 patch -d work/debug <ORStackInspect/StackSymbols.patch -F 3
 patch -d work/debug <CrossCompiler/POSTPATCH_after_StackSymbols.patch

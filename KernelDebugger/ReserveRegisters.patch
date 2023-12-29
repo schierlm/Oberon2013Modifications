@@ -29,7 +29,7 @@
      IF (im >= -10000H) & (im <= 0FFFFH) THEN Put1(op, a, b, im)
      ELSE Put1(Mov+U, RH, 0, im DIV 10000H);
        IF im MOD 10000H # 0 THEN Put1(Ior, RH, RH, im MOD 10000H) END ;
-@@ -71,9 +80,16 @@
+@@ -71,10 +80,17 @@
      END
    END Put1a;
  
@@ -37,6 +37,7 @@
 +  PROCEDURE Put2X(op, a, b, off: LONGINT);
    BEGIN (*emit load/store instruction*)
 +    ASSERT((a # 10) & (a # 11));
+     IF ABS(off) >= 80000H THEN ORS.Mark("displacement larger than 512KB") END;
      code[pc] := ((op * 10H + a) * 10H + b) * 100000H + (off MOD 100000H); INC(pc)
 +  END Put2X;
 +

@@ -1,0 +1,10 @@
+--- 1/ORG.Mod.txt
++++ 2/ORG.Mod.txt
+@@ -73,6 +73,7 @@
+ 
+   PROCEDURE Put2(op, a, b, off: LONGINT);
+   BEGIN (*emit load/store instruction*)
++    IF ABS(off) >= 80000H THEN ORS.Mark("displacement larger than 512KB") END;
+     code[pc] := ((op * 10H + a) * 10H + b) * 100000H + (off MOD 100000H); INC(pc)
+   END Put2;
+ 
