@@ -93,6 +93,7 @@ patch -d work <ColorTheme/PREPATCH_after_VariableLinespace.patch
 patch -d work <ColorTheme/ColorTheme.patch
 patch -d work <ColorTheme/POSTPATCH_after_VariableLinespace.patch
 patch -d work <ColorTheme/UTF8CharsetLite.patch
+patch -d work <CursorKeys/CursorKeys.patch
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug

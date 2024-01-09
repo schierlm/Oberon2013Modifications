@@ -1,0 +1,80 @@
+--- 1/Input.Mod.txt
++++ 2/Input.Mod.txt
+@@ -63,16 +63,16 @@
+       00 6E 62 68 67 79 36 00  00 00 6D 6A 75 37 38 00
+       00 2C 6B 69 6F 30 39 00  00 2E 2F 6C 3B 70 2D 00
+       00 00 27 00 5B 3D 00 00  00 00 0D 5D 00 5C 00 00
+-      00 00 00 00 00 00 08 00  00 00 00 00 00 00 00 00
+-      00 7F 00 00 00 00 1B 00  00 00 00 00 00 00 00 00
++      00 00 00 00 00 00 08 00  00 00 00 11 00 00 00 00
++      00 7F 14 00 12 13 1B 00  00 00 00 00 00 00 00 00
+       00 00 00 00 00 00 00 00  00 00 00 00 00 09 7E 00
+       00 00 00 00 00 51 21 00  00 00 5A 53 41 57 40 00
+       00 43 58 44 45 24 23 00  00 20 56 46 54 52 25 00
+       00 4E 42 48 47 59 5E 00  00 00 4D 4A 55 26 2A 00
+       00 3C 4B 49 4F 29 28 00  00 3E 3F 4C 3A 50 5F 00
+       00 00 22 00 7B 2B 00 00  00 00 0D 7D 00 7C 00 00
+-      00 00 00 00 00 00 08 00  00 00 00 00 00 00 00 00
+-      00 7F 00 00 00 00 1B 00  00 00 00 00 00 00 00 00$)
++      00 00 00 00 00 00 08 00  00 00 00 11 00 00 00 00
++      00 7F 14 00 12 13 1B 00  00 00 00 00 00 00 00 00$)
+   END Init;
+ 
+ BEGIN Init
+--- 1/TextFrames.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -621,6 +621,18 @@
+       IF F.carloc.pos > F.org THEN
+         Texts.Delete(F.text, F.carloc.pos - 1, F.carloc.pos, DelBuf); SetCaret(F, F.carloc.pos - 1)
+       END
++    ELSIF ch = 7FX THEN (*delete*)
++      IF F.carloc.pos < F.text.len THEN
++        Texts.Delete(F.text, F.carloc.pos, F.carloc.pos + 1, DelBuf); SetCaret(F, F.carloc.pos - 1)
++      END
++    ELSIF ch = 11X THEN (*cursor left*)
++      IF F.carloc.pos > F.org THEN RemoveCaret(F); SetCaret(F, F.carloc.pos - 1) END
++    ELSIF ch = 12X THEN (*cursor right*)
++      IF F.carloc.pos < F.text.len THEN RemoveCaret(F); SetCaret(F, F.carloc.pos + 1) END
++    ELSIF ch = 13X THEN (*cursor up*)
++      RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y + F.lsp))
++    ELSIF ch = 14X THEN (*cursor down*)
++      RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y - F.lsp))
+     ELSIF ch = 3X THEN (* ctrl-c  copy*)
+       IF F.hasSel THEN
+         NEW(TBuf); Texts.OpenBuf(TBuf); Texts.Save(F.text, F.selbeg.pos, F.selend.pos, TBuf)
+--- 1/GraphicFrames.Mod.txt
++++ 2/GraphicFrames.Mod.txt
+@@ -365,7 +365,7 @@
+   PROCEDURE Handle*(G: Display.Frame; VAR M: Display.FrameMsg);
+     VAR x, y, h: INTEGER;
+       DM: DispMsg; dM: DrawMsg;
+-      G1: Frame;
++      G1: Frame; loc: Location; obj: Graphics.Object;
+   BEGIN
+     CASE G OF Frame:
+       CASE M OF
+@@ -376,6 +376,24 @@
+         ELSIF M.id = Oberon.consume THEN
+           IF M.ch = 7FX THEN (*DEL*)
+             Erase(G); Graphics.Delete(G.graph); Mark(G, 1)
++          ELSIF (M.ch >= 11X) & (M.ch <= 14X) THEN (*cursor keys*)
++            IF G.ticked THEN x := 16 ELSE x := 1 END; y := 0;
++            IF M.ch = 11X THEN (*left*) x := -x
++            ELSIF M.ch = 12X THEN (*right*) (* no-op *)
++            ELSIF M.ch = 13X THEN (*up*) y := -x; x := 0
++            ELSIF M.ch = 14X THEN (*down*) y := x; x := 0 END;
++            IF G.graph.sel # NIL THEN
++              Erase(G); Graphics.Move(G.graph, x, y); Draw(G)
++            END;
++            IF G.marked THEN
++              FlipMark(G.mark.x, G.mark.y); INC(G.mark.x, x); INC(G.mark.y, y); FlipMark(G.mark.x, G.mark.y);
++              loc := G.mark.next;
++              WHILE loc # NIL DO
++                FlipMark(loc.x, loc.y); INC(loc.x, x); INC(loc.y, y); FlipMark(loc.x, loc.y);
++                loc := loc.next
++              END
++            END;
++            Mark(G, 1)
+           ELSIF (M.ch >= 20X) & (M.ch < 7FX) THEN
+             IF newcap # NIL THEN InsertChar(G, M.ch); Mark(G, 1)
+             ELSIF G.marked THEN
