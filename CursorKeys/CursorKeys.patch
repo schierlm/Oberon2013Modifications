@@ -29,7 +29,7 @@
        END
 +    ELSIF ch = 7FX THEN (*delete*)
 +      IF F.carloc.pos < F.text.len THEN
-+        Texts.Delete(F.text, F.carloc.pos, F.carloc.pos + 1, DelBuf); SetCaret(F, F.carloc.pos - 1)
++        Texts.Delete(F.text, F.carloc.pos, F.carloc.pos + 1, DelBuf); SetCaret(F, F.carloc.pos)
 +      END
 +    ELSIF ch = 11X THEN (*cursor left*)
 +      IF F.carloc.pos > F.org THEN RemoveCaret(F); SetCaret(F, F.carloc.pos - 1) END

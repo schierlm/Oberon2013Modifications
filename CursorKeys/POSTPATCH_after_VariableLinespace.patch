@@ -1,0 +1,14 @@
+--- 1/TextFrames0.Mod.txt
++++ 2/TextFrames.Mod.txt
+@@ -701,9 +701,9 @@
+     ELSIF ch = 12X THEN (*cursor right*)
+       IF F.carloc.pos < F.text.len THEN RemoveCaret(F); SetCaret(F, F.carloc.pos + 1) END
+     ELSIF ch = 13X THEN (*cursor up*)
+-      RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y + F.lsp))
++      RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y + F.carloc.lin.lsp))
+     ELSIF ch = 14X THEN (*cursor down*)
+-      RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y - F.lsp))
++      RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y - dsr - 1))
+     ELSIF ch = 3X THEN (* ctrl-c  copy*)
+       IF F.hasSel THEN
+         NEW(TBuf); Texts.OpenBuf(TBuf); Texts.Save(F.text, F.selbeg.pos, F.selend.pos, TBuf)
