@@ -241,9 +241,21 @@
 +END TextFramesU.
 --- 1/Fonts.Mod.txt
 +++ 2/Fonts.Mod.txt
-@@ -33,12 +33,13 @@
+@@ -14,6 +14,8 @@
+ 
+     LargeFontDesc = RECORD (FontDesc) ext: ARRAY 2560 OF BYTE END ;
+     LargeFont = POINTER TO LargeFontDesc;
++    HugeFontDesc = RECORD (LargeFontDesc) ext2: ARRAY 32768 OF BYTE END ;
++    HugeFont = POINTER TO HugeFontDesc;
+     RunRec = RECORD beg, end: BYTE END ;
+     BoxRec = RECORD dx, x, y, w, h: BYTE END ;
+     
+@@ -31,14 +33,15 @@
+ END GetPat;
+ 
  PROCEDURE This*(name: ARRAY OF CHAR): Font;
-   VAR F: Font; LF: LargeFont;
+-  VAR F: Font; LF: LargeFont;
++  VAR F: Font; LF: LargeFont; HF: HugeFont;
      f: Files.File; R: Files.Rider;
 -    NofRuns, NofBoxes: BYTE;
 +    NofRuns, NofBoxes: INTEGER;
@@ -257,19 +269,19 @@
      run: ARRAY 16 OF RunRec;
      box: ARRAY 512 OF BoxRec;
  
-@@ -46,6 +47,11 @@
-     VAR b1: BYTE;
+@@ -47,6 +50,11 @@
    BEGIN Files.ReadByte(R, b0); Files.ReadByte(R, b1)
    END RdInt16;
-+
+ 
 +  PROCEDURE ReadInt16(VAR R: Files.Rider; VAR r: INTEGER);
 +    VAR b0, b1: BYTE;
 +  BEGIN Files.ReadByte(R, b0); Files.ReadByte(R, b1); r := b1 * 100H + b0;
 +  END ReadInt16;
- 
++
  BEGIN F := root;
    WHILE (F # NIL) & (name # F.name) DO F := F.next END;
-@@ -57,19 +63,20 @@
+   IF F = NIL THEN
+@@ -57,21 +65,27 @@
          Files.ReadByte(R, b); (*abstraction*)
          Files.ReadByte(R, b); (*family*)
          Files.ReadByte(R, b); (*variant*)
@@ -290,9 +302,17 @@
          WHILE j # NofBoxes DO
            RdInt16(R, box[j].dx); RdInt16(R, box[j].x); RdInt16(R, box[j].y);
            RdInt16(R, box[j].w); RdInt16(R, box[j].h);
++          IF j < UsedBoxes THEN
            NofBytes := NofBytes + 5 + (box[j].w + 7) DIV 8 * box[j].h;
 -          INC(j)
-+          IF j < UsedBoxes THEN INC(j) ELSE DEC(NofBoxes) END;
++          INC(j) ELSE DEC(NofBoxes) END;
          END;
-         IF NofBytes < 2300 THEN NEW(F) ELSE NEW(LF); F := LF END ;
+-        IF NofBytes < 2300 THEN NEW(F) ELSE NEW(LF); F := LF END ;
++        IF NofBytes < 2360 THEN NEW(F)
++        ELSIF NofBytes < 2360 + 2560 THEN NEW(LF); F := LF
++        ELSIF NofBytes < 2360 + 2560 + 32768 THEN NEW(HF); F := HF
++        ELSE ASSERT(FALSE)
++        END ;
          F.name := name;
+         F.height := height; F.minX := minX; F.maxX := maxX; F.maxY := maxY;
+         IF minY >= 80H THEN F.minY := minY - 100H ELSE F.minY := minY END ;
