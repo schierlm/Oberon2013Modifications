@@ -4,8 +4,8 @@
      data: INTEGER; (*SPI data in*)
      sectorMapStart*, lastUsedSector: INTEGER;
      sectorMap: ARRAY mapsize DIV 32 OF SET;
--    timer, spiData, spiCtrl, pvDisk, dbgConsole, softResetAddr, hardResetAddr: INTEGER;
-+    timer, spiData, spiCtrl, pvDisk, cacheInvalAddr, dbgConsole, softResetAddr, hardResetAddr: INTEGER;
+-    timer, spiData, spiCtrl, pvDisk, dbgConsole, softResetAddr, hardResetAddr, quitAddr: INTEGER;
++    timer, spiData, spiCtrl, pvDisk, cacheInvalAddr, dbgConsole, softResetAddr, hardResetAddr, quitAddr: INTEGER;
      powerManagement: BOOLEAN;
      
  (* ---------- New: heap allocation ----------*)

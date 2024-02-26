@@ -13,12 +13,12 @@
      data: INTEGER; (*SPI data in*)
      sectorMapStart*, lastUsedSector: INTEGER;
      sectorMap: ARRAY mapsize DIV 32 OF SET;
-+    timer, spiData, spiCtrl, pvDisk, softResetAddr, hardResetAddr: INTEGER;
++    timer, spiData, spiCtrl, pvDisk, softResetAddr, hardResetAddr, quitAddr: INTEGER;
 +    powerManagement: BOOLEAN;
      
  (* ---------- New: heap allocation ----------*)
  
-@@ -137,6 +139,112 @@
+@@ -137,6 +139,117 @@
      UNTIL p >= heapLim
    END Scan;
  
@@ -79,9 +79,10 @@
 +      IF hasReset THEN
 +        SYSTEM.PUT(hwEnumerator, Rset);
 +        SYSTEM.GET(hwEnumerator, softResetAddr);
-+        SYSTEM.GET(hwEnumerator, hardResetAddr)
++        SYSTEM.GET(hwEnumerator, hardResetAddr);
++        SYSTEM.GET(hwEnumerator, quitAddr)
 +      ELSE
-+        softResetAddr := 0; hardResetAddr := 0
++        softResetAddr := 0; hardResetAddr := 0; quitAddr := 0
 +      END;
 +      IF hasPvDsk THEN
 +        SYSTEM.PUT(hwEnumerator, vDsk);
@@ -128,10 +129,14 @@
 +    END
 +  END HardReset;
 +
++  PROCEDURE Quit*;
++  BEGIN IF quitAddr # 0 THEN PerformReset(quitAddr, FALSE) END
++  END Quit;
++
  (* ---------- Disk storage management ----------*)
  
    PROCEDURE SPIIdle(n: INTEGER); (*send n FFs slowly with no card selected*)
-@@ -255,30 +363,48 @@
+@@ -261,30 +374,48 @@
  
    PROCEDURE GetSector*(src: INTEGER; VAR dst: Sector);
    BEGIN src := src DIV 29; ASSERT(SYSTEM.H(0) = 0);
@@ -195,7 +200,7 @@
    END TrimAllSectorsAfter;
  
  (*-------- Miscellaneous procedures----------*)
-@@ -341,6 +467,7 @@
+@@ -400,6 +531,7 @@
      list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
      SYSTEM.PUT(list0, heapLim - heapOrg); SYSTEM.PUT(list0+4, -1); SYSTEM.PUT(list0+8, 0);
      allocated := 0; clock := 0; InitSecMap
@@ -1026,7 +1031,22 @@
  END SCC.
 --- System.Mod.txt
 +++ System.Mod.txt
-@@ -171,7 +171,7 @@
+@@ -71,6 +71,14 @@
+   BEGIN Oberon.Collect(0)
+   END Collect;
+ 
++  PROCEDURE Quit*;
++  BEGIN Kernel.Quit
++  END Quit;
++
++  PROCEDURE Reboot*;
++  BEGIN Kernel.HardReset
++  END Reboot;
++
+   (* ------------- Toolbox for standard display ---------------*)
+ 
+   PROCEDURE Open*;  (*open viewer in system track*)
+@@ -171,7 +179,7 @@
    (* ------------- Toolbox of file system ---------------*)
  
    PROCEDURE List(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
@@ -1035,7 +1055,7 @@
    BEGIN
      i := 0;
      WHILE (pat[i] > "*") & (pat[i] = name[i]) DO INC(i) END ;
-@@ -191,9 +191,9 @@
+@@ -191,9 +199,9 @@
      IF (name[i0] = 0X) & (pat[j0] = 0X) THEN (*found*)
        Texts.WriteString(W, name);
        IF pat[j0+1] = "!" THEN (*option*)

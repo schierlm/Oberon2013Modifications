@@ -4,8 +4,8 @@
      data: INTEGER; (*SPI data in*)
      sectorMapStart*, lastUsedSector: INTEGER;
      sectorMap: ARRAY mapsize DIV 32 OF SET;
--    timer, spiData, spiCtrl, pvDisk, softResetAddr, hardResetAddr: INTEGER;
-+    timer, spiData, spiCtrl, pvDisk, dbgConsole, softResetAddr, hardResetAddr: INTEGER;
+-    timer, spiData, spiCtrl, pvDisk, softResetAddr, hardResetAddr, quitAddr: INTEGER;
++    timer, spiData, spiCtrl, pvDisk, dbgConsole, softResetAddr, hardResetAddr, quitAddr: INTEGER;
      powerManagement: BOOLEAN;
      
  (* ---------- New: heap allocation ----------*)
@@ -78,9 +78,9 @@
        END;
        IF hasTimer THEN
 @@ -199,6 +235,12 @@
-         SYSTEM.GET(hwEnumerator, hardResetAddr)
+         SYSTEM.GET(hwEnumerator, quitAddr)
        ELSE
-         softResetAddr := 0; hardResetAddr := 0
+         softResetAddr := 0; hardResetAddr := 0; quitAddr := 0
 +      END;
 +      IF hasDebugConsole THEN
 +        SYSTEM.PUT(hwEnumerator, DbgC);
