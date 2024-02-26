@@ -74,11 +74,11 @@ MODULE OptimizeFont;
     WHILE i > 0 DO (* trim left *)
       empty := TRUE; j := h - 1;
       WHILE empty & (j >= 0) DO
-        empty := (glyph[j * ww] = 0); DEC(j);
+        empty := (glyph[j * ww] MOD 2 = 0); DEC(j);
       END;
       IF empty THEN
         DEC(w); INC(x); carry := FALSE;
-        FOR j := ww * h - 1 TO 0 DO
+        FOR j := ww * h - 1 TO 0 BY -1 DO
           carry2 := glyph[j] MOD 2 # 0;
           glyph[j] := glyph[j] DIV 2 + ORD(carry) * 80H;
           carry := carry2;
