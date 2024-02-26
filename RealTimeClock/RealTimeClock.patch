@@ -9,7 +9,7 @@
      list0, list1, list2, list3: INTEGER;  (*lists of free blocks of size n*256, 128, 64, 32 bytes*)
      data: INTEGER; (*SPI data in*)
      sectorMap: ARRAY mapsize DIV 32 OF SET;
-@@ -239,12 +239,60 @@
+@@ -239,12 +239,64 @@
    BEGIN SYSTEM.GET(timer, t); RETURN t
    END Time;
  
@@ -39,9 +39,13 @@
 +  PROCEDURE UpdateClock;
 +  VAR value, rest: INTEGER;
 +  BEGIN
-+    value := (Time() - clockTime) DIV 1000;
-+    clockTime := clockTime + value * 1000;
-+    value := clock MOD 40H + value;
++    IF clock = 0 THEN
++      value := 0 (* avoid ticking if not set *)
++    ELSE
++      value := (Time() - clockTime) DIV 1000;
++      clockTime := clockTime + value * 1000;
++      value := clock MOD 40H + value
++    END;
 +    IF value < 60 THEN
 +      clock := clock DIV 40H * 40H + value
 +    ELSE
@@ -72,7 +76,7 @@
    END SetClock;
  
    PROCEDURE Install*(Padr, at: INTEGER);
-@@ -264,6 +312,7 @@
+@@ -264,6 +316,7 @@
      SYSTEM.GET(12, MemLim); SYSTEM.GET(24, heapOrg);
      stackOrg := heapOrg; stackSize := 8000H; heapLim := MemLim;
      list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
