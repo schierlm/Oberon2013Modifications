@@ -166,7 +166,7 @@ MODULE BiSixelConverter;
 
   PROCEDURE WriteMixedColorRow(colors: ARRAY OF INTEGER; color: INTEGER; advance: BOOLEAN);
     VAR monoPixels: SET; i: INTEGER;
-  BEGIN monoPixels := {0};
+  BEGIN monoPixels := {};
     FOR i := 0 TO 11 DO
       IF colors[i] = color THEN INCL(monoPixels, i) END
     END;
