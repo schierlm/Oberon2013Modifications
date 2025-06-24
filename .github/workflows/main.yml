@@ -49,13 +49,13 @@ jobs:
 
     - name: Upload reject files in case of patch failure
       if: ${{ failure() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: RejectFiles
         path: rejectfiles/
 
     - name: Upload PatchedModules artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: PatchedModules
         path: work/
@@ -68,28 +68,14 @@ jobs:
         ./make_disk_image.sh
 
     - name: Upload DiskImages artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: DiskImages
-        path: work/OberonModifications.dsk
-
-    - name: Upload DiskImages artifact (Debug)
-      uses: actions/upload-artifact@v2
-      with:
-        name: DiskImages
-        path: work/OberonModificationsDebug.dsk
-
-    - name: Upload DiskImages artifact (With rescue)
-      uses: actions/upload-artifact@v2
-      with:
-        name: DiskImages
-        path: work/OberonModificationsWithRescue.dsk
-
-    - name: Upload DiskImages artifact (Debug with rescue)
-      uses: actions/upload-artifact@v2
-      with:
-        name: DiskImages
-        path: work/OberonModificationsDebugWithRescue.dsk
+        path: |
+          work/OberonModifications.dsk
+          work/OberonModificationsDebug.dsk
+          work/OberonModificationsWithRescue.dsk
+          work/OberonModificationsDebugWithRescue.dsk
 
     - name: Update release metadata and remove old assets
       if: github.ref == 'refs/heads/master' && github.repository == 'schierlm/Oberon2013Modifications'
