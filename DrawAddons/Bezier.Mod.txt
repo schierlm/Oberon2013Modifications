@@ -1,0 +1,177 @@
+MODULE Bezier;
+  IMPORT Display, Files, Oberon, Graphics, GraphicFrames;
+
+  TYPE
+    Bezier* = POINTER TO BezierDesc;
+    BezierDesc* = RECORD (Graphics.ObjectDesc)
+        swap*, cubic*: BOOLEAN;
+        x1*, y1*, x2*, y2*, lw*: INTEGER;
+    END;
+
+  VAR method*: Graphics.Method;
+
+  PROCEDURE Dot(f: GraphicFrames.Frame; col, x, y: INTEGER);
+  BEGIN
+    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (x+7 < f.Y1) THEN Display.Dot(col, x, y, Display.replace) END
+  END Dot;
+
+  PROCEDURE mark(f: GraphicFrames.Frame; col, x, y: INTEGER);
+  BEGIN DEC(x, 3); DEC(y, 3);
+    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN
+      IF col = Display.black THEN Display.ReplConst(Display.black, x, y, 7, 7, Display.replace)
+      ELSE Display.CopyPattern(col, GraphicFrames.tack, x, y, Display.replace)
+      END
+    END
+  END mark;
+
+  PROCEDURE bezQuad(f: GraphicFrames.Frame; xS, yS, x1, y1, xE, yE, col: INTEGER);
+  VAR xA1, yA1, xA2, yA2, xB, yB: INTEGER;
+  BEGIN
+    IF (ABS(xE - x1) < 2) & (ABS(yE - y1) < 2) & (ABS(x1 - xS) < 2) & (ABS(y1 - yS) < 2) THEN
+      Dot(f, col, xS, yS); Dot(f, col, x1, y1); Dot(f, col, xE, yE)
+    ELSE
+      xA1 := (xS + x1) DIV 2; yA1 := (yS + y1) DIV 2;
+      xA2 := (x1 + xE) DIV 2; yA2 := (y1 + yE) DIV 2;
+      xB := (xA1 + xA2) DIV 2; yB := (yA1 + yA2) DIV 2;
+      bezQuad(f, xS, yS, xA1, yA1, xB, yB, col);
+      bezQuad(f, xB, yB, xA2, yA2, xE, yE, col)
+    END
+  END bezQuad;
+
+  PROCEDURE bezCubic(f: GraphicFrames.Frame; xS, yS, x1, y1, x2, y2, xE, yE, col: INTEGER);
+  VAR xA1, yA1, xA2, yA2, xA3, yA3, xB1, yB1, xB2, yB2, xC, yC: INTEGER;
+  BEGIN
+    IF (ABS(xE - x2) < 2) & (ABS(yE - y2) < 2) &
+            (ABS(x2 - x1) < 2) & (ABS(y2 - y1) < 2) &
+            (ABS(x1 - xS) < 2) & (ABS(y1 - yS) < 2) THEN
+      Dot(f, col, xS, yS); Dot(f, col, x1, y1); Dot(f, col, x2, y2); Dot(f, col, xE, yE)
+    ELSE
+      xA1 := (xS + x1) DIV 2; yA1 := (yS + y1) DIV 2;
+      xA2 := (x1 + x2) DIV 2; yA2 := (y1 + y2) DIV 2;
+      xA3 := (x2 + xE) DIV 2; yA3 := (y2 + yE) DIV 2;
+      xB1 := (xA1 + xA2) DIV 2; yB1 := (yA1 + yA2) DIV 2;
+      xB2 := (xA2 + xA3) DIV 2; yB2 := (yA2 + yA3) DIV 2;
+      xC := (xB1 + xB2) DIV 2; yC := (yB1 + yB2) DIV 2;
+      bezCubic(f, xS, yS, xA1, yA1, xB1, yB1, xC, yC, col);
+      bezCubic(f, xC, yC, xB2, yB2, xA3, yA3, xE, yE, col)
+    END
+  END bezCubic;
+
+  PROCEDURE bezier(f: GraphicFrames.Frame; col, mx, my: INTEGER; b: Bezier);
+  VAR yS, yE: INTEGER;
+  BEGIN
+    IF b.swap THEN yS := b.y + b.h; yE := b.y ELSE yS := b.y; yE := b.y+b.h END;
+    IF b.cubic THEN
+      bezCubic(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x2 + mx, b.y2 + my, b.x + b.w + mx, yE + my, col);
+    ELSE
+      bezQuad(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x + b.w + mx, yE + my, col);
+    END;
+  END bezier;
+
+  PROCEDURE New*;
+    VAR b: Bezier;
+  BEGIN NEW(b); b.do := method; Graphics.New(b)
+  END New;
+
+  PROCEDURE Copy(src, dst: Graphics.Object);
+  BEGIN dst.x := src.x; dst.y := src.y; dst.w := src.w; dst.h := src.h; dst.col := src.col;
+    dst(Bezier).swap := src(Bezier).swap; dst(Bezier).cubic := src(Bezier).cubic;
+    dst(Bezier).x1 := src(Bezier).x1; dst(Bezier).y1 := src(Bezier).y1;
+    dst(Bezier).x2 := src(Bezier).x2; dst(Bezier).y2 := src(Bezier).y2;
+    dst(Bezier).lw := src(Bezier).lw
+  END Copy;
+
+  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
+    VAR x, y, w, h, col: INTEGER; f: GraphicFrames.Frame;
+  BEGIN
+    CASE M OF GraphicFrames.DrawMsg:
+      x := obj.x + M.x; y := obj.y + M.y; w := obj.w; h := obj.h; f := M.f;
+      IF M.col = Display.black THEN col := obj.col ELSE col := M.col END;
+      IF (x < f.X1) & (f.X <= x+w) & (y < f.Y1) & (f.Y <= y+h) THEN
+        IF ~obj(Bezier).swap THEN
+          IF M.mode = 0 THEN
+            IF obj.selected THEN mark(f, Display.white, x, y) END;
+            bezier(f, col, M.x, M.y, obj(Bezier))
+          ELSIF M.mode = 1 THEN mark(f, Display.white, x, y)
+          ELSIF M.mode = 2 THEN mark(f, f.col, x, y)
+          ELSIF M.mode = 3 THEN mark(f, Display.black, x, y); bezier(f, Display.black, M.x, M.y, obj(Bezier))
+          END
+        ELSE
+          IF M.mode = 0 THEN
+            IF obj.selected THEN mark(f, Display.white, x, y+h) END;
+            bezier(f, col, M.x, M.y, obj(Bezier))
+          ELSIF M.mode = 1 THEN mark(f, Display.white, x, y+h)
+          ELSIF M.mode = 2 THEN mark(f, f.col, x, y+h)
+          ELSIF M.mode = 3 THEN mark(f, Display.black, x, y+h); bezier(f, Display.black, M.x, M.y, obj(Bezier))
+          END
+        END
+      END
+    END
+  END Draw;
+
+  PROCEDURE Selectable(obj: Graphics.Object; x, y: INTEGER): BOOLEAN;
+    VAR y0, w, h: INTEGER;
+  BEGIN
+    w := obj.w; h := obj.h;
+    IF obj(Bezier).swap THEN y0 := obj.y + h; h := -h ELSE y0 := obj.y END
+    RETURN (obj.x <= x) & (x < obj.x + w) & (ABS(y-y0)*w - (x-obj.x)*h < w*4)
+  END Selectable;
+
+  PROCEDURE Change(obj: Graphics.Object; VAR M: Graphics.Msg);
+  BEGIN
+    IF M IS Graphics.ColorMsg THEN obj.col := M(Graphics.ColorMsg).col END
+  END Change;
+
+  PROCEDURE Read(obj: Graphics.Object; VAR R: Files.Rider; VAR C: Graphics.Context);
+    VAR len: BYTE; xy: INTEGER;
+  BEGIN Files.ReadByte(R, len); obj(Bezier).swap := len # 0;
+    Files.ReadByte(R, len); obj(Bezier).cubic := len # 0;
+    Files.ReadInt(R, xy); obj(Bezier).y1 := xy DIV 10000H; obj(Bezier).x1 := xy * 10000H DIV 10000H;
+    IF obj(Bezier).cubic THEN
+      Files.ReadInt(R, xy); obj(Bezier).y2 := xy DIV 10000H; obj(Bezier).x2 := xy * 10000H DIV 10000H;
+    END;
+    Files.ReadByte(R, len); obj(Bezier).lw := len
+  END Read;
+
+  PROCEDURE Write(obj: Graphics.Object; cno: INTEGER; VAR W: Files.Rider; VAR C: Graphics.Context);
+  BEGIN Graphics.WriteObj(W, cno, obj);
+    Files.WriteByte(W, ORD(obj(Bezier).swap));
+    Files.WriteByte(W, ORD(obj(Bezier).cubic));
+    Files.WriteInt(W, obj(Bezier).x1 +  obj(Bezier).y1 * 10000H);
+    IF (obj(Bezier).cubic) THEN Files.WriteInt(W, obj(Bezier).x2 +  obj(Bezier).y2 * 10000H) END;
+    Files.WriteByte(W, obj(Bezier).lw)
+  END Write;
+
+  PROCEDURE Make*;  (*command*)
+    VAR xS, xE, yS, yE: INTEGER;
+      b: Bezier;
+      G: GraphicFrames.Frame;
+  BEGIN G := GraphicFrames.Focus();
+    IF (G # NIL) & (G.mark.next # NIL) & (G.mark.next.next # NIL) THEN
+      GraphicFrames.Deselect(G);
+      xS := G.mark.x; yS := G.mark.y; xE := G.mark.next.next.x; yE := G.mark.next.next.y;
+      NEW(b); b.col := Oberon.CurCol;
+      b.x1 := G.mark.next.x - G.x; b.y1 := G.mark.next.y - G.y;
+      b.cubic := G.mark.next.next.next # NIL;
+      IF (b.cubic) THEN
+        b.x2 := xE - G.x; b.y2 := yE - G.y;
+        xE := G.mark.next.next.next.x; yE := G.mark.next.next.next.y
+      END;
+      b.w := ABS(xE-xS); b.h := ABS(yE-yS); b.lw := Graphics.width;
+      IF xS <= xE THEN b.x := xS; b.swap := yS > yE;
+        IF b.swap THEN b.y := yE ELSE b.y := yS  END
+      ELSE b.x := xE; b.swap := yE >= yS;
+        IF b.swap THEN b.y := yS ELSE b.y := yE END;
+        IF b.cubic THEN xS := b.x1; b.x1 := b.x2; b.x2 := xS; xS := b.y1; b.y1 := b.y2; b.y2 := xS END;
+      END;
+      DEC(b.x, G.x); DEC(b.y, G.y); b.do := method;
+      Graphics.Add(G.graph, b);
+      GraphicFrames.Defocus(G); GraphicFrames.DrawObj(G, b)
+    END
+  END Make;
+
+BEGIN NEW(method); method.module := "Bezier"; method.allocator := "New";
+  method.new := New; method.copy := Copy; method.draw := Draw;
+  method.selectable := Selectable; method.change := Change;
+  method.read := Read; method.write := Write
+END Bezier.

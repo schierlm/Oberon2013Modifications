@@ -1,4 +1,4 @@
-Splines.MakeOpen     Splines.MakeClosed
+Splines.MakeOpen     Splines.MakeClosed     Bezier.Make
 Fills.MakeFilledRectangle Fills.MakeFloodFill
 
 PictureTiles.MakePicture Grapes.Pict

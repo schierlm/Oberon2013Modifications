@@ -5,7 +5,8 @@ Description
 
 Chapter 13.2.7 of the [Project Oberon book](http://www.inf.ethz.ch/personal/wirth/ProjectOberon/PO.Applications.pdf)
 refers to a module `Splines.Mod`, which is not included in Project Oberon, but was
-included in older versions of Oberon. So you will find a ported version here.
+included in older versions of Oberon. So you will find a ported version here, as well
+as a version of `Bezier.Mod`.
 
 Also, other oberon systems have support for displaying `.Pict` files (bitmap graphics).
 The `PictureTiles.Mod` module allows to embed bitmap tiles from `.Pict` files into
@@ -20,7 +21,7 @@ screen, which is called `DisplayGrab.Mod` and may need adjusting if you are usin
 modified `Display.Mod` (There is a second version of this module available in `16Colors`
 directory, in case your display is 16 colors).
 
-And since `PictureTiles only allows loading of `.Pict` files, there is a module
+And since `PictureTiles` only allows loading of `.Pict` files, there is a module
 called `PictureGrab`, which can be used to take (partial) screenshots and save them
 as `.Pict` files.
 
@@ -63,7 +64,7 @@ Installation
 
 - Compile the new modules:
 
-      ORP.Compile Splines.Mod/s PictureTiles.Mod/s ~
+      ORP.Compile Splines.Mod/s Bezier.Mod/s PictureTiles.Mod/s ~
       ORP.Compile DisplayGrab.Mod/s Fills.Mod/s ~
       ORP.Compile PictureGrab.Mod/s ~
       ORP.Compile PixelizrObjects.Mod/s Pixelizr.Mod/s ~

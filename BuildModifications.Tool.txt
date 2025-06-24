@@ -25,7 +25,7 @@ ORP.Compile Draw.Mod/s MacroTool.Mod/s SCC.Mod/s ~
 ORP.Compile BootLoad.Mod ~
 
 ORP.Compile Calc.Mod/s RealCalc.Mod/s ~
-ORP.Compile Splines.Mod/s PictureTiles.Mod/s ~
+ORP.Compile Splines.Mod/s Bezier.Mod/s PictureTiles.Mod/s ~
 ORP.Compile DisplayGrab.Mod/s Fills.Mod/s ~
 ORP.Compile PictureGrab.Mod/s ~
 ORP.Compile ColorPictureGrab.Mod/s ColorPictureTiles.Mod/s ~

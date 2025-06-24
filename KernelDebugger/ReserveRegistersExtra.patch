@@ -95,3 +95,29 @@
    END NewText;
  
  BEGIN NEW(TBuf); NEW(DelBuf);
+--- 1/Bezier.Mod.txt
++++ 2/Bezier.Mod.txt
+@@ -38,6 +38,7 @@
+     END
+   END bezQuad;
+ 
++  (*
+   PROCEDURE bezCubic(f: GraphicFrames.Frame; xS, yS, x1, y1, x2, y2, xE, yE, col: INTEGER);
+   VAR xA1, yA1, xA2, yA2, xA3, yA3, xB1, yB1, xB2, yB2, xC, yC: INTEGER;
+   BEGIN
+@@ -56,13 +57,14 @@
+       bezCubic(f, xC, yC, xB2, yB2, xA3, yA3, xE, yE, col)
+     END
+   END bezCubic;
++  *)
+ 
+   PROCEDURE bezier(f: GraphicFrames.Frame; col, mx, my: INTEGER; b: Bezier);
+   VAR yS, yE: INTEGER;
+   BEGIN
+     IF b.swap THEN yS := b.y + b.h; yE := b.y ELSE yS := b.y; yE := b.y+b.h END;
+     IF b.cubic THEN
+-      bezCubic(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x2 + mx, b.y2 + my, b.x + b.w + mx, yE + my, col);
++      (*bezCubic(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x2 + mx, b.y2 + my, b.x + b.w + mx, yE + my, col);*)
+     ELSE
+       bezQuad(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x + b.w + mx, yE + my, col);
+     END;

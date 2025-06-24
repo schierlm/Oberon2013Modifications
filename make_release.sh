@@ -98,7 +98,7 @@ patch -d work <CursorKeys/POSTPATCH_after_VariableLinespace.patch
 
 mkdir work/debug work/rescue work/debugrescue
 cp work/ORB.Mod.txt work/ORG.Mod.txt work/ORP.Mod.txt work/Oberon.Mod.txt work/System.Mod.txt work/debug
-cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/debug
+cp work/TextFrames.Mod.txt work/OnScreenKeyboard.Mod.txt work/Trappy.Mod.txt work/TextFramesU.Mod.txt work/Bezier.Mod.txt work/debug
 
 sed -i 's/maxCode = 8500; /maxCode = 8900; /' work/debug/ORG.Mod.txt
 patch -d work/debug <ORInspect/MoreSymbols.patch
