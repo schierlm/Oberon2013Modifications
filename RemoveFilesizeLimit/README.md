@@ -37,7 +37,8 @@ Installation
   and `Files.Mod` (and optionally `DefragFiles.Mod` if you want to use the defragger).
 
 - Optionally apply [`SlidingSectorBitmap.patch`](SlidingSectorBitmap.patch) to `Kernel.Mod`,
-  `FileDir.Mod` and `Files.Mod` (and optionally `DefragFiles.Mod` if you want to use the defragger).
+  `FileDir.Mod` and `Files.Mod` (and optionally `DefragFiles.Mod` and `Defragger.Mod` if you
+  want to use the defragger).
 
 - Push the new modules.
 

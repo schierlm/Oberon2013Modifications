@@ -26,6 +26,7 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
         modH, registered: BOOLEAN;
         sechint: DiskAdr;
         name: FileDir.FileName;
+        date: INTEGER;
         ext:  ARRAY FileDir.ExTabSize OF IndexRecord;
         sec: FileDir.SectorTable
       END ;
@@ -37,8 +38,12 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
       END;
 
   VAR onlyFile: FileDesc;
-    fileOpen: BOOLEAN;
+    fileOpen, cleanDisk: BOOLEAN;
     onlyBuf: BufferRecord;
+
+  PROCEDURE SetCleanDisk*(val: BOOLEAN);
+  BEGIN cleanDisk := val
+  END SetCleanDisk;
 
   PROCEDURE Check(s: ARRAY OF CHAR;
         VAR name: FileDir.FileName; VAR res: INTEGER);
@@ -70,7 +75,7 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
     onlyBuf.apos := 0; onlyBuf.mod := FALSE;
     F := SYSTEM.VAL(FileDir.FileHd, SYSTEM.ADR(onlyBuf.data));
     Kernel.GetSector(header, onlyBuf.data); ASSERT(F.mark = FileDir.HeaderMark);
-    onlyFile.aleng := F.aleng; onlyFile.bleng := F.bleng;
+    onlyFile.aleng := F.aleng; onlyFile.bleng := F.bleng; onlyFile.date := F.date;
     IF onlyFile.aleng = 0 THEN onlyBuf.lim := onlyFile.bleng ELSE onlyBuf.lim := SS END;
     onlyFile.name := namebuf; onlyFile.registered := TRUE;
     onlyFile.sec := F.sec;
@@ -153,7 +158,13 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
   BEGIN ASSERT(fileOpen);
     IF onlyBuf.apos # pos THEN
       IF onlyBuf.mod THEN WriteBuf() END;
-      IF pos <= onlyFile.aleng THEN ReadBuf(pos) ELSE onlyBuf.apos := pos; onlyBuf.lim := 0; onlyBuf.mod := FALSE END
+      IF pos <= onlyFile.aleng THEN ReadBuf(pos) ELSE
+        onlyBuf.apos := pos; onlyBuf.lim := 0; onlyBuf.mod := FALSE;
+        IF cleanDisk THEN
+          onlyBuf.lim := SS;
+          WHILE onlyBuf.lim > 0 DO DEC(onlyBuf.lim); onlyBuf.data[onlyBuf.lim] := 0 END
+        END
+      END
     END
   END GetBuf;
 
@@ -177,7 +188,7 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
     END
   END Unbuffer;
 
-  PROCEDURE Register*();
+  PROCEDURE Register*() : INTEGER;
   BEGIN ASSERT(fileOpen);
     IF onlyFile.name[0] # 0X THEN
       Unbuffer();
@@ -185,6 +196,7 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
         FileDir.Insert(onlyFile.name, onlyFile.sec[0]); onlyFile.registered := TRUE
       END
     END; fileOpen := FALSE
+    RETURN onlyFile.sec[0]
   END Register;
 
   PROCEDURE Close*();
@@ -195,6 +207,11 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
   BEGIN ASSERT(fileOpen);
   RETURN onlyFile.aleng * SS + onlyFile.bleng - HS
   END Length;
+
+  PROCEDURE Date*(): INTEGER;
+  BEGIN ASSERT(fileOpen);
+  RETURN onlyFile.date
+  END Date;
 
   PROCEDURE SetAtZero*(VAR r: Rider);
     VAR a, b: INTEGER;
@@ -229,6 +246,10 @@ MODULE DefragFiles;  (* used for defragmentation without memory allocations *)
       ELSE WriteBuf(); INC(r.apos);
         IF r.apos <= onlyFile.aleng THEN ReadBuf(r.apos)
         ELSE onlyBuf.apos := r.apos; onlyBuf.lim := 1; INC(onlyFile.aleng); onlyFile.bleng := 1; onlyFile.modH := TRUE;
+          IF cleanDisk THEN
+            onlyBuf.lim := SS;
+            WHILE onlyBuf.lim > 1 DO DEC(onlyBuf.lim); onlyBuf.data[onlyBuf.lim] := 0 END;
+          END;
           IF (onlyFile.aleng - STS) MOD XS = 0 THEN NewExt() END
         END;
         r.bpos := 0

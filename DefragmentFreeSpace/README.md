@@ -9,9 +9,10 @@ disk images with others, it can be helpful to remove unneccessary and potentiall
 private information. Also when sharing disk images for my JavaScript emulator,
 it makes sense to defragment them first.
 
-As the `Kernel` does not expose the last used sector of the filesystem, a small patch to
-`Kernel.Mod` is required (and a rebuild of the inner core) if you want to use the
-Defragmenter.
+As the `Kernel` does not expose the last used sector of the filesystem, yet there is a viable
+workaround to determine it in reasonable time without that. In case you also apply the
+[HardwareEnumerator](../HardwareEnumerator/README.md) modification, it exposes this piece
+of information, so the defragmenter is updated to use it there.
 
 After defragmentation, the second step is to trim the filesystem at the last used sector.
 Therefore, the defragmenter writes an extra sector containing
@@ -41,25 +42,7 @@ can only open one file at a time, but does not need to do any allocations at run
 Installation
 ------------
 
-- Apply [`DefragSupport.patch`](DefragSupport.patch) to `Kernel.Mod`.
-
 - Push the new modules.
-
-- Recompile `Kernel.Mod` and rebuild the whole system (including the compiler):
-
-      ORP.Compile Kernel.Mod/s FileDir.Mod/s Files.Mod/s Modules.Mod/s ~
-      ORL.Link Modules ~
-      ORL.Load Modules.bin ~
-
-      ORP.Compile Input.Mod/s Display.Mod/s Viewers.Mod/s ~
-      ORP.Compile Fonts.Mod/s Texts.Mod/s ~
-      ORP.Compile Oberon.Mod/s ~
-      ORP.Compile MenuViewers.Mod/s ~
-      ORP.Compile TextFrames.Mod/s ~
-      ORP.Compile System.Mod/s ~
-      ORP.Compile Edit.Mod/s ~
-      ORP.Compile ORS.Mod/s ORB.Mod/s ~
-      ORP.Compile ORG.Mod/s ORP.Mod/s ~
 
 - Compile the new modules:
 
@@ -72,5 +55,10 @@ Installation
 - Restart the system.
 
 - In case you are using the Lite version, run `Defragger.Prepare` and `System.Collect`.
+
+- If you want to preserve date stamps (full version only), run `Defragger.SetPreserveDates`.
+
+- If you want to overwrite all unused disk space with zeroes (full version only),
+  run `Defragger.SetCleanDisk`.
 
 - Run `Defragger.Defrag`.

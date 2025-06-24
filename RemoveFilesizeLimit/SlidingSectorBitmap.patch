@@ -194,7 +194,7 @@
      END;
 --- 1/DefragFiles.Mod.txt
 +++ 2/DefragFiles.Mod.txt
-@@ -156,7 +156,7 @@
+@@ -161,7 +161,7 @@
      IF onlyBuf.apos < STS THEN
        secadr := onlyFile.sec[onlyBuf.apos];
        IF secadr = 0 THEN
@@ -203,7 +203,7 @@
          onlyFile.modH := TRUE; onlyFile.sec[onlyBuf.apos] := secadr; onlyFile.sechint := secadr
        END;
        IF onlyBuf.apos = 0 THEN
-@@ -169,7 +169,7 @@
+@@ -174,7 +174,7 @@
        END;
        k := (onlyBuf.apos - STS) MOD XS; secadr := onlyFile.ext[i].sec[k];
        IF secadr = 0 THEN
@@ -212,7 +212,7 @@
          onlyFile.modH := TRUE; onlyFile.ext[i].mod := TRUE; onlyFile.ext[i].sec[k] := secadr; onlyFile.sechint := secadr
        END
       ELSE
-@@ -178,12 +178,12 @@
+@@ -183,12 +183,12 @@
          ASSERT(onlyFile.lextIdx = -1);
          onlyFile.lext.nil := FALSE; onlyFile.lextIdx := 0;
          FOR m := 0 TO XS - 1 DO onlyFile.lext.sec[m] := 0 END;
@@ -227,7 +227,7 @@
          onlyFile.lext.sec[XS - 1] := secadr;
          Kernel.PutSector(onlyFile.lext.adr, onlyFile.lext.sec);
          IF onlyFile.lextIdx = 0 THEN
-@@ -197,7 +197,7 @@
+@@ -202,7 +202,7 @@
        END; ASSERT(l = onlyFile.lextIdx);
        secadr := onlyFile.lext.sec[k];
        IF secadr = 0 THEN
@@ -236,7 +236,7 @@
          onlyFile.modH := TRUE; onlyFile.lext.mod := TRUE; onlyFile.lext.sec[k] := secadr; onlyFile.sechint := secadr
        END
       END
-@@ -225,7 +225,7 @@
+@@ -236,7 +236,7 @@
      WHILE (i < k) & (i < FileDir.ExTabSize) DO
        IF onlyFile.ext[i].mod THEN
          IF onlyFile.ext[i].adr = 0 THEN
@@ -245,7 +245,7 @@
          END;
          Kernel.PutSector(onlyFile.ext[i].adr, onlyFile.ext[i].sec); onlyFile.ext[i].mod := FALSE
        END; INC(i)
-@@ -284,7 +284,7 @@
+@@ -301,7 +301,7 @@
      REPEAT DEC(i); onlyFile.ext[k].sec[i] := 0 UNTIL i = 0
     ELSIF (onlyFile.aleng >= STS + FileDir.ExTabSize * XS) & ((onlyFile.aleng - STS - FileDir.ExTabSize * XS) MOD (XS - 1) = 0) THEN
      k := (onlyFile.aleng - STS - FileDir.ExTabSize * XS) DIV (XS - 1);
@@ -254,3 +254,14 @@
      IF k = 0 THEN
        onlyFile.lext.nil := FALSE; onlyFile.modH := TRUE
      ELSE
+--- 1/Defragger.Mod.txt
++++ 2/Defragger.Mod.txt
+@@ -31,7 +31,7 @@
+   BEGIN
+     n := Kernel.NofSectors - 1; hint := 64 * 29;
+     WHILE n > 0 DO
+-      Kernel.AllocSector(hint-29, sec); Kernel.FreeSector(sec);
++      FileDir.AllocSector(hint-29, sec); Kernel.FreeSector(sec);
+       IF hint # sec THEN DEC(n) END;
+       IF n > 0 THEN INC(hint, 29) END
+     END;

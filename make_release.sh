@@ -3,7 +3,7 @@ set -e
 
 ./get_unpatched_source.sh
 
-cp DefragmentFreeSpace/DefragFiles.Mod.txt work
+cp DefragmentFreeSpace/DefragFiles.Mod.txt DefragmentFreeSpace/Defragger.Mod.txt work
 
 patch -d work <BugFixes/CheckGlobalsSize.patch
 patch -d work <BugFixes/InitializeGraphicFramesTbuf.patch
@@ -20,8 +20,6 @@ patch -d work <ConvertEOL/ConvertEOL.patch
 patch -d work <DrawAddons/MoreClasses.patch
 patch -d work <RemoveFilesizeLimit/LinkedExtensionTable.patch
 patch -d work <RemoveFilesizeLimit/SlidingSectorBitmap.patch
-patch -d work <DefragmentFreeSpace/DefragSupport.patch
-patch -d work <DefragmentFreeSpace/POSTPATCH_after_SlidingSectorBitmap.patch
 patch -d work <RealTimeClock/RealTimeClock.patch
 patch -d work <DynamicMemorySplit/DynamicMemorySplit.patch
 patch -d work <DoubleTrap/DoubleTrap.patch
@@ -68,7 +66,7 @@ sed -i 's/maxCode = 8000; /maxCode = 8500; /' work/ORG.Mod.txt
 sed -i '1,2d' work/BootLoad.Mod.txt
 
 cp BuildModifications.Tool.txt ORL.Mod.txt Calculator/*.txt DrawAddons/*.txt ResourceMonitor/*.txt work
-cp DefragmentFreeSpace/Defragger.Mod.txt OnScreenKeyboard/*.txt ImageBuilder/*.txt Scripting/*.txt work
+cp OnScreenKeyboard/*.txt ImageBuilder/*.txt Scripting/*.txt work
 cp RebuildToolBuilder/*.txt KeyboardTester/*.txt RobustTrapViewer/*.txt ORInspect/*.txt Clock/*.txt work
 cp UTF8CharsetLite/*.txt InnerEmulator/*.txt FontConversion/*.txt DynamicMemorySplit/*.txt work
 cp LanguageServerProtocolHelper/*.txt HardwareEnumerator/*.txt SeamlessResize/*.txt DebugConsole/*.txt work

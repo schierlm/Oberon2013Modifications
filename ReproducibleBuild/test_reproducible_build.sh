@@ -14,14 +14,13 @@ dos2unix work/System.Tool.txt
 
 cp DefragmentFreeSpace/DefragFiles.Mod.txt DefragmentFreeSpace/Defragger.Mod.txt ORL.Mod.txt ReproducibleBuild/BuildTools.Mod.txt ReproducibleBuild/BuildReproducibly.Tool.txt work
 
-patch -d work <ReproducibleBuild/ReproducibleDefragger.patch
 patch -d work <ReproducibleBuild/ReproducibleORL.patch
 
 cd work
 for i in *.txt; do unix2mac $i; mv $i ${i%.txt}; done
 tar --sort=name --mode="ugo-rwx" --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner -cf oberon-reproducible.tar *.Mod *.Tool
 
-echo 'ea1de3ba621b0cf65b93d6f5a698324d4419a6af0d3e54226e59256de0b93413 *oberon-reproducible.tar' | sha256sum -c
+echo 'c1502862c6214d0002610c22b332cee51d1e98517d6a05a99d7f46e0813cc674 *oberon-reproducible.tar' | sha256sum -c
 
 cd ..
 
@@ -60,6 +59,7 @@ echo 'CommandLineDefragger.Load' > .cmds
 echo 'ORP.Compile System.Mod ~' >> .cmds
 echo 'System.RenameFiles System1.Tool => System.Tool ~' >> .cmds
 echo 'System.DeleteFiles DefragFiles.rsc Defragger.rsc CommandLineDefragger.rsc BuildReproducibly.Tool CommandLineSystem.rsc ~' >> .cmds
+echo 'Defragger.SetCleanDisk' >> .cmds
 echo 'CommandLineDefragger.Defrag' >> .cmds
 ./risc work.dsk < .cmds
 ../DefragmentFreeSpace/trim_defragmented_image.sh work.dsk

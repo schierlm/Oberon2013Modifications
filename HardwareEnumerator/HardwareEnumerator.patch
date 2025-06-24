@@ -136,7 +136,19 @@
  (* ---------- Disk storage management ----------*)
  
    PROCEDURE SPIIdle(n: INTEGER); (*send n FFs slowly with no card selected*)
-@@ -261,30 +374,48 @@
+@@ -212,6 +325,11 @@
+   BEGIN InitSlidingSecMap(0)
+   END InitSecMap;
+ 
++  PROCEDURE LastUsedSector*(): INTEGER;
++  BEGIN
++  RETURN lastUsedSector * 29
++  END LastUsedSector;
++
+   PROCEDURE MarkSector*(sec: INTEGER);
+   BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
+     IF sec > lastUsedSector THEN lastUsedSector := sec END;
+@@ -250,16 +368,50 @@
  
    PROCEDURE GetSector*(src: INTEGER; VAR dst: Sector);
    BEGIN src := src DIV 29; ASSERT(SYSTEM.H(0) = 0);
@@ -166,20 +178,9 @@
 +    END
    END PutSector;
  
-   PROCEDURE TrimAllSectorsAfter*(sec: INTEGER);
-   VAR i: INTEGER; magicSector: ARRAY 512 OF BYTE;
-   BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
--    sec := sec * 2 + FSoffset + 2;
--    magicSector[0] := ORD("!"); magicSector[504] := ORD("!");
--    magicSector[1] := ORD("!"); magicSector[505] := ORD("!");
--    magicSector[2] := ORD("T"); magicSector[506] := ORD("T");
--    magicSector[3] := ORD("R"); magicSector[507] := ORD("R");
--    magicSector[4] := ORD("I"); magicSector[508] := ORD("I");
--    magicSector[5] := ORD("M"); magicSector[509] := ORD("M");
--    magicSector[6] := ORD("!"); magicSector[510] := ORD("!");
--    magicSector[7] := ORD("!"); magicSector[511] := ORD("!");
--    FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
--    WriteSD(sec, SYSTEM.ADR(magicSector));
++  PROCEDURE TrimAllSectorsAfter*(sec: INTEGER);
++  VAR i: INTEGER; magicSector: ARRAY 512 OF BYTE;
++  BEGIN sec := sec DIV 29; ASSERT(SYSTEM.H(0) = 0);
 +    IF pvDisk # 0 THEN
 +      sec := sec + (FSoffset - 80000H) DIV 2 + 1;
 +      SYSTEM.PUT(pvDisk, 3FFFFFFFH);
@@ -197,11 +198,13 @@
 +      FOR i := 8 TO 503 DO magicSector[i] := ORD("-") END;
 +      WriteSD(sec, SYSTEM.ADR(magicSector))
 +    END
-   END TrimAllSectorsAfter;
- 
++  END TrimAllSectorsAfter;
++
  (*-------- Miscellaneous procedures----------*)
-@@ -400,6 +531,7 @@
-     list1 := 0; list2 := 0; list3 := 0; list0 := heapOrg;
+ 
+   PROCEDURE Time*(): INTEGER;
+@@ -373,6 +525,7 @@
+     clockTime := Time();
      SYSTEM.PUT(list0, heapLim - heapOrg); SYSTEM.PUT(list0+4, -1); SYSTEM.PUT(list0+8, 0);
      allocated := 0; clock := 0; InitSecMap
 +    ;EnumerateHardware
@@ -314,7 +317,7 @@
    END Delete;
  
    PROCEDURE enumerate(prefix:   ARRAY OF CHAR;
-@@ -297,11 +338,50 @@
+@@ -297,11 +338,62 @@
      END
    END enumerate;
  
@@ -362,11 +365,23 @@
 +    END
 +  END GetAttributes;
 +
++  PROCEDURE SetDate*(adr, date: INTEGER);
++    VAR hp: FileHeader;
++  BEGIN
++    IF HostFsAddr # 0 THEN
++      (* not yet supported by Host FS *)
++    ELSE
++      Kernel.GetSector(adr, hp);
++      hp.date := date;
++      Kernel.PutSector(adr, hp)
++    END
++  END SetDate;
++
 +
  (* ----- initialization ----- *)
  
  PROCEDURE InitFS;
-@@ -377,8 +457,18 @@
+@@ -377,8 +469,18 @@
    END InitFS;
  
    PROCEDURE Init*;
@@ -1068,3 +1083,23 @@
          (*Texts.WriteHex(W, adr)*)
        END ;
        Texts.WriteLn(W)
+--- Defragger.Mod.txt
++++ Defragger.Mod.txt
+@@ -96,7 +96,7 @@
+   PROCEDURE Trim*;
+   BEGIN
+     IF cleanDisk THEN CleanDirPages(FileDir.DirRootAdr) END;
+-    TrimAllSectorsAfter(LastUsedSector())
++    Kernel.TrimAllSectorsAfter(Kernel.LastUsedSector())
+   END Trim;
+ 
+   PROCEDURE EnumAll(name: FileDir.FileName; adr: LONGINT; VAR cont: BOOLEAN);
+@@ -134,7 +134,7 @@
+     lastUsedSector, currSector, pos, len, fileno, adr: INTEGER;
+   BEGIN
+     DefragFiles.SetCleanDisk(cleanDisk);
+-    fileInfo.firstSector := LastUsedSector() + 29; fileInfo.count := 0;
++    fileInfo.firstSector := Kernel.LastUsedSector() + 29; fileInfo.count := 0;
+     fileInfo.sector := fileInfo.firstSector;
+     FileDir.Enumerate("", EnumAll);
+     Kernel.PutSector(fileInfo.sector, fileInfo);

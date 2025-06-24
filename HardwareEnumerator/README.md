@@ -5,7 +5,7 @@ Description
 
 **NOTE**: Unlike other modifications, this modification is not standalone. It requires that
 you applied the [RemoveFilesizeLimit](../RemoveFilesizeLimit/README.md),
-[DefragmentFreeSpace](../DefragmentFreeSpace/README.md),
+[DefragmentFreeSpace](../DefragmentFreeSpace/README.md), [RealTimeClock](../RealTimeClock/README.md),
 [WeakReferences](../WeakReferences/README.md) and [ChangeResolution](../ChangeResolution/README.md)
 modifications, and parts of the [FontConversion](../FontConversion/README.md) and
 [KernelDebugger](../KernelDebugger/README.md) modification, before this modification.
@@ -38,11 +38,11 @@ Installation
 ------------
 
 - Apply [RemoveFilesizeLimit](../RemoveFilesizeLimit/README.md), [DefragmentFreeSpace](../DefragmentFreeSpace/README.md),
-  [WeakReferences](../WeakReferences/README.md) and [ChangeResolution](../ChangeResolution/README.md),
-  if not already applied.
+  [RealTimeClock](../RealTimeClock/README.md), [WeakReferences](../WeakReferences/README.md)
+  and [ChangeResolution](../ChangeResolution/README.md), if not already applied.
 
 - Apply [`RemoveGlyphWidthLimit.patch`](../FontConversion/RemoveGlyphWidthLimit.patch) from the **FontConversion**
-  modification to `RS232.Mod` (if not already applied).
+  modification to `Display.Mod` (if not already applied).
 
 - Apply [`RS232.patch`](../KernelDebugger/RS232.patch) from the **KernelDebugger**
   modification to `RS232.Mod` (if not already applied).

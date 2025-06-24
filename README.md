@@ -56,7 +56,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | **[CrossCompiler](CrossCompiler/README.md)** | Compile a second set of modules without affecting the current system | Recompile compiler |
 | **[CursorKeys](CursorKeys/README.md)** | Support cursor keys in TextFrames and GraphicFrames | Recompile affacted outer core modules |
 | **[DebugConsole](DebugConsole/README.md)** | Write debug strings to MMIO address and view them in emulator output | Hardware Enumerator |
-| **[DefragmentFreeSpace](DefragmentFreeSpace/README.md)** | Defragment all files and move them to the beginning of the filesystem | Recompile inner core |
+| **[DefragmentFreeSpace](DefragmentFreeSpace/README.md)** | Defragment all files and move them to the beginning of the filesystem | None |
 | **[DoubleTrap](DoubleTrap/README.md)** | Detect when a trap occurs in the trap handler and work around it | Minimal: Recompile `System.Mod`; Full: Recompile inner core |
 | **[DrawAddons](DrawAddons/README.md)** | More features for Oberon Draw | Optionally recompile `Graphics.Mod` |
 | **[DynamicMemorySplit](DynamicMemorySplit/README.md)** | Move the address that separates heap from stack and modules | Rebuild inner core |
