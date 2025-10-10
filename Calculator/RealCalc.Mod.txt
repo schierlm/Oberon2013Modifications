@@ -22,13 +22,13 @@ MODULE RealCalc;
       IF s.c = "+" THEN
         val := ReadReal() + ReadReal();
       ELSIF s.c = "-" THEN
-        val := ReadReal() - ReadReal();
+        val := ReadReal(); val := val - ReadReal();
       ELSIF s.c = "~" THEN
         val := - ReadReal();
       ELSIF s.c = "*" THEN
         val := ReadReal() * ReadReal();
       ELSIF s.c = "/" THEN
-        val := ReadReal() / ReadReal();
+        val := ReadReal(); val := val / ReadReal();
       ELSIF s.c = "#" THEN
         val := ABS(ReadReal());
       ELSIF s.c = "<" THEN

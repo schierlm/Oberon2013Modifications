@@ -21,15 +21,15 @@ MODULE Calc;
       IF s.c = "+" THEN
         val := ReadInt() + ReadInt();
       ELSIF s.c = "-" THEN
-        val := ReadInt() - ReadInt();
+        val := ReadInt(); val := val - ReadInt();
       ELSIF s.c = "~" THEN
         val := -ReadInt();
       ELSIF s.c = "*" THEN
         val := ReadInt() * ReadInt();
       ELSIF s.c = "/" THEN
-        val := ReadInt() DIV ReadInt();
+        val := ReadInt(); val := val DIV ReadInt();
       ELSIF s.c = "%" THEN
-        val := ReadInt() MOD ReadInt();
+        val := ReadInt(); val := val MOD ReadInt();
       ELSIF s.c = "&" THEN
         val := SYSTEM.VAL(INTEGER, SYSTEM.VAL(SET, ReadInt()) * SYSTEM.VAL(SET, ReadInt()));
       ELSIF s.c = "|" THEN
@@ -43,11 +43,11 @@ MODULE Calc;
       ELSIF s.c = "?" THEN
         val := ORD(ODD(ReadInt()));
       ELSIF s.c = "<" THEN
-        val := LSL(ReadInt(), ReadInt());
+        val := ReadInt(); val := LSL(val, ReadInt());
       ELSIF s.c = ">" THEN
-        val := ASR(ReadInt(), ReadInt());
+        val := ReadInt(); val := ASR(val, ReadInt());
       ELSIF s.c = "=" THEN
-        val := ROR (ReadInt(), ReadInt());
+        val := ReadInt(); val := ROR(val, ReadInt());
       ELSE
         val := 0;
         Texts.WriteString(log, "Invalid operator ");

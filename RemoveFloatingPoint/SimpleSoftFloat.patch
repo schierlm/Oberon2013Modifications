@@ -156,7 +156,7 @@
 -        val := ReadReal() + ReadReal();
 +        ReadReal(val); ReadReal(v2); Unreal.Add(val, v2)
        ELSIF s.c = "-" THEN
--        val := ReadReal() - ReadReal();
+-        val := ReadReal(); val := val - ReadReal();
 +       ReadReal(val); ReadReal(v2); Unreal.Negate(v2); Unreal.Add(val, v2)
        ELSIF s.c = "~" THEN
 -        val := - ReadReal();
@@ -165,7 +165,7 @@
 -        val := ReadReal() * ReadReal();
 +        ReadReal(val); ReadReal(v2); Unreal.Multiply(val, v2)
        ELSIF s.c = "/" THEN
--        val := ReadReal() / ReadReal();
+-        val := ReadReal(); val := val / ReadReal();
 +        ReadReal(val); ReadReal(v2); Unreal.Divide(val, v2)
        ELSIF s.c = "#" THEN
 -        val := ABS(ReadReal());
