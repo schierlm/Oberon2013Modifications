@@ -61,8 +61,8 @@
 +            IF G.ticked THEN x := 16 ELSE x := 1 END; y := 0;
 +            IF M.ch = 11X THEN (*left*) x := -x
 +            ELSIF M.ch = 12X THEN (*right*) (* no-op *)
-+            ELSIF M.ch = 13X THEN (*up*) y := -x; x := 0
-+            ELSIF M.ch = 14X THEN (*down*) y := x; x := 0 END;
++            ELSIF M.ch = 13X THEN (*up*) y := x; x := 0
++            ELSIF M.ch = 14X THEN (*down*) y := -x; x := 0 END;
 +            IF G.graph.sel # NIL THEN
 +              Erase(G); Graphics.Move(G.graph, x, y); Draw(G)
 +            END;
