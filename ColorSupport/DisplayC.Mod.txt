@@ -311,7 +311,7 @@ MODULE DisplayC;  (*NW 5.11.2013 / 3.7.2016*)
       END
     ELSIF ar > al THEN
       a0 := al;
-      WHILE a0 < al + (h-1) * Span DO
+      WHILE a0 <= al + (h-1) * Span DO
         SYSTEM.GET(pta0, pat); pat := pat * color;
         SYSTEM.GET(a0, pix); SYSTEM.PUT(a0, (pix - left) + (pix/pat * left));
         FOR a1 := a0+4 TO ar-4 BY 4 DO SYSTEM.GET(a1, pix); SYSTEM.PUT(a1, pix/pat) END;

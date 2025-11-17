@@ -116,8 +116,8 @@
    BEGIN
      IF b.swap THEN yS := b.y + b.h; yE := b.y ELSE yS := b.y; yE := b.y+b.h END;
      IF b.cubic THEN
--      bezCubic(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x2 + mx, b.y2 + my, b.x + b.w + mx, yE + my, col);
-+      (*bezCubic(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x2 + mx, b.y2 + my, b.x + b.w + mx, yE + my, col);*)
+-      bezCubic(f, b.x + mx, yS + my, b.x + b.dx1 + mx, b.y + b.dy1 + my, b.x + b.dx2 + mx, b.y + b.dy2 + my, b.x + b.w + mx, yE + my, col);
++      (*bezCubic(f, b.x + mx, yS + my, b.x + b.dx1 + mx, b.y + b.dy1 + my, b.x + b.dx2 + mx, b.y + b.dy2 + my, b.x + b.w + mx, yE + my, col);*)
      ELSE
-       bezQuad(f, b.x + mx, yS + my, b.x1 + mx, b.y1 + my, b.x + b.w + mx, yE + my, col);
+       bezQuad(f, b.x + mx, yS + my, b.x + b.dx1 + mx, b.y + b.dy1 + my, b.x + b.w + mx, yE + my, col);
      END;

@@ -1,0 +1,20 @@
+--- 1/Curves.Mod.txt
++++ 2/Curves.Mod.txt
+@@ -14,7 +14,7 @@
+ 
+   PROCEDURE Dot(f: GraphicFrames.Frame; col, x, y: INTEGER);
+   BEGIN
+-    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (x+7 < f.Y1) THEN Display.Dot(col, x, y, Display.replace) END
++    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN Display.Dot(col, x, y, Display.replace) END
+   END Dot;
+ 
+   PROCEDURE mark(f: GraphicFrames.Frame; col, x, y: INTEGER);
+@@ -149,7 +149,7 @@
+     IF obj(Curve).kind <= 1 THEN  (*line*)
+       w := obj.w; h := obj.h;
+       IF obj(Curve).kind = 1 THEN y0 := obj.y + h; h := -h ELSE y0 := obj.y END ;
+-      res := (obj.x <= x) & (x < obj.x + w) & (ABS(y-y0)*w - (x-obj.x)*h < w*4)
++      res := (obj.x <= x) & (x < obj.x + w) & (ABS(y-y0)*w - (x-obj.x)*ABS(h) < w*4)
+     ELSE (*circle or ellipse*)
+       xm := obj.w DIV 2 + obj.x;
+       res := (xm - 4 <= x) & (x <= xm + 4) & (obj.y - 4 <= y) & (y <= obj.y + 4)

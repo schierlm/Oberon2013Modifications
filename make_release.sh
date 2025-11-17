@@ -12,6 +12,7 @@ patch -d work <BugFixes/IllegalAccessInGC.patch
 patch -d work <BugFixes/CompileSetLiterals.patch
 patch -d work <BugFixes/FixScrollCursorCorruption.patch
 patch -d work <BugFixes/FixWrappedMemoryDisplacement.patch
+patch -d work <BugFixes/CurvesBoundsCheck.patch
 for i in FileDir Files; do
 	cp work/$i.Mod.txt work/Image$i.Mod.txt
 done

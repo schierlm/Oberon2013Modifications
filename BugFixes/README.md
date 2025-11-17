@@ -76,6 +76,13 @@ of 512 KB. The original compiler just wrapped the displacement, resulting in mem
 This fix makes displacements larger than 512 KB a compile time error, forcing the user to rewrite
 their code instead of a hard to debug memory corruption at runtime.
 
+Fix 8: Correct bounds checks in `Curves` module
+-----------------------------------------------
+
+When your viewer is wide and not tall, curve parts are clipped due to an incorrect comparison of
+the x coordinate against the y axis limit. Also, downwards Lines cannot be selected due to a
+missing ABS call when calculating the distance/slope.
+
 
 Installation
 ------------
@@ -94,6 +101,8 @@ Installation
 
 - Apply [`FixWrappedMemoryDisplacement.patch`](FixWrappedMemoryDisplacement.patch) to `ORG.Mod`
 
+- Apply [`CurvesBoundsCheck.patch`](CurvesBoundsCheck.patch) to `Curves.Mod`
+
 - Recompile the changed modules and rebuild the inner core:
 
       ORP.Compile Kernel.Mod ~
@@ -102,6 +111,7 @@ Installation
 
       ORP.Compile TextFrames.Mod ~
       ORP.Compile GraphicFrames.Mod ~
+      ORP.Compile Curves.Mod ~
       ORP.Compile ORG.Mod ~
 
 - Restart the system.
