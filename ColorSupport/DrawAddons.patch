@@ -28,7 +28,7 @@
 +        END;
 +      ELSE
 +        FOR i := xx TO xx + w - 1 DO
-+          Display.Dot(pwd DIV LSL(1, i * 4) MOD 10H, i, yy, Display.replace)
++          Display.Dot(pwd DIV LSL(1, (i - xx) * 4) MOD 10H, i, yy, Display.replace)
 +        END;
 +        INC(yy);
 +      END;

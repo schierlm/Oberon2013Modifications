@@ -29,7 +29,17 @@ MODULE ColorPictureGrab;
       IF ww > 1 THEN ww := 2; px := px + 10H * DisplayGrab.GrabDot(xx + 1, yy) END;
       INC(xx, ww); IF xx = x + w THEN xx := x; DEC(yy) END;
       IF (lastcount = 0) OR (lastpx = px) THEN
+        IF bufcount > 0 THEN
+          Files.WriteByte(R, bufcount - 1);
+          Files.WriteBytes(R, buf, bufcount);
+          bufcount := 0
+        END;
         INC(lastcount);
+        IF lastcount = 128 THEN
+          Files.WriteByte(R, 101H - lastcount);
+          Files.WriteByte(R, lastpx);
+          lastcount := 0
+        END
       ELSIF lastcount = 1 THEN
         buf[bufcount] := lastpx;
         INC(bufcount);
@@ -39,11 +49,6 @@ MODULE ColorPictureGrab;
           bufcount := 0
         END
       ELSE
-        IF bufcount > 0 THEN
-          Files.WriteByte(R, bufcount - 1);
-          Files.WriteBytes(R, buf, bufcount);
-          bufcount := 0
-        END;
         Files.WriteByte(R, 101H - lastcount);
         Files.WriteByte(R, lastpx);
         lastcount := 1

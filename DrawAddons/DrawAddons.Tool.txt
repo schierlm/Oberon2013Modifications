@@ -4,6 +4,7 @@ Fills.MakeFilledRectangle Fills.MakeFloodFill
 PictureTiles.MakePicture Grapes.Pict
 PictureTiles.MakePicture ^ !Escher.Pict !Grapes.Pict
 
+PictureGrab.PrintDraggedRect
 PictureGrab.GrabPicture 200 200 Test.Pict
 PictureGrab.GrabScreenshot 100 100 300 300 Test.Pict
 

@@ -1,5 +1,5 @@
 MODULE PictureGrab;
-  IMPORT DisplayGrab, Files, Texts, Oberon, GraphicFrames;
+  IMPORT DisplayGrab, Files, Input, Texts, Oberon, GraphicFrames;
 
   PROCEDURE WriteShort(VAR R: Files.Rider; short: INTEGER);
   BEGIN
@@ -25,7 +25,17 @@ MODULE PictureGrab;
       px := DisplayGrab.GrabPatternRow(xx, yy, ww) MOD 100H;
       INC(xx, ww); IF xx = x + w THEN xx := x; DEC(yy) END;
       IF (lastcount = 0) OR (lastpx = px) THEN
+        IF bufcount > 0 THEN
+          Files.WriteByte(R, bufcount - 1);
+          Files.WriteBytes(R, buf, bufcount);
+          bufcount := 0
+        END;
         INC(lastcount);
+        IF lastcount = 128 THEN
+          Files.WriteByte(R, 101H - lastcount);
+          Files.WriteByte(R, lastpx);
+          lastcount := 0
+        END
       ELSIF lastcount = 1 THEN
         buf[bufcount] := lastpx;
         INC(bufcount);
@@ -35,11 +45,6 @@ MODULE PictureGrab;
           bufcount := 0
         END
       ELSE
-        IF bufcount > 0 THEN
-          Files.WriteByte(R, bufcount - 1);
-          Files.WriteBytes(R, buf, bufcount);
-          bufcount := 0
-        END;
         Files.WriteByte(R, 101H - lastcount);
         Files.WriteByte(R, lastpx);
         lastcount := 1
@@ -77,6 +82,29 @@ MODULE PictureGrab;
       Files.Register(F)
     END
   END Grab;
+
+  PROCEDURE PrintDraggedRect*;
+  VAR W: Texts.Writer;
+    k: SET; x1, y1, x2, y2, t: INTEGER;
+  BEGIN
+    REPEAT Input.Mouse(k, x1, y1);
+      Oberon.DrawMouseArrow(x1, y1)
+    UNTIL  k # {};
+    REPEAT Input.Mouse(k, x2, y2);
+      Oberon.DrawMouseArrow(x2, y2)
+    UNTIL  k = {};
+    Oberon.FadeMouse;
+    IF x2 < x1 THEN t := x1; x1 := x2; x2 := t END;
+    IF y2 < y1 THEN t := y1; y1 := y2; y2 := t END;
+    DEC(x2, x1); DEC(y2, y1);
+    Texts.OpenWriter(W);
+    Texts.WriteString(W,"Rect: ");
+    Texts.WriteInt(W, x1, 11);
+    Texts.WriteInt(W, y1, 11);
+    Texts.WriteInt(W,  x2, 11);
+    Texts.WriteInt(W, y2, 11);
+    Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+  END PrintDraggedRect;
 
   PROCEDURE GrabScreenshot*;  (*command*)
     VAR x, y: INTEGER;
