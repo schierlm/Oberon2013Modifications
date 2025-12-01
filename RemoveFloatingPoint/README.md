@@ -25,6 +25,10 @@ software floating point emulation (providing only about 4 significant digits on 
 and patches both `Splines.Mod` and `RealCalc.Mod` to use it. Splines is slower than the
 previous patch, but I did not notice any precision artifacts.
 
+In case you want to use softfloat with the calculator, the precision loss is still
+noticable, though. Therefore, you can apply (on top of the soft float patch)
+[`UnrealisticPrecision.patch`](UnrealisticPrecision.patch) to make emulation even slower,
+but precise enough so that multiplication and division artifacts are no longer noticable.
 
 Removing Floating Point
 -----------------------

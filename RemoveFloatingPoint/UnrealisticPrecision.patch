@@ -1,0 +1,36 @@
+--- Unreal.Mod.txt
++++ Unreal.Mod.txt
+@@ -53,13 +53,17 @@
+   END Add;
+ 
+   PROCEDURE Multiply*(VAR a: Value; b: Value);
++    VAR al, ah, bl, bh, md: INTEGER;
+   BEGIN
+-    a.m := (a.m DIV PreDivide) * (b.m DIV PreDivide);
++    ah := a.m DIV PreDivide; al := a.m MOD PreDivide;
++    bh := b.m DIV PreDivide; bl := b.m MOD PreDivide;
++    md := ah * bl + al * bh + al * bl DIV PreDivide;
++    a.m := ah * bh + md DIV PreDivide;
+     a.e := a.e + b.e + PreDivideBits * 2;
+     Normalize(a)
+   END Multiply;
+ 
+-  PROCEDURE Divide*(VAR a: Value; b: Value);
++  PROCEDURE Divide0(VAR a: Value; b: Value);
+     VAR bm: INTEGER;
+   BEGIN bm := b.m;
+     IF bm < 0 THEN bm := -bm; a.m := -a.m END;
+@@ -68,6 +72,13 @@
+     END;
+     a.e := a.e - b.e - PreDivideBits;
+     Normalize(a)
++  END Divide0;
++
++  PROCEDURE Divide*(VAR a: Value; b: Value);
++    VAR a0, d: Value;
++  BEGIN a0 := a; Divide0(a, b);
++    d := a; Multiply(d, b); Negate(d); Add(d, a0);
++    IF Sign(d) # 0 THEN Divide0(d, b); Add(a, d) END
+   END Divide;
+ 
+   PROCEDURE Compare*(a, b: Value) : INTEGER;
