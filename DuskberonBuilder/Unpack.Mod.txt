@@ -1,0 +1,40 @@
+MODULE Unpack;
+IMPORT Files, Texts, Oberon;
+
+  PROCEDURE Unpack*;
+    VAR
+      F, FF: Files.File;
+      R, RR: Files.Rider;
+      ch: CHAR; i: INTEGER;
+      name: ARRAY 32 OF CHAR;
+      W: Texts.Writer;
+  BEGIN Texts.OpenWriter(W);
+    FF := Files.Old("PACK"); F := NIL;
+    Files.Set(RR, FF, 0); Files.Read(RR, ch);
+    WHILE ~RR.eof DO
+      IF ch = 1X THEN
+        i := 0; Files.Read(RR, ch);
+        WHILE ch # 0AX DO
+          name[i] := ch; INC(i); Files.Read(RR, ch)
+        END;
+        name[i] := 0X;
+        IF F # NIL THEN Files.Register(F) END;
+        Texts.WriteString(W, "Unpacking ");
+        Texts.WriteString(W, name);
+        Texts.WriteLn(W);
+        Texts.Append(Oberon.Log, W.buf);
+        F := Files.New(name);
+        Files.Set(R, F, 0)
+      ELSE
+        Files.Write(R, ch)
+      END;
+      Files.Read(RR, ch)
+    END;
+    Files.Register(F);
+    Files.Close(FF);
+    Texts.WriteString(W, "Done.");
+    Texts.WriteLn(W);
+    Texts.Append(Oberon.Log, W.buf);
+  END Unpack;
+
+END Unpack.

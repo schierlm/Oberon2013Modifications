@@ -1,0 +1,45 @@
+ImageTool.Init data/oberon.dsk ~
+
+ORP.Compile data/osrc/kernel.mod data/osrc/filedir.mod ~
+ORP.Compile data/osrc/files.mod data/osrc/modules.mod ~
+ORL.Link Modules ~
+ORL.Load Modules.bin ~
+
+ORP.Compile data/osrc/input.mod data/osrc/displaym.mod data/osrc/displayc.mod ~
+ORP.Compile data/osrc/display.mod data/osrc/viewers.mod ~
+ORP.Compile data/osrc/fonts.mod data/osrc/texts.mod ~
+ORP.Compile data/osrc/oberon.mod ~
+ORP.Compile data/osrc/menuview.mod ~
+ORP.Compile data/osrc/textfram.mod ~
+ORP.Compile data/osrc/system.mod ~
+ORP.Compile data/osrc/ors.mod data/osrc/orb.mod ~
+ORP.Compile data/osrc/org.mod data/osrc/orp.mod ~
+ORP.Compile data/osrc/unpack.mod ~
+
+ImageTool.AddFiles data/osrc/kernel.mod   Kernel.Mod      ~
+ImageTool.AddFiles data/osrc/filedir.mod  FileDir.Mod     ~
+ImageTool.AddFiles data/osrc/files.mod    Files.Mod       ~
+ImageTool.AddFiles data/osrc/modules.mod  Modules.Mod     ~
+ImageTool.AddFiles data/osrc/input.mod    Input.Mod       ~
+ImageTool.AddFiles data/osrc/displayc.mod DisplayC.Mod    ~
+ImageTool.AddFiles data/osrc/displaym.mod DisplayM.Mod    ~
+ImageTool.AddFiles data/osrc/display.mod  Display.Mod     ~
+ImageTool.AddFiles data/osrc/viewers.mod  Viewers.Mod     ~
+ImageTool.AddFiles data/osrc/fonts.mod    Fonts.Mod       ~
+ImageTool.AddFiles data/osrc/texts.mod    Texts.Mod       ~
+ImageTool.AddFiles data/osrc/oberon.mod   Oberon.Mod      ~
+ImageTool.AddFiles data/osrc/menuview.mod MenuViewers.Mod ~
+ImageTool.AddFiles data/osrc/textfram.mod TextFrames.Mod  ~
+ImageTool.AddFiles data/osrc/system.mod   System.Mod      ~
+ImageTool.AddFiles data/osrc/ors.mod      ORS.Mod         ~
+ImageTool.AddFiles data/osrc/orb.mod      ORB.Mod         ~
+ImageTool.AddFiles data/osrc/org.mod      ORG.Mod         ~
+ImageTool.AddFiles data/osrc/orp.mod      ORP.Mod         ~
+ImageTool.AddFiles data/osrc/system1.too  System.Tool     ~
+ImageTool.AddFiles data/osrc/splashlo.pic SplashLogo.Pict ~
+ImageTool.AddFiles data/osrc/system.too   System.Tool     ~
+ImageTool.AddFiles data/osrc/system1.too  System1.Tool    ~
+ImageTool.AddFiles data/font/ob10.fnt     Oberon10.Scn.Fnt ~
+ImageTool.AddFiles data/osrc/pack         PACK ~
+
+ImageTool.Close ~

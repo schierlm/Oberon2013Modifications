@@ -32,7 +32,7 @@
 -    Real* = 4;          (*real number x*)
      Char* = 6;          (*special character c*)
  
-     (* TextBlock = TextTag "1" offset run {run} "0" len {AsciiCode}.
+     (* TextBlock = TextTag offset run {run} "0" len {AsciiCode}.
 @@ -50,8 +49,6 @@
        nextCh*: CHAR;
        line*, class*: INTEGER;
@@ -42,7 +42,7 @@
        c*: CHAR;
        len*: INTEGER;
        s*: ARRAY 32 OF CHAR
-@@ -316,27 +313,12 @@
+@@ -318,26 +315,11 @@
    BEGIN OpenReader(S, T, pos); S.line := 0; S.nextCh := " "
    END OpenScanner;
  
@@ -62,15 +62,14 @@
 -
    PROCEDURE Scan* (VAR S: Scanner);
      CONST maxExp = 38; maxM = 16777216; (*2^24*)
-     VAR ch, term: CHAR;
+     VAR ch: CHAR;
        neg, negE, hex: BOOLEAN;
        i, j, h, d, e, n, s: INTEGER;
-       k: LONGINT;
 -      x: REAL;
    BEGIN ch := S.nextCh; i := 0;
      WHILE (ch = " ") OR (ch = TAB) OR (ch = CR) DO
        IF ch = CR THEN INC(S.line) END ;
-@@ -359,32 +341,6 @@
+@@ -360,32 +342,6 @@
            n := 10*n + d; h := 10H*h + d; Read(S, ch)
          END ;
          IF ch = "H" THEN (*hex integer*) Read(S, ch); S.i := h; S.class := Int  (*neg?*)
@@ -103,12 +102,13 @@
          ELSE (*decimal integer*)
            IF neg THEN S.i := -n ELSE S.i := n END;
            IF hex THEN S.class := Inval ELSE S.class := Int END
-@@ -466,53 +422,6 @@
+@@ -466,57 +422,6 @@
+     UNTIL i = 8;
      REPEAT DEC(i); Write(W, a[i]) UNTIL i = 0
    END WriteHex;
- 
+-
 - PROCEDURE WriteReal* (VAR W: Writer; x: REAL; n: INTEGER);
--    VAR e, i, m: INTEGER;
+-    VAR e, i, k, m: INTEGER;
 -      d: ARRAY 16 OF CHAR;
 -  BEGIN e := ASR(ORD(x), 23) MOD 100H;  (*binary exponent*)
 -    IF e = 0 THEN
@@ -121,9 +121,13 @@
 -      IF x < 0.0 THEN Write(W, "-"); x := -x ELSE Write(W, " ") END ;
 -      e := (e - 127) * 77 DIV 256 - 6;  (*decimal exponent*)
 -      IF e >= 0 THEN x := x / Ten(e) ELSE x := Ten(-e) * x END ;
--      m := FLOOR(x + 0.5); i := 0;
+-      m := FLOOR(x + 0.5);
 -      IF m >= 10000000 THEN INC(e); m := m DIV 10 END ;
--      REPEAT d[i] := CHR(m MOD 10 + 30H); m := m DIV 10; INC(i) UNTIL m = 0;
+-      i := 0; k := 13-n;
+-      REPEAT
+-         IF i = k THEN INC(m, 5) END ;    (*rounding*)
+-       d[i] := CHR(m MOD 10 + 30H); m := m DIV 10; INC(i)
+-      UNTIL m = 0;
 -      DEC(i); Write(W, d[i]); Write(W, ".");
 -      IF i < n-7 THEN n := 0 ELSE n := 14 - n END ;
 -      WHILE i > n DO DEC(i); Write(W, d[i]) END ;
@@ -153,10 +157,9 @@
 -      WHILE i > 0 DO DEC(i); Write(W, d[i]) END
 -    END
 -  END WriteRealFix;
--
+ 
    PROCEDURE WritePair(VAR W: Writer; ch: CHAR; x: LONGINT);
    BEGIN Write(W, ch);
-     Write(W, CHR(x DIV 10 + 30H)); Write(W, CHR(x MOD 10 + 30H))
 --- 1/ORB.Mod.txt
 +++ 2/ORB.Mod.txt
 @@ -13,7 +13,7 @@

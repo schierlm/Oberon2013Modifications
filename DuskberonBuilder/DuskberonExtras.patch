@@ -1,0 +1,2528 @@
+--- calc/calc.mod
++++ calc/calc.mod
+@@ -1,5 +1,5 @@
+ MODULE Calc;
+-  IMPORT SYSTEM, Texts, Oberon;
++  IMPORT Texts, TextFrames, Oberon;
+ 
+   VAR
+     s: Texts.Scanner;
+@@ -11,43 +11,37 @@
+       t: Texts.Text;
+   BEGIN
+     Texts.Scan(s);
+-    IF (s.class = Texts.Char) & (s.c = "^") THEN
+-      Oberon.GetSelection(t, beg, end, time);
++    IF (s.class = Texts.Char) & (s.c = '^') THEN
++      TextFrames.GetSelection(t, beg, end);
+       IF time >= 0 THEN
+         Texts.OpenScanner(s, t, beg); Texts.Scan(s);
+       END
+     END;
+     IF s.class = Texts.Char THEN
+-      IF s.c = "+" THEN
++      IF s.c = '+' THEN
+         val := ReadInt() + ReadInt();
+-      ELSIF s.c = "-" THEN
++      ELSIF s.c = '-' THEN
+         val := ReadInt(); val := val - ReadInt();
+-      ELSIF s.c = "~" THEN
++      ELSIF s.c = '~' THEN
+         val := -ReadInt();
+-      ELSIF s.c = "*" THEN
++      ELSIF s.c = '*' THEN
+         val := ReadInt() * ReadInt();
+-      ELSIF s.c = "/" THEN
++      ELSIF s.c = '/' THEN
+         val := ReadInt(); val := val DIV ReadInt();
+-      ELSIF s.c = "%" THEN
++      ELSIF s.c = '%' THEN
+         val := ReadInt(); val := val MOD ReadInt();
+-      ELSIF s.c = "&" THEN
+-        val := SYSTEM.VAL(INTEGER, SYSTEM.VAL(SET, ReadInt()) * SYSTEM.VAL(SET, ReadInt()));
+-      ELSIF s.c = "|" THEN
+-        val := SYSTEM.VAL(INTEGER, SYSTEM.VAL(SET, ReadInt()) + SYSTEM.VAL(SET, ReadInt()));
+-      ELSIF s.c = ":" THEN
+-        val := SYSTEM.VAL(INTEGER, SYSTEM.VAL(SET, ReadInt()) / SYSTEM.VAL(SET, ReadInt()));
+-      ELSIF s.c = "!" THEN
+-        val := SYSTEM.VAL(INTEGER, -SYSTEM.VAL(SET, ReadInt()));
+-      ELSIF s.c = "#" THEN
+-        val := ABS(ReadInt());
+-      ELSIF s.c = "?" THEN
+-        val := ORD(ODD(ReadInt()));
+-      ELSIF s.c = "<" THEN
++      ELSIF s.c = '&' THEN
++        val := VAL(INTEGER, VAL(SET, ReadInt()) * VAL(SET, ReadInt()));
++      ELSIF s.c = '|' THEN
++        val := VAL(INTEGER, VAL(SET, ReadInt()) + VAL(SET, ReadInt()));
++      ELSIF s.c = ':' THEN
++        val := VAL(INTEGER, VAL(SET, ReadInt()) / VAL(SET, ReadInt()));
++      ELSIF s.c = '!' THEN
++        val := VAL(INTEGER, -VAL(SET, ReadInt()));
++      ELSIF s.c = '<' THEN
+         val := ReadInt(); val := LSL(val, ReadInt());
+-      ELSIF s.c = ">" THEN
++      ELSIF s.c = '>' THEN
+         val := ReadInt(); val := ASR(val, ReadInt());
+-      ELSIF s.c = "=" THEN
+-        val := ReadInt(); val := ROR(val, ReadInt());
+       ELSE
+         val := 0;
+         Texts.WriteString(log, "Invalid operator ");
+--- calc/calc.ort
++++ calc/calc.ort
+@@ -10,6 +10,5 @@
+    + 2 3    - 10 2    ~ 5        addition/subtraction/negation
+    * 4 3    / 10 3   % 10 3    multiplication/division/modulo
+     & 7 4   | 7 4    : 7 4   ! 4  and/or/xor/not
+-    # ~ 2  ? 9                        abs/odd
+-    < 3 3  > 23 1  = 4 9         shift left/right / rotate right
++    < 3 3  > 23 1           shift left/right
+    42H    42                          decimal/hex input
+--- calc/realcalc.mod
++++ calc/realcalc.mod
+@@ -1,5 +1,5 @@
+ MODULE RealCalc;
+-  IMPORT Texts, Oberon, Unreal;
++  IMPORT Texts, TextFrames, Oberon, Unreal;
+ 
+   VAR
+     s: Texts.Scanner;
+@@ -12,26 +12,26 @@
+       t: Texts.Text;
+   BEGIN
+     Texts.Scan(s);
+-    IF (s.class = Texts.Char) & (s.c = "^") THEN
+-      Oberon.GetSelection(t, beg, end, time);
++    IF (s.class = Texts.Char) & (s.c = '^') THEN
++      TextFrames.GetSelection(t, beg, end);
+       IF time >= 0 THEN
+         Texts.OpenScanner(s, t, beg); Texts.Scan(s);
+       END
+     END;
+     IF s.class = Texts.Char THEN
+-      IF s.c = "+" THEN
++      IF s.c = '+' THEN
+         ReadReal(val); ReadReal(v2); Unreal.Add(val, v2)
+-      ELSIF s.c = "-" THEN
+-       ReadReal(val); ReadReal(v2); Unreal.Negate(v2); Unreal.Add(val, v2)
+-      ELSIF s.c = "~" THEN
++      ELSIF s.c = '-' THEN
++       ReadReal(val); ReadReal(v2); Unreal.Negate(v2); Unreal.Add(val, v2);
++      ELSIF s.c = '~' THEN
+         ReadReal(val); Unreal.Negate(val)
+-      ELSIF s.c = "*" THEN
++      ELSIF s.c = '*' THEN
+         ReadReal(val); ReadReal(v2); Unreal.Multiply(val, v2)
+-      ELSIF s.c = "/" THEN
++      ELSIF s.c = '/' THEN
+         ReadReal(val); ReadReal(v2); Unreal.Divide(val, v2)
+-      ELSIF s.c = "#" THEN
++      ELSIF s.c = '#' THEN
+         ReadReal(val); IF Unreal.Sign(val) = -1 THEN Unreal.Negate(val) END
+-      ELSIF s.c = "<" THEN
++      ELSIF s.c = '<' THEN
+         ReadReal(val); Unreal.New(val, Unreal.Floor(val))
+       ELSE
+         Unreal.New(val, 0);
+@@ -46,7 +46,7 @@
+         Texts.WriteString(log, "Invalid token");
+         Texts.WriteLn(log);
+     END;
+-    result := val;
++    result := val
+   END ReadReal;
+ 
+   PROCEDURE Real*();
+--- calc/unreal.mod
++++ calc/unreal.mod
+@@ -26,7 +26,7 @@
+   BEGIN v.m := -v.m
+   END Negate;
+ 
+-  PROCEDURE Sign*(v: Value): INTEGER;
++  PROCEDURE Sign*(VAR v: Value): INTEGER;
+     VAR s: INTEGER;
+   BEGIN
+     IF v.m > 0 THEN s := 1
+@@ -36,13 +36,11 @@
+   RETURN s
+   END Sign;
+ 
+-  PROCEDURE Add*(VAR a: Value; b: Value);
++  PROCEDURE Add*(VAR a, b: Value);
+     VAR t: Value;
+   BEGIN
+     IF a.e > b.e THEN
+-      t := b;
+-      Add(t, a);
+-      a := t
++      t := b; Add(t, a); a := t
+     ELSE
+       WHILE a.e < b.e DO
+         a.m := a.m DIV 2; INC(a.e)
+@@ -52,7 +50,7 @@
+     END
+   END Add;
+ 
+-  PROCEDURE Multiply*(VAR a: Value; b: Value);
++  PROCEDURE Multiply*(VAR a, b: Value);
+     VAR al, ah, bl, bh, md: INTEGER;
+   BEGIN
+     ah := a.m DIV PreDivide; al := a.m MOD PreDivide;
+@@ -63,7 +61,7 @@
+     Normalize(a)
+   END Multiply;
+ 
+-  PROCEDURE Divide0(VAR a: Value; b: Value);
++  PROCEDURE Divide0*(VAR a, b: Value);
+     VAR bm: INTEGER;
+   BEGIN bm := b.m;
+     IF bm < 0 THEN bm := -bm; a.m := -a.m END;
+@@ -74,14 +72,14 @@
+     Normalize(a)
+   END Divide0;
+ 
+-  PROCEDURE Divide*(VAR a: Value; b: Value);
++  PROCEDURE Divide*(VAR a, b: Value);
+     VAR a0, d: Value;
+   BEGIN a0 := a; Divide0(a, b);
+     d := a; Multiply(d, b); Negate(d); Add(d, a0);
+     IF Sign(d) # 0 THEN Divide0(d, b); Add(a, d) END
+   END Divide;
+ 
+-  PROCEDURE Compare*(a, b: Value) : INTEGER;
++  PROCEDURE Compare*(VAR a, b: Value) : INTEGER;
+   VAR result, sa, sb: INTEGER;
+   BEGIN result := 0;
+     sa := Sign(a); sb := Sign(b);
+@@ -94,7 +92,7 @@
+   RETURN result
+   END Compare;
+ 
+-  PROCEDURE Floor*(v: Value): INTEGER;
++  PROCEDURE Floor*(VAR v: Value): INTEGER;
+     VAR r, e: INTEGER;
+   BEGIN r := v.m; e := v.e;
+     WHILE e > 0 DO r := r * 2; DEC(e) END;
+@@ -106,21 +104,21 @@
+     VAR p: Value;
+   BEGIN New(result, 1); New(p, 10);
+     WHILE n > 0 DO
+-      IF ODD(n) THEN Multiply(result, p) END;
++      IF n MOD 2 = 1 THEN Multiply(result, p) END;
+       Multiply(p, p); n := n DIV 2
+     END
+   END TenTo;
+ 
+-  PROCEDURE WriteUnreal*(VAR W: Texts.Writer; v: Value);
++  PROCEDURE WriteUnreal*(VAR W: Texts.Writer; VAR v: Value);
+     VAR e, i, m: INTEGER;
+       d: ARRAY 16 OF CHAR;
+       v1, v2, v3: Value;
+   BEGIN
+     IF v.m = 0 THEN
+       Texts.WriteString(W, "  0 ");
+-    ELSE Texts.Write(W, " "); v1 := v;
++    ELSE Texts.Write(W, ' '); v1 := v;
+       e := (v.e + 28) * 77 DIV 256 - 6; (*decimal exponent*)
+-      IF v.m < 0 THEN Texts.Write(W, "-"); Negate(v1) ELSE Texts.Write(W, " ") END;
++      IF v.m < 0 THEN Texts.Write(W, '-'); Negate(v1) ELSE Texts.Write(W, ' ') END;
+       IF e >= 0 THEN TenTo(v2, e); Divide(v1, v2) ELSE TenTo(v2, -e); Multiply(v1, v2) END;
+       New(v2, 1); New(v3, 2); Divide(v2, v3); Add(v2, v1); (* v2 := x + 0.5 *)
+       m := Floor(v2);
+@@ -129,10 +127,10 @@
+       REPEAT
+         d[i] := CHR(m MOD 10 + 30H); m := m DIV 10; INC(i)
+       UNTIL m = 0;
+-      DEC(i); Texts.Write(W, d[i]); Texts.Write(W, ".");
++      DEC(i); Texts.Write(W, d[i]); Texts.Write(W, '.');
+       WHILE i > 0 DO DEC(i); Texts.Write(W, d[i]) END;
+-      Texts.Write(W, "E"); INC(e, 6);
+-      IF e < 0 THEN Texts.Write(W, "-"); e := -e ELSE Texts.Write(W, "+") END;
++      Texts.Write(W, 'E'); INC(e, 6);
++      IF e < 0 THEN Texts.Write(W, '-'); e := -e ELSE Texts.Write(W, '+') END;
+       Texts.Write(W, CHR(e DIV 10 + 30H)); Texts.Write(W, CHR(e MOD 10 + 30H))
+     END
+   END WriteUnreal;
+--- draw/cpgrab.mod
++++ draw/cpgrab.mod
+@@ -1,5 +1,5 @@
+-MODULE ColorPictureGrab;
+-  IMPORT DisplayGrab, Files, Texts, Oberon, GraphicFrames;
++MODULE CPGrab;
++  IMPORT DisplayGrab, Files, Input, Texts, Oberon, TextFrames, GraphicFrames;
+ 
+   PROCEDURE WriteShort(VAR R: Files.Rider; short: INTEGER);
+   BEGIN
+@@ -76,14 +76,14 @@
+   BEGIN
+     IF S.class = Texts.Int THEN w := S.i; Texts.Scan(S) ELSE w := 32 END;
+     IF S.class = Texts.Int THEN h := S.i; Texts.Scan(S) ELSE h := 32 END;
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(text, beg, end, t);
+-      IF t >= 0 THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(text, beg, end);
++      IF text # NIL THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
+     END;
+     IF (S.class = Texts.Name) THEN
+-      F := Files.New(S.s);
++      F := Files.Ensure(S.s);
+       SavePicture(F, x, y, w, h);
+-      Files.Register(F)
++      Files.Truncate(F); Files.Close(F)
+     END
+   END Grab;
+ 
+@@ -109,4 +109,4 @@
+   END GrabPicture;
+ 
+ BEGIN
+-END ColorPictureGrab.
++END CPGrab.
+--- draw/cptiles.mod
++++ draw/cptiles.mod
+@@ -1,16 +1,16 @@
+-MODULE ColorPictureTiles;
+-  IMPORT SYSTEM, Display, DisplayGrab, Files, Texts, Oberon, Graphics, GraphicFrames;
++MODULE CPTiles;
++  IMPORT Display, DisplayGrab, Files, Texts, Oberon, TextFrames, Graphics, GraphicFrames;
+ 
+   TYPE Picture = POINTER TO PictureDesc;
+     Tile = POINTER TO TileDesc;
+ 
+     PictureDesc = RECORD (Graphics.ObjectDesc)
+-      tile: Tile;
++      tile: Tile
+     END;
+ 
+     TileDesc = RECORD
+       next: Tile;
+-      data: ARRAY 244 OF BYTE;
++      data: ARRAY 244 OF BYTE
+     END;
+ 
+   VAR method*: Graphics.Method;
+@@ -26,25 +26,23 @@
+   END Copy;
+ 
+   PROCEDURE mark(f: GraphicFrames.Frame; col, x, y: INTEGER);
+-  BEGIN GraphicFrames.ReplConst(f, col, x+1, y+1, 4, 4, Display.invert)
++  BEGIN GraphicFrames.InvertBlockClip(f, col, x+1, y+1, 4, 4)
+   END mark;
+ 
+-  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
+-    VAR x, y, w, h: INTEGER; f: GraphicFrames.Frame;
+-
+     PROCEDURE draw(f: GraphicFrames.Frame; x, y, w, h: INTEGER; tile: Tile);
+     VAR xx, yy: INTEGER;
+     BEGIN
+-      GraphicFrames.ReplConst(f, Display.black, x, y, w, h, Display.replace);
++    GraphicFrames.FillBlockClip(f, Display.black, x, y, w, h);
+       WHILE tile # NIL DO
+         xx := x + tile.data[0]*8; yy := y + tile.data[1]*60;
+         IF (xx > f.X) & (xx + tile.data[2] <= f.X1) & (yy > f.Y) & (yy + tile.data[3] <= f.Y1) THEN
+-          DisplayGrab.CopyColorPattern(SYSTEM.ADR(tile.data[2]), xx, yy)
++        DisplayGrab.CopyColorPattern(ADR(tile.data[2]), xx, yy)
+         END;
+         tile := tile.next;
+       END
+     END draw;
+-
++  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
++    VAR x, y, w, h: INTEGER; f: GraphicFrames.Frame;
+   BEGIN
+     CASE M OF GraphicFrames.DrawMsg:
+       x := obj.x + M.x; y := obj.y + M.y; w := obj.w; h := obj.h; f := M.f;
+@@ -54,7 +52,7 @@
+           IF obj.selected THEN mark(f, Display.black, x, y) END
+         ELSIF M.mode = 1 THEN mark(f, Display.white, x, y)  (*normal -> selected*)
+         ELSIF M.mode = 2 THEN mark(f, Display.black, x, y)  (*selected -> normal*)
+-        ELSIF M.mode = 3 THEN GraphicFrames.ReplConst(f, Display.black, x, y, w, h, Display.replace)  (*erase*)
++        ELSIF M.mode = 3 THEN GraphicFrames.FillBlockClip(f, Display.black, x, y, w, h)  (*erase*)
+         END
+       END
+     END
+@@ -159,7 +157,7 @@
+   END LoadPicture;
+ 
+   PROCEDURE MakePicture*;  (*command*)
+-    VAR beg, end, t: INTEGER;
++    VAR beg, end: INTEGER;
+       S: Texts.Scanner;
+       G: GraphicFrames.Frame;
+       text: Texts.Text;
+@@ -167,13 +165,13 @@
+       F: Files.File;
+   BEGIN G := GraphicFrames.Focus();
+     Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(text, beg, end, t);
+-      IF t >= 0 THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(text, beg, end);
++      IF text # NIL THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
+     END;
+     IF (S.class = Texts.Name) & (G # NIL) & (G.marked) THEN
+       GraphicFrames.Deselect(G);
+-      NEW(P); P.col := Oberon.CurCol;
++      NEW(P); P.col := GraphicFrames.OberonCurCol;
+       F := Files.Old(S.s);
+       LoadPicture(F, P);
+       Files.Close(F);
+@@ -185,7 +183,7 @@
+   END MakePicture;
+ 
+   PROCEDURE LoadPalette*;  (*command*)
+-    VAR beg, end, t, val, col: INTEGER;
++    VAR beg, end, val, col: INTEGER;
+       b0, b1, b2: BYTE;
+       S: Texts.Scanner;
+       text: Texts.Text;
+@@ -193,9 +191,9 @@
+       R: Files.Rider;
+   BEGIN
+     Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(text, beg, end, t);
+-      IF t >= 0 THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(text, beg, end);
++      IF text # NIL THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
+     END;
+     IF S.class = Texts.Name THEN
+       F := Files.Old(S.s);
+@@ -214,8 +212,8 @@
+   END LoadPalette;
+ 
+ BEGIN NEW(method);
+-  method.module := "ColorPictureTiles"; method.allocator := "New";
++  method.module := "CPTiles"; method.allocator := "New";
+   method.new := New; method.copy := Copy; method.draw := Draw;
+   method.selectable := Selectable; method.change := Change;
+   method.read := Read; method.write := Write
+-END ColorPictureTiles.
++END CPTiles.
+--- draw/displayg.mod
++++ draw/displayg.mod
+@@ -1,17 +1,12 @@
++(* TODO untested *)
+ MODULE DisplayGrab;
+-  IMPORT SYSTEM, Display;
++  IMPORT Display;
+ 
+   PROCEDURE GrabDot*(x, y: INTEGER) : INTEGER;
+     VAR a, col: INTEGER; s: SET;
+   BEGIN
+-    a := Display.Base + (x DIV (32 DIV Display.Depth)) * 4 + y * Display.Span;
+-    IF Display.Depth = 1 THEN
+-      col := 1; SYSTEM.GET(a, s); IF (s * {x MOD 32} = {}) THEN col := 0 END
+-    ELSIF Display.Depth = 4 THEN
+-      SYSTEM.GET(a, col); col := ASR(col, (x MOD 8) * 4) MOD 10H;
+-    ELSE
+-      col := 0
+-    END
++    a := Display.Base + (x DIV (32 DIV 4)) * 4 + y * Display.Span;
++    GET(a, col); col := ASR(col, (x MOD 8) * 4) MOD 10H;
+     RETURN col
+   END GrabDot;
+ 
+@@ -20,27 +15,11 @@
+   BEGIN
+     ASSERT((w > 0) & (w <= 32));
+     aL := Display.Base + y*Display.Span; aR := ((x+w-1) DIV 32)*4 + aL; aL := (x DIV 32)*4 + aL;
+-    IF Display.Depth # 1 THEN
+       pix := {};
+       FOR row := 0 TO w - 1 DO
+         IF GrabDot(x+row, y) # 0 THEN INCL(pix, row) END
+       END;
+-      row := SYSTEM.VAL(INTEGER, pix);
+-    ELSIF aR = aL THEN
+-      mask := {(x MOD 32) .. ((x+w-1) MOD 32)};
+-      SYSTEM.GET(aL, pix);
+-      row := ASR(SYSTEM.VAL(INTEGER, pix * mask), x MOD 32)
+-    ELSIF aR = aL + 4 THEN
+-      mask := {(x MOD 32) .. 31};
+-      SYSTEM.GET(aL, pix);
+-      row := ASR(SYSTEM.VAL(INTEGER, pix * mask), x MOD 32);
+-      mask := {0 .. 31 - x MOD 32};
+-      row := SYSTEM.VAL(INTEGER, SYSTEM.VAL(SET, row) * mask);
+-      mask := {0 .. ((x+w-1) MOD 32)};
+-      SYSTEM.GET(aR, pix);
+-      row := row + LSL(SYSTEM.VAL(INTEGER, pix * mask), 32 - x MOD 32)
+-    ELSE ASSERT(FALSE)
+-    END;
++    row := VAL(INTEGER, pix);
+     RETURN row
+   END GrabPatternRow;
+ 
+@@ -48,29 +27,22 @@
+     VAR a, a0, pwd, xx, yy, i: INTEGER;
+       w, h, pbt: BYTE; pix, mask: SET;
+   BEGIN
+-    SYSTEM.GET(patadr, w); SYSTEM.GET(patadr+1, h); INC(patadr, 2); xx := x; yy := y;
+-    a := Display.Base + (x DIV 8)*4 + y*Display.Span; x := x MOD 8; mask := SYSTEM.VAL(SET, ASR(7FFFFFFFH, 31-(x*4)));
++    GET(patadr, w); GET(patadr+1, h); INC(patadr, 2); xx := x; yy := y;
++    a := Display.Base + (x DIV 8)*4 + y*Display.Span; x := x MOD 8; mask := VAL(SET, ASR(7FFFFFFFH, 31-(x*4)));
+     a0 := a;
+     WHILE a0 < a + h * Display.Span DO
+       (*build pattern line; w <= 8*)
+-      SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt;
+-      IF w > 2 THEN SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt*100H + pwd;
+-        IF w > 4 THEN SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt*10000H + pwd;
+-          IF w > 6 THEN SYSTEM.GET(patadr, pbt); INC(patadr); pwd := pbt*1000000H + pwd END
++      GET(patadr, pbt); INC(patadr); pwd := pbt;
++      IF w > 2 THEN GET(patadr, pbt); INC(patadr); pwd := pbt*100H + pwd;
++        IF w > 4 THEN GET(patadr, pbt); INC(patadr); pwd := pbt*10000H + pwd;
++          IF w > 6 THEN GET(patadr, pbt); INC(patadr); pwd := pbt*1000000H + pwd END
+         END
+       END;
+-      IF Display.Depth = 4 THEN
+-        SYSTEM.GET(a0, pix);
+-        SYSTEM.PUT(a0, SYSTEM.VAL(SET, LSL(pwd, x * 4)) + pix);
++      GET(a0, pix);
++      PUT(a0, VAL(SET, LSL(pwd, x * 4)) + pix);
+         IF x + w > 8 THEN (*spill over*)
+-          SYSTEM.GET(a0+4, pix);
+-          SYSTEM.PUT(a0+4, SYSTEM.VAL(SET, ASR(pwd, -(x * 4))) * mask + pix)
+-        END;
+-      ELSE
+-        FOR i := xx TO xx + w - 1 DO
+-          Display.Dot(pwd DIV LSL(1, (i - xx) * 4) MOD 10H, i, yy, Display.replace)
+-        END;
+-        INC(yy);
++        GET(a0+4, pix);
++        PUT(a0+4, VAL(SET, ASR(pwd, -(x * 4))) * mask + pix)
+       END;
+       INC(a0, Display.Span)
+     END
+--- draw/draw.ort
++++ draw/draw.ort
+@@ -0,0 +1,32 @@
++Draw.Open XX.Graph  Draw.Store 
++Rectangles.Make  Curves.MakeCircle
++Curves.MakeLine Curves.MakeEllipse
++
++Draw.SetFont ob10.Fnt
++Draw.SetColor 15
++Draw.SetWidth 2
++
++Draw.ChangeFont ob10.fnt
++Draw.ChangeFont ob10b.fnt
++Draw.ChangeColor 10
++Draw.ChangeWidth 2
++
++Draw.Macro TTL0 N02
++
++Splines.MakeOpen     Splines.MakeClosed   Bezier.Make
++
++Fills.MakeFilledRectangle Fills.MakeFloodFill
++
++PictureTiles.MakePicture Grapes.Pict
++PictureTiles.MakePicture ^ !Escher.Pict !Grapes.Pict
++
++CPTiles.MakePicture Marble.Pict
++
++PictureGrab.PrintDraggedRect
++PictureGrab.GrabPicture 200 200 Test.Pict
++PictureGrab.GrabScreenshot 100 100 300 300 Test.Pict
++
++CPGrab.GrabPicture 200 200 Test.Pict
++CPGrab.GrabScreenshot 100 100 300 300 Test.Pict
++
++Pixelizr.Open
+--- draw/fills.mod
++++ draw/fills.mod
+@@ -1,5 +1,5 @@
+ MODULE Fills;
+-  IMPORT Display, DisplayGrab, Files, Oberon, Graphics, GraphicFrames;
++  IMPORT Display, DisplayGrab, Files, Graphics, GraphicFrames;
+ 
+   TYPE Fill* = POINTER TO FillDesc;
+     FillDesc* = RECORD (Graphics.ObjectDesc) END;
+@@ -9,12 +9,13 @@
+       x1, x2, y: INTEGER;
+       dir: BYTE; (* 2: above the previous segment, 1: below the previous segment, 0: no previous segment *)
+       left, right: BOOLEAN;
+-      next: Segment;
++      next: Segment
+     END;
+ 
+   VAR method*: Graphics.Method;
+     segstack, freeSegments: Segment;
+ 
++
+   (* scanline fill based on http://www.adammil.net/blog/v126_A_More_Efficient_Flood_Fill.html *)
+ 
+   PROCEDURE ScanlineAddSegment(newcol, x1, x2, y: INTEGER; dir: BYTE; left, right: BOOLEAN);
+@@ -29,7 +30,7 @@
+     seg.dir := dir; seg.left := left; seg.right := right;
+     seg.next := segstack;
+     segstack := seg;
+-    Display.ReplConst(newcol, x1, y, x2-x1, 1, Display.replace)
++    Display.FillBlock(newcol, x1, y, x2-x1, 1)
+   END ScanlineAddSegment;
+ 
+   PROCEDURE ScanlineAdd(oldcol, newcol, x1, x2, y, ix1, ix2: INTEGER; dir: BYTE; sameDir: BOOLEAN);
+@@ -53,15 +54,15 @@
+     seg: Segment;
+   BEGIN
+     oldcol := DisplayGrab.GrabDot(x, y);
+-    Display.Dot(newcol, x, y, Display.replace);
++    Display.Dot(newcol, x, y);
+     segstack := NIL; freeSegments := NIL;
+     ScanlineAddSegment(newcol, x, x+1, y, 0, TRUE, TRUE);
+     WHILE segstack # NIL DO
+       seg := segstack; segstack := seg.next; x1 := seg.x1; x2 := seg.x2;
+       WHILE seg.left & (x1 > 0) & (DisplayGrab.GrabDot(x1-1, seg.y) = oldcol) DO DEC(x1) END;
+       WHILE seg.right & (x2 < Display.Width) & (DisplayGrab.GrabDot(x2, seg.y) = oldcol) DO INC(x2) END;
+-      IF x1 # seg.x1 THEN Display.ReplConst(newcol, x1, seg.y, seg.x1 - x1, 1, Display.replace) END;
+-      IF x2 # seg.x2 THEN Display.ReplConst(newcol, seg.x2, seg.y, x2 - seg.x2, 1, Display.replace) END;
++      IF x1 # seg.x1 THEN Display.FillBlock(newcol, x1, seg.y, seg.x1 - x1, 1) END;
++      IF x2 # seg.x2 THEN Display.FillBlock(newcol, seg.x2, seg.y, x2 - seg.x2, 1) END;
+       DEC(seg.x1); INC(seg.x2);
+       IF seg.y > 0 THEN ScanlineAdd(oldcol, newcol, x1, x2, seg.y - 1, seg.x1, seg.x2, 2, seg.dir = 2) END;
+       IF seg.y < Display.Height - 1 THEN ScanlineAdd(oldcol, newcol, x1, x2, seg.y + 1, seg.x1, seg.x2, 1, seg.dir = 1) END;
+@@ -82,22 +83,20 @@
+   END Copy;
+ 
+   PROCEDURE mark(f: GraphicFrames.Frame; col, x, y: INTEGER);
+-  BEGIN GraphicFrames.ReplConst(f, col, x+1, y+1, 4, 4, 0)
++  BEGIN GraphicFrames.FillBlockClip(f, col, x+1, y+1, 4, 4)
+   END mark;
+ 
+-  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
+-    VAR x, y, w, h, col, mcol: INTEGER; f: GraphicFrames.Frame;
+-
+     PROCEDURE draw(f: GraphicFrames.Frame; col, x, y, w, h: INTEGER);
+-    VAR oldcol: INTEGER;
+     BEGIN
+       IF (w = 0) & (h = 0) THEN
+         ScanlineFill(col, x, y)
+       ELSE
+-        GraphicFrames.ReplConst(f, col, x, y, w, h, Display.replace)
++      GraphicFrames.FillBlockClip(f, col, x, y, w, h)
+       END;
+     END draw;
+ 
++  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
++    VAR x, y, w, h, col, mcol: INTEGER; f: GraphicFrames.Frame;
+   BEGIN
+     CASE M OF GraphicFrames.DrawMsg:
+       x := obj.x + M.x; y := obj.y + M.y; w := obj.w; h := obj.h; f := M.f;
+@@ -146,7 +145,7 @@
+     IF (G # NIL) & (G.mark.next # NIL) THEN
+       GraphicFrames.Deselect(G);
+       x0 := G.mark.x; y0 := G.mark.y; x1 := G.mark.next.x; y1 := G.mark.next.y;
+-      NEW(R); R.col := Oberon.CurCol;
++      NEW(R); R.col := GraphicFrames.OberonCurCol;
+       R.w := ABS(x1-x0); R.h := ABS(y1-y0);
+       IF x1 < x0 THEN x0 := x1 END;
+       IF y1 < y0 THEN y0 := y1 END;
+@@ -162,7 +161,7 @@
+   BEGIN G := GraphicFrames.Focus();
+     IF (G # NIL) & (G.marked) THEN
+       GraphicFrames.Deselect(G);
+-      NEW(R); R.col := Oberon.CurCol;
++      NEW(R); R.col := GraphicFrames.OberonCurCol;
+       R.w := 0; R.h := 0; R.x := G.mark.x - G.x; R.y := G.mark.y - G.y;
+       R.do := method;
+       Graphics.Add(G.graph, R);
+--- draw/graphtoo.mod
++++ draw/graphtoo.mod
+@@ -24,20 +24,20 @@
+             Texts.WriteInt(W, class, 4);
+             IF class = Context THEN
+               Files.ReadByte(R, cat); Files.ReadByte(R, inx); Texts.WriteInt(W, cat, 4); Texts.WriteInt(W, inx, 4);
+-              Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name);
+-              IF cat = 2 THEN Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name) END
++              Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name);
++              IF cat = 2 THEN Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name) END
+             ELSE Files.ReadInt(R, xy);
+               Texts.WriteInt(W, xy * 10000H DIV 10000H, 5); Texts.WriteInt(W, xy DIV 10000H, 5);
+               Files.ReadInt(R, wh);
+               Texts.WriteInt(W, wh * 10000H DIV 10000H, 5); Texts.WriteInt(W, wh DIV 10000H, 5);
+-              Files.ReadByte(R, col); Files.Read(R, ch); Texts.WriteInt(W, col, 5); Texts.Write(W, "|");
++              Files.ReadByte(R, col); Files.Read(R, ch); Texts.WriteInt(W, col, 5); Texts.Write(W, '|');
+               IF class = Line THEN
+               ELSIF class = Caption THEN
+-                Files.ReadByte(R, fno);  Texts.WriteInt(W, fno, 5); Texts.Write(W, " ");
++                Files.ReadByte(R, fno);  Texts.WriteInt(W, fno, 5); Texts.Write(W, ' ');
+                 Files.ReadString(R, name); Texts.WriteString(W, name)
+               ELSIF class = Macro THEN
+                 Files.ReadByte(R, libno); Files.ReadString(R, name);
+-                Texts.WriteInt(W, libno, 4); Texts.Write(W, " "); Texts.WriteString(W, name)
++                Texts.WriteInt(W, libno, 4); Texts.Write(W, ' '); Texts.WriteString(W, name)
+               ELSIF class = Rectangles THEN
+                 Files.ReadByte(R, fno); Texts.WriteInt(W, fno, 4); Files.ReadByte(R, fno); Texts.WriteInt(W, fno, 4);
+                 Files.ReadByte(R, fno); Texts.WriteInt(W, fno, 4)
+@@ -74,20 +74,20 @@
+             Texts.WriteInt(W, class, 4);
+             IF class = Context THEN
+               Files.ReadByte(R, cat); Files.ReadByte(R, inx); Texts.WriteInt(W, cat, 4); Texts.WriteInt(W, inx, 4);
+-              Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name);
+-              IF cat = 2 THEN Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name) END
++              Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name);
++              IF cat = 2 THEN Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name) END
+             ELSE Files.ReadInt(R, xy);
+               Texts.WriteInt(W, xy * 10000H DIV 10000H, 5); Texts.WriteInt(W, xy DIV 10000H, 5);
+               Files.ReadInt(R, wh);
+               Texts.WriteInt(W, wh * 10000H DIV 10000H, 5); Texts.WriteInt(W, wh DIV 10000H, 5);
+-              Files.ReadByte(R, col); Texts.WriteInt(W, col, 5); Texts.Write(W, "|");
++              Files.ReadByte(R, col); Texts.WriteInt(W, col, 5); Texts.Write(W, '|');
+               IF class = Line THEN
+               ELSIF class = Caption THEN
+-                Files.ReadByte(R, fno);  Texts.WriteInt(W, fno, 5); Texts.Write(W, " ");
++                Files.ReadByte(R, fno);  Texts.WriteInt(W, fno, 5); Texts.Write(W, ' ');
+                 Files.ReadString(R, name); Texts.WriteString(W, name)
+               ELSIF class = Macro THEN
+                 Files.ReadByte(R, libno); Files.ReadString(R, name);
+-                Texts.WriteInt(W, libno, 4); Texts.Write(W, " "); Texts.WriteString(W, name)
++                Texts.WriteInt(W, libno, 4); Texts.Write(W, ' '); Texts.WriteString(W, name)
+               ELSIF class = Rectangles THEN
+                 Files.ReadByte(R, len); Texts.WriteInt(W, len, 4);
+                 Files.ReadByte(R, lw); Texts.WriteInt(W, lw, 4);
+@@ -126,8 +126,8 @@
+               Texts.WriteInt(W, class, 4);
+               IF class = Context THEN
+                 Files.ReadByte(R, cat); Files.ReadByte(R, inx); Texts.WriteInt(W, cat, 4); Texts.WriteInt(W, inx, 4);
+-                Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name);
+-                IF cat = 2 THEN Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name) END
++                Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name);
++                IF cat = 2 THEN Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name) END
+               ELSE Files.ReadInt(R, xy);
+                 Texts.WriteInt(W, xy * 10000H DIV 10000H, 5); Texts.WriteInt(W, xy DIV 10000H, 5);
+                 Files.ReadInt(R, wh);
+@@ -135,10 +135,10 @@
+                 Files.ReadByte(R, col); Texts.WriteInt(W, col, 5);
+                 IF class = Line THEN
+                 ELSIF class = Caption THEN
+-                  Texts.Write(W, "|"); Files.ReadByte(R, fno);  Texts.WriteInt(W, fno, 5); Texts.Write(W, " ");
++                  Texts.Write(W, '|'); Files.ReadByte(R, fno);  Texts.WriteInt(W, fno, 5); Texts.Write(W, ' ');
+                   Files.ReadString(R, name); Texts.WriteString(W, name)
+                 ELSIF class = Rectangles THEN
+-                  Texts.Write(W, "|"); Files.ReadByte(R, len); Texts.WriteInt(W, len, 4);
++                  Texts.Write(W, '|'); Files.ReadByte(R, len); Texts.WriteInt(W, len, 4);
+                   Files.ReadByte(R, lnw); Texts.WriteInt(W, lnw, 4);
+                   Files.ReadByte(R, vers); Texts.WriteInt(W, vers, 4)
+                 ELSE Texts.WriteString(W, "other class ="); Texts.WriteInt(W, class, 4)
+@@ -148,7 +148,7 @@
+             END ;
+             (*end macro*) Texts.WriteString(W, "---");
+             Files.ReadInt(R, wh); Texts.WriteInt(W, wh MOD 10000H, 5); Texts.WriteInt(W, wh DIV 10000H, 5);
+-            Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name);
++            Files.ReadString(R, name); Texts.Write(W, ' '); Texts.WriteString(W, name);
+             Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf); Files.ReadByte(R, class)
+           END
+         ELSE Texts.WriteString(W, " not a graphics library")
+@@ -158,70 +158,6 @@
+       Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+     END
+   END DecLibrary1;
+-
+-  PROCEDURE ConvertFontname(VAR x: ARRAY OF CHAR);
+-  BEGIN (* Syntax --> Oberon *)
+-    IF (x[0] = "S") & (x[1] = "y") & (x[2] = "n") & (x[3] = "t") & (x[4] = "a") & (x[5] = "x") THEN
+-      x[0] := "O"; x[1] := "b"; x[2] := "e"; x[3] := "r"; x[4] := "o"; x[5] := "n"
+-    END
+-  END ConvertFontname;
+-
+-  PROCEDURE ConvertLibrary*;
+-    VAR ch: CHAR;
+-      class, col, fno, cat, inx, libno, len, lnw, vers: BYTE;
+-      xy, wh: INTEGER;
+-      name: ARRAY 32 OF CHAR;
+-      F, G: Files.File; R, Q: Files.Rider;
+-      S: Texts.Scanner;
+-  BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF S.class = Texts.Name THEN
+-      Texts.WriteString(W, "convert library "); Texts.WriteString(W, S.s);
+-      F := Files.Old(S.s);
+-      IF F # NIL THEN
+-        Texts.Scan(S); G := Files.New(S.s);
+-        Texts.WriteString(W, " => "); Texts.WriteString(W, S.s);
+-        Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
+-        Files.Set(R, F, 0); Files.Set(Q, G, 0); Files.Read(R, ch);
+-        IF ch = 0FDX THEN
+-          Files.Write(Q, 0FBX); Files.ReadByte(R, class);
+-          WHILE (class < 255) & ~R.eof  DO
+-            WHILE class < 255  DO
+-              Files.WriteByte(Q, class);
+-              IF class = Context THEN
+-                Files.ReadByte(R, cat); Files.ReadByte(R, inx); Texts.WriteInt(W, cat, 4); Texts.WriteInt(W, inx, 4);
+-                Files.WriteByte(Q, cat); Files.WriteByte(Q, inx);
+-                Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name);
+-                IF cat = 0 THEN (*font*) ConvertFontname(name) END ;
+-                Files.WriteString(Q, name);
+-                IF cat = 2 THEN (*class*) Files.ReadString(R, name); Texts.Write(W, " "); Texts.WriteString(W, name); Files.WriteString(Q, name) END ;
+-                Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+-              ELSE Files.ReadInt(R, xy); Files.WriteInt(Q, xy); Files.ReadInt(R, wh); Files.WriteInt(Q, wh);
+-                Files.ReadByte(R, col); Files.Read(R, ch); Files.WriteByte(Q, 1);
+-                IF class = Line THEN
+-                ELSIF class = Caption THEN
+-                  Files.ReadByte(R, fno); Files.WriteByte(Q, fno); Files.ReadString(R, name); Files.WriteString(Q, name)
+-                ELSIF class = Rectangles THEN
+-                  Files.ReadByte(R, len); Files.WriteByte(Q, len); Files.ReadByte(R, len);
+-                  Files.ReadByte(R, lnw); Files.WriteByte(Q, lnw);
+-                  Files.ReadByte(R, vers); Files.WriteByte(Q, vers)
+-                ELSE Texts.WriteString(W, "alien class "); Texts.WriteInt(W, class, 4)
+-                END
+-              END ;
+-              Files.ReadByte(R, class)
+-            END ;
+-            Files.WriteByte(Q, 255); (*end macro*) Files.ReadInt(R, wh); Files.WriteInt(Q, wh);
+-            Files.ReadString(R, name); Files.WriteString(Q, name);
+-            Texts.WriteString(W, name); Texts.WriteInt(W, wh MOD 10000H, 4); Texts.WriteInt(W, wh DIV 10000H, 4);
+-            Texts.WriteLn(W); Files.ReadByte(R, class)
+-          END
+-        ELSE Texts.WriteString(W, " not a graphics library")
+-        END ;
+-        Files.Register(G); Texts.WriteString(W, " done")
+-      ELSE Texts.WriteString(W, " not found")
+-      END ;
+-      Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf)
+-    END
+-  END ConvertLibrary;
+ 
+ BEGIN Texts.OpenWriter(W); Texts.WriteString(W, "GraphTool 8.8.2013");
+   Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
+--- draw/pictureg.mod
++++ draw/pictureg.mod
+@@ -1,5 +1,5 @@
+ MODULE PictureGrab;
+-  IMPORT DisplayGrab, Files, Input, Texts, Oberon, GraphicFrames;
++  IMPORT DisplayGrab, Files, Texts, Oberon, TextFrames, GraphicFrames;
+ 
+   PROCEDURE WriteShort(VAR R: Files.Rider; short: INTEGER);
+   BEGIN
+@@ -66,20 +66,20 @@
+   END SavePicture;
+ 
+   PROCEDURE Grab(x, y: INTEGER; VAR S: Texts.Scanner);
+-    VAR beg, end, t, w, h: INTEGER;
++    VAR beg, end, w, h: INTEGER;
+       F: Files.File;
+       text: Texts.Text;
+   BEGIN
+     IF S.class = Texts.Int THEN w := S.i; Texts.Scan(S) ELSE w := 32 END;
+     IF S.class = Texts.Int THEN h := S.i; Texts.Scan(S) ELSE h := 32 END;
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(text, beg, end, t);
+-      IF t >= 0 THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(text, beg, end);
++      IF text # NIL THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
+     END;
+     IF (S.class = Texts.Name) THEN
+-      F := Files.New(S.s);
++      F := Files.Ensure(S.s);
+       SavePicture(F, x, y, w, h);
+-      Files.Register(F)
++      Files.Truncate(F); Files.Close(F)
+     END
+   END Grab;
+ 
+--- draw/picturet.mod
++++ draw/picturet.mod
+@@ -1,16 +1,16 @@
+ MODULE PictureTiles;
+-  IMPORT SYSTEM, Display, Files, Texts, Oberon, Graphics, GraphicFrames;
++  IMPORT Display, Files, Texts, Oberon, TextFrames, Graphics, GraphicFrames;
+ 
+   TYPE Picture* = POINTER TO PictureDesc;
+     Tile* = POINTER TO TileDesc;
+ 
+     PictureDesc* = RECORD (Graphics.ObjectDesc)
+-      tile*: Tile;
++      tile: Tile
+     END;
+ 
+     TileDesc* = RECORD
+-      next*: Tile;
+-      data*: ARRAY 244 OF BYTE;
++      next: Tile;
++      data: ARRAY 244 OF BYTE
+     END;
+ 
+   VAR method*: Graphics.Method;
+@@ -26,25 +26,24 @@
+   END Copy;
+ 
+   PROCEDURE mark(f: GraphicFrames.Frame; col, x, y: INTEGER);
+-  BEGIN GraphicFrames.ReplConst(f, col, x+1, y+1, 4, 4, Display.invert)
++  BEGIN GraphicFrames.InvertBlockClip(f, col, x+1, y+1, 4, 4)
+   END mark;
+ 
+-  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
+-    VAR x, y, w, h, col: INTEGER; f: GraphicFrames.Frame;
+-
+     PROCEDURE draw(f: GraphicFrames.Frame; col, x, y, w, h: INTEGER; tile: Tile);
+     VAR xx, yy: INTEGER;
+     BEGIN
+-      GraphicFrames.ReplConst(f, Display.black, x, y, w, h, Display.replace);
++    GraphicFrames.FillBlockClip(f, Display.black, x, y, w, h);
+       WHILE tile # NIL DO
+         xx := x + tile.data[0]*32; yy := y + tile.data[1]*60;
+         IF (xx > f.X) & (xx + tile.data[2] <= f.X1) & (yy > f.Y) & (yy + tile.data[3] <= f.Y1) THEN
+-          Display.CopyPattern(col, SYSTEM.ADR(tile.data[2]), xx, yy, Display.paint)
++        Display.PaintPattern(col, ADR(tile.data[2]), xx, yy)
+         END;
+         tile := tile.next;
+       END
+     END draw;
+ 
++  PROCEDURE Draw(obj: Graphics.Object; VAR M: Graphics.Msg);
++    VAR x, y, w, h, col: INTEGER; f: GraphicFrames.Frame;
+   BEGIN
+     CASE M OF GraphicFrames.DrawMsg:
+       x := obj.x + M.x; y := obj.y + M.y; w := obj.w; h := obj.h; f := M.f;
+@@ -55,7 +54,7 @@
+           IF obj.selected THEN mark(f, Display.black, x, y) END
+         ELSIF M.mode = 1 THEN mark(f, Display.white, x, y)  (*normal -> selected*)
+         ELSIF M.mode = 2 THEN mark(f, Display.black, x, y)  (*selected -> normal*)
+-        ELSIF M.mode = 3 THEN GraphicFrames.ReplConst(f, Display.black, x, y, w, h, Display.replace)  (*erase*)
++        ELSIF M.mode = 3 THEN GraphicFrames.FillBlockClip(f, Display.black, x, y, w, h)  (*erase*)
+         END
+       END
+     END
+@@ -110,9 +109,9 @@
+   PROCEDURE Invert(VAR b: BYTE);
+   VAR i: INTEGER; s : SET;
+   BEGIN
+-    i := b; s := SYSTEM.VAL(SET, i);
++    i := b; s := VAL(SET, i);
+     s := s / {0..7};
+-    i := SYSTEM.VAL(INTEGER, s); b := i;
++    i := VAL(INTEGER, s); b := i;
+   END Invert;
+ 
+   PROCEDURE LoadPicture(F: Files.File; P: Picture; invert: BOOLEAN);
+@@ -179,7 +178,7 @@
+   END LoadPicture;
+ 
+   PROCEDURE MakePicture*;  (*command*)
+-    VAR beg, end, t, x, y: INTEGER;
++    VAR beg, end: INTEGER;
+       invert: BOOLEAN;
+       S: Texts.Scanner;
+       G: GraphicFrames.Frame;
+@@ -188,16 +187,16 @@
+       F: Files.File;
+   BEGIN G := GraphicFrames.Focus(); invert := FALSE;
+     Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(text, beg, end, t);
+-      IF t >= 0 THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(text, beg, end);
++      IF text # NIL THEN Texts.OpenScanner(S, text, beg); Texts.Scan(S) END
+     END;
+-    IF (S.class = Texts.Char) & (S.c = "!") THEN
++    IF (S.class = Texts.Char) & (S.c = '!') THEN
+       invert := TRUE; Texts.Scan(S)
+     END;
+     IF (S.class = Texts.Name) & (G # NIL) & (G.marked) THEN
+       GraphicFrames.Deselect(G);
+-      NEW(P); P.col := Oberon.CurCol;
++      NEW(P); P.col := GraphicFrames.OberonCurCol;
+       F := Files.Old(S.s);
+       LoadPicture(F, P, invert);
+       P.x := G.mark.x - G.x; P.y := G.mark.y - G.y;
+--- draw/pixelizr.mod
++++ draw/pixelizr.mod
+@@ -1,6 +1,6 @@
+ MODULE Pixelizr;
+-  IMPORT SYSTEM, Display, Viewers, Input, Texts, Graphics, Oberon, TextFrames, MenuViewers,
+-   GraphicFrames, PixelizrObjects;
++  IMPORT Display, Viewers, Input, Texts, Oberon, Graphics, TextFrames, MenuViewers,
++   GraphicFrames, PixlObjects;
+ 
+   CONST
+    Menu = "System.Close  System.Copy  System.Grow  Pixelizr.Apply  Pixelizr.Disable";
+@@ -17,6 +17,7 @@
+ 
+   VAR
+     W: Texts.Writer;
++    Crosshair*: Oberon.Marker;
+ 
+   PROCEDURE Pixelize(F: Frame; x0, y0: INTEGER; k0: SET);
+     VAR x1, y1, col: INTEGER;
+@@ -28,11 +29,11 @@
+         Oberon.FadeMouse;
+         IF (x0 - F.x > 0) & (x0 - F.x < 33*16) & (y0 - F.y > 0) & (y0 - F.y < 33*16) THEN
+           IF k0 = {2} THEN col := Display.white ELSE col := Display.black END;
+-          PixelizrObjects.MakeFill(col, x0 - F.x, y0 - F.y, F);
++          PixlObjects.MakeFill(col, x0 - F.x, y0 - F.y, F);
+         END;
+         REPEAT Input.Mouse(k1, x1, y1);
+           DEC(x1, (x1-F.x) MOD 4); DEC(y1, (y1-F.y) MOD 4);
+-          Oberon.DrawMouse(GraphicFrames.Crosshair, x1, y1);
++          Oberon.DrawMouse(Crosshair, x1, y1);
+           DEC(x1, (x1-F.x) MOD 16); DEC(y1, (y1-F.y) MOD 16);
+         UNTIL (k1 = {}) OR (x1 # x0) OR (y1 # y0);
+         x0 := x1; y0 := y1
+@@ -41,7 +42,7 @@
+     ELSIF k0 = {1} THEN
+       REPEAT Input.Mouse(k1, x1, y1);
+         DEC(x1, (x1-F.x) MOD 4); DEC(y1, (y1-F.y) MOD 4);
+-        Oberon.DrawMouse(GraphicFrames.Crosshair, x1, y1)
++        Oberon.DrawMouse(Crosshair, x1, y1)
+       UNTIL  k1 = {};
+       Oberon.FadeMouse; INC(F.Xg, x1-x0); INC(F.Yg, y1-y0); GraphicFrames.Restore(F)
+     END
+@@ -72,20 +73,18 @@
+     F.enabled := TRUE;
+   END Enable;
+ 
+-  PROCEDURE Handle*(G: Display.Frame; VAR M: Display.FrameMsg);
++  PROCEDURE Handle*(G: Viewers.Frame; VAR M: Viewers.FrameMsg);
+     VAR x, y: INTEGER;
+       handled: BOOLEAN;
+   BEGIN
+     handled := FALSE;
+     CASE G OF Frame:
+       IF G.enabled THEN
+-        CASE M OF Oberon.InputMsg:
+-          IF M.id = Oberon.track THEN
++        CASE M OF Oberon.MouseMsg:
+             x := M.X - (M.X - G.x) MOD 4; y := M.Y - (M.Y - G.y) MOD 4;
+             IF M.keys # {} THEN Pixelize(G, x, y, M.keys); handled := TRUE END
+           END
+         END
+-      END
+     END;
+     IF ~handled THEN GraphicFrames.Handle(G, M) END
+   END Handle;
+@@ -104,17 +103,17 @@
+       X := GF.mark.x; Y := GF.mark.y;
+       GraphicFrames.Deselect(GF);
+       GraphicFrames.Defocus(GF);
+-      PixelizrObjects.MakePictureTile(X, Y, X-GF.x, Y-GF.y, Oberon.CurCol, GF, T);
++      PixlObjects.MakePictureTile(X, Y, X-GF.x, Y-GF.y, GraphicFrames.OberonCurCol, GF, T);
+       NEW(G); Graphics.Open(G, "");
+       NEW(F); GraphicFrames.Open(F, G); F.enabled := TRUE; F.handle := Handle;
+       F.parent := GF; F.picture := T;
+-      PixelizrObjects.MakeBorderRectangle(Display.white, F);
++      PixlObjects.MakeBorderRectangle(Display.white, F);
+       FOR X := 0 TO 31 DO
+         FOR Y := 0 TO 31 DO
+-          i := PixelizrObjects.GetTileData(T, X, Y);
+-          s := SYSTEM.VAL(SET, i);
++          i := PixlObjects.GetTileData(T, X, Y);
++          s := VAL(SET, i);
+           IF X MOD 8 IN s THEN
+-            PixelizrObjects.MakeFill(Display.white, X * 16 + 16, Y * 16 + 16, F)
++            PixlObjects.MakeFill(Display.white, X * 16 + 16, Y * 16 + 16, F)
+           END
+         END
+       END;
+@@ -127,9 +126,11 @@
+     VAR F: Frame;
+   BEGIN
+     F := Oberon.Par.vwr.dsc.next(Frame);
+-    PixelizrObjects.UpdatePictureTile(F.x + 25, F.y + 25, F.picture);
++    PixlObjects.UpdatePictureTile(F.x + 25, F.y + 25, F.picture);
+     GraphicFrames.DrawObj(F.parent, F.picture);
+   END Apply;
+ 
+ BEGIN Texts.OpenWriter(W);
++  Crosshair.patadr := Display.cross;
++  Crosshair.DX := 7; Crosshair.DY := 7;
+ END Pixelizr.
+--- draw/pixlobje.mod
++++ draw/pixlobje.mod
+@@ -1,5 +1,5 @@
+-MODULE PixelizrObjects;
+-  IMPORT SYSTEM, Graphics, GraphicFrames, PictureTiles, Rectangles, Fills, DisplayGrab;
++MODULE PixlObjects;
++  IMPORT Graphics, GraphicFrames, PictureTiles, Rectangles, Fills, DisplayGrab;
+ 
+   (* Extracting references to rarely needed Pixelizr imports, due to a limit of
+    16 imports, imposed by the .rsc Object file format *)
+@@ -61,13 +61,13 @@
+     FOR X := 0 TO 31 DO
+       FOR Y := 0 TO 31 DO
+         i := P.tile.data[4 + Y * 4 + X DIV 8];
+-        s := SYSTEM.VAL(SET, i);
++        s := VAL(SET, i);
+         IF DisplayGrab.GrabDot(X*16+x, Y*16+y) # 0 THEN INCL(s, X MOD 8) ELSE EXCL(s, X MOD 8) END;
+-        i := SYSTEM.VAL(INTEGER, s);
++        i := VAL(INTEGER, s);
+         P.tile.data[4 + Y * 4 + X DIV 8] := i;
+       END
+     END
+   END UpdatePictureTile;
+ 
+ BEGIN
+-END PixelizrObjects.
++END PixlObjects.
+--- draw/splines.mod
++++ draw/splines.mod
+@@ -6,8 +6,8 @@
+   TYPE Spline* = POINTER TO SplineDesc;
+ 
+     SplineDesc* = RECORD (Graphics.ObjectDesc)
+-      n*: INTEGER; open*: BOOLEAN;
+-      u*, v*: ARRAY N OF INTEGER
++      n: INTEGER; open: BOOLEAN;
++      u, v: ARRAY N OF INTEGER
+     END ;
+ 
+     RealVector = ARRAY N OF Unreal.Value;
+@@ -21,27 +21,27 @@
+   BEGIN i := 1;
+     IF sp.open THEN n := sp.n ELSE n := sp.n-1 END ;
+     WHILE i < n DO
+-      INC(i); GraphicFrames.ReplConst(f, col, sp.u[i] + x0, sp.v[i] + y0, 4, 4, 0)
++      INC(i); GraphicFrames.FillBlockClip(f, col, sp.u[i] + x0, sp.v[i] + y0, 4, 4)
+     END
+   END mark;
+ 
+   PROCEDURE markOrg(f: GraphicFrames.Frame; col, x, y: INTEGER; sp: Spline);
+   BEGIN INC(x, sp.u[0]); INC(y, sp.v[0]);
+-    GraphicFrames.ReplConst(f, col, x, y, 4, 4, 0)
++    GraphicFrames.FillBlockClip(f, col, x, y, 4, 4)
+   END markOrg;
+ 
+-  PROCEDURE Dot(f: GraphicFrames.Frame; col, x, y, mode: INTEGER);
++  PROCEDURE DotClip(f: GraphicFrames.Frame; col, x, y: INTEGER);
+   BEGIN
+-    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN Display.Dot(col, x, y, mode) END
+-  END Dot;
++    IF (x >= f.X) & (x+7 < f.X1) & (y >= f.Y) & (y+7 < f.Y1) THEN Display.Dot(col, x, y) END
++  END DotClip;
+ 
+-  PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; lim: Unreal.Value);
++  PROCEDURE ShowPoly(f: GraphicFrames.Frame; col: INTEGER; VAR p, q: Poly; VAR lim: Unreal.Value);
+     VAR t, x, y, one: Unreal.Value;
+   BEGIN Unreal.New(t, 0); Unreal.New(one, 1);
+     REPEAT
+       x := p.a; Unreal.Multiply(x, t); Unreal.Add(x, p.b); Unreal.Multiply(x, t); Unreal.Add(x, p.c); Unreal.Multiply(x, t); Unreal.Add(x, p.d);
+       y := q.a; Unreal.Multiply(y, t); Unreal.Add(y, q.b); Unreal.Multiply(y, t); Unreal.Add(y, q.c); Unreal.Multiply(y, t); Unreal.Add(y, q.d);
+-      Dot(f, col, Unreal.Floor(x), Unreal.Floor(y), 0);
++      DotClip(f, col, Unreal.Floor(x), Unreal.Floor(y));
+       Unreal.Add(t, one)
+     UNTIL Unreal.Compare(t,lim) >= 0
+   END ShowPoly;
+@@ -244,7 +244,7 @@
+       WHILE i < n DO DEC(spl.u[i], x0); DEC(spl.v[i], y0); INC(i) END ;
+       IF ~open THEN spl.u[n] := spl.u[0]; spl.v[n] := spl.v[0]; INC(n) END ;
+       spl.x := x0 - G.x; spl.y :=  y0 - G.y; spl.w := x1 - x0 + 1; spl.h := y1 - y0 + 1;
+-      spl.open := open; spl.n := n; spl.col := Oberon.CurCol; spl.do := method;
++      spl.open := open; spl.n := n; spl.col := GraphicFrames.OberonCurCol; spl.do := method;
+       Graphics.Add(G.graph, spl);
+       GraphicFrames.Defocus(G); GraphicFrames.DrawObj(G, spl)
+     END
+--- unicode/uedit.mod
++++ unicode/uedit.mod
+@@ -1,8 +1,8 @@
+-MODULE EditU; (*based on Edit; JG 2.11.1990 / NW 28.11.2015*)
+-  IMPORT Files, Fonts, Texts, TextsU, Display, Viewers, Oberon, MenuViewers, TextFrames := TextFramesU;
++MODULE UEdit; (*based on Edit; JG 2.11.1990 / NW 28.11.2015*)
++  IMPORT Files, Fonts, Texts, UTexts, Display, Viewers, Oberon, MenuViewers, TextFrames, UTextFrames;
+ 
+   CONST CR = 0DX; maxlen = 32;
+-    StandardMenu = "System.Close System.Copy System.Grow EditU.Search EditU.Store";
++    StandardMenu = "System.Close System.Copy System.Grow UEdit.Search UEdit.Store";
+ 
+   TYPE Line = POINTER TO LineDesc;
+     LineDesc = RECORD
+@@ -20,75 +20,66 @@
+     VAR T: Texts.Text;
+       S: Texts.Scanner;
+       V: Viewers.Viewer;
+-      X, Y, beg, end, time: INTEGER;
++      X, Y, beg, end: INTEGER;
+   BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF (S.class = Texts.Char) & (S.c = "^") OR (S.line # 0) THEN
+-      Oberon.GetSelection(T, beg, end, time);
+-      IF time >= 0 THEN Texts.OpenScanner(S, T, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') OR (S.line # 0) THEN
++      TextFrames.GetSelection(T, beg, end);
++      IF T # NIL THEN Texts.OpenScanner(S, T, beg); Texts.Scan(S) END
+     END;
+     IF S.class = Texts.Name THEN
+       Oberon.AllocateUserViewer(Oberon.Par.vwr.X, X, Y);
+       V := MenuViewers.New(
+-        TextFrames.NewMenu(S.s, StandardMenu),
+-        TextFrames.NewText(TextFrames.Text(S.s), 0),
+-        TextFrames.menuH, X, Y)
++        UTextFrames.NewMenu(S.s, StandardMenu),
++        UTextFrames.NewText(UTextFrames.Text(S.s), 0),
++        UTextFrames.menuH, X, Y)
+     END
+   END Open;
+ 
+   PROCEDURE Store*;
+     VAR V: Viewers.Viewer;
+-      Text: TextFrames.Frame;
++      Text: UTextFrames.Frame;
+       T: Texts.Text;
+       S: Texts.Scanner;
+       f: Files.File; R: Files.Rider;
+-      beg, end, time, len: INTEGER;
++      beg, end, len: INTEGER;
+ 
+-    PROCEDURE Backup (VAR name: ARRAY OF CHAR);
+-      VAR res, i: INTEGER; bak: ARRAY 32 OF CHAR;
+-    BEGIN i := 0;
+-      WHILE name[i] # 0X DO bak[i] := name[i]; INC(i) END;
+-      bak[i] := "."; bak[i+1] := "B"; bak[i+2] := "a"; bak[i+3] := "k"; bak[i+4] := 0X;
+-      Files.Rename(name, bak, res)
+-    END Backup;
+-
+-  BEGIN Texts.WriteString(W, "EditU.Store ");
++  BEGIN Texts.WriteString(W, "UEdit.Store ");
+     IF Oberon.Par.frame = Oberon.Par.vwr.dsc THEN
+-      V := Oberon.Par.vwr; Texts.OpenScanner(S, V.dsc(TextFrames.Frame).text, 0)
++      V := Oberon.Par.vwr; Texts.OpenScanner(S, V.dsc(UTextFrames.Frame).text, 0)
+     ELSE V := Oberon.MarkedViewer(); Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos)
+     END;
+     Texts.Scan(S);
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(T, beg, end, time);
+-      IF time >= 0 THEN Texts.OpenScanner(S, T, beg); Texts.Scan(S) END
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(T, beg, end);
++      IF T # NIL THEN Texts.OpenScanner(S, T, beg); Texts.Scan(S) END
+     END;
+-    IF (S.class = Texts.Name) & (V.dsc # NIL) & (V.dsc.next IS TextFrames.Frame) THEN
+-      Text := V.dsc.next(TextFrames.Frame);
++    IF (S.class = Texts.Name) & (V.dsc # NIL) & (V.dsc.next IS UTextFrames.Frame) THEN
++      Text := V.dsc.next(UTextFrames.Frame);
+       Texts.WriteString(W, S.s); Texts.WriteInt(W, Text.text.len, 8);
+       Texts.WriteLn(W); Texts.Append(Oberon.Log, W.buf);
+-      Backup(S.s); Texts.Close(Text.text, S.s)
++      Texts.Close(Text.text, S.s);
++      (* TODO: Open() below shouldn't be needed *)
++      Texts.Open(Text.text, S.s)
+     END
+   END Store;
+ 
+   PROCEDURE CopyLooks*;
+     VAR T: Texts.Text;
+-      F: TextFrames.Frame;
++      F: UTextFrames.Frame;
+       v: Viewers.Viewer;
+-      beg, end, time: INTEGER;
++      beg, end: INTEGER;
+       fnt: Fonts.Font; col, voff: INTEGER;
+-  BEGIN Oberon.GetSelection(T, beg, end, time);
++  BEGIN TextFrames.GetSelection(T, beg, end);
+     IF time >= 0 THEN
+       v := Oberon.FocusViewer;
+-      IF (v # NIL) & (v.dsc # NIL) & (v.dsc.next IS TextFrames.Frame) THEN
+-        F := v.dsc.next(TextFrames.Frame);
++      IF (v # NIL) & (v.dsc # NIL) & (v.dsc.next IS UTextFrames.Frame) THEN
++        F := v.dsc.next(UTextFrames.Frame);
+         Texts.Attributes(F.text, F.carloc.pos, fnt, col, voff);
+         Texts.ChangeLooks(T, beg, end, {0,1,2}, fnt, col, voff)
+       END
+     END
+   END CopyLooks;
+ 
+-  PROCEDURE ShowPos(F: TextFrames.Frame; pos: INTEGER);
+-    VAR R: Texts.Reader; ch: CHAR; p, n: INTEGER; Fst, Mid, Lst: Line;
+-
+     PROCEDURE CountForw(l: Line): INTEGER;
+       VAR cnt: INTEGER;
+     BEGIN cnt := 0; REPEAT l := l.n; INC(cnt) UNTIL l = NIL
+@@ -146,10 +137,14 @@
+       WHILE l # NIL DO INC(h, l.h); l := l.n END
+     RETURN h
+     END Height;
++
++  PROCEDURE ShowPos(F: UTextFrames.Frame; pos: INTEGER);
++    VAR R: Texts.Reader; ch: CHAR; p, n: INTEGER; Fst, Mid, Lst: Line;
++
+   BEGIN
+-    IF (pos < F.org) OR (TextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
++    IF (pos < F.org) OR (UTextFrames.Pos(F, F.X + F.W, F.Y) < pos) THEN
+       IF pos <= 0 THEN
+-        TextFrames.Show(F, 0)
++        UTextFrames.Show(F, 0)
+       ELSE
+         NEW(Mid); Fst := Mid; Lst := Mid;
+         Forward(F.text, pos, Lst); Backward(F.text, pos - 1, Fst, Fst);
+@@ -174,32 +169,33 @@
+             IF ch = 0DX THEN p := Texts.Pos(R) - 1 END
+           UNTIL Texts.Pos(R) = pos
+         END;
+-        TextFrames.Show(F, p)
++        UTextFrames.Show(F, p)
+       END
+     END
+   END ShowPos;
+ 
+-  PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
+-    VAR Text: TextFrames.Frame;
+-      V: Viewers.Viewer;
+-      R: Texts.Reader;
+-      T: Texts.Text;
+-      pos, beg, end, prevTime, len, n, i, j: INTEGER;
+-      buf: ARRAY 32 OF CHAR;
+ 
+-    PROCEDURE Forward(n: INTEGER; VAR R: Texts.Reader; VAR buf: ARRAY OF CHAR);
++  PROCEDURE SearchForward(n: INTEGER; VAR R: Texts.Reader; VAR buf: ARRAY OF CHAR);
+       VAR m: INTEGER; j: INTEGER;
+     BEGIN m := M - n; j := 0;
+       WHILE j # m DO buf[j] := buf[n + j]; INC(j) END;
+       WHILE j # M DO Texts.Read(R, buf[j]); INC(j) END
+-    END Forward;
++  END SearchForward;
++
++  PROCEDURE Search*;  (*uses global variables M, pat, d for Boyer-Moore search*)
++    VAR Text: UTextFrames.Frame;
++      V: Viewers.Viewer;
++      R: Texts.Reader;
++      T: Texts.Text;
++      pos, beg, end, len, n, i, j: INTEGER;
++      buf: ARRAY 32 OF CHAR;
+ 
+   BEGIN V := Oberon.Par.vwr;
+     IF Oberon.Par.frame # V.dsc THEN V := Oberon.FocusViewer END;
+-    IF (V.dsc # NIL) & (V.dsc.next IS TextFrames.Frame) THEN
+-      Text := V.dsc.next(TextFrames.Frame);
+-      prevTime := time; Oberon.GetSelection(T, beg, end, time);
+-      IF time > prevTime THEN
++    IF (V.dsc # NIL) & (V.dsc.next IS UTextFrames.Frame) THEN
++      Text := V.dsc.next(UTextFrames.Frame);
++      TextFrames.GetSelection(T, beg, end);
++      IF T # NIL THEN
+         Texts.OpenReader(R, T, beg);
+         i := 0; pos := beg;
+         REPEAT Texts.Read(R, pat[i]); INC(i); INC(pos)
+@@ -212,37 +208,35 @@
+       IF Text.hasCar THEN pos := Text.carloc.pos ELSE pos := 0 END;
+       len := Text.text.len;
+       Texts.OpenReader(R, Text.text, pos);
+-      Forward(M, R, buf); pos := pos + M;
++      SearchForward(M, R, buf); pos := pos + M;
+       j := M;
+       REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j]);
+       WHILE (j >= 0) & (pos < len) DO
+-        n := d[ORD(buf[M-1])]; Forward(n, R, buf); INC(pos, n); j := M;
++        n := d[ORD(buf[M-1])]; SearchForward(n, R, buf); INC(pos, n); j := M;
+         REPEAT DEC(j) UNTIL (j < 0) OR (buf[j] # pat[j])
+       END;
+       IF j < 0 THEN
+-        TextFrames.RemoveSelection(Text); TextFrames.RemoveCaret(Text);
++        UTextFrames.RemoveSelection(Text); UTextFrames.RemoveCaret(Text);
+         Oberon.RemoveMarks(Text.X, Text.Y, Text.W, Text.H);
+         ShowPos(Text, pos); Oberon.PassFocus(V);
+-        TextFrames.SetCaret(Text, pos)
++        UTextFrames.SetCaret(Text, pos)
+       END
+     END
+   END Search;
+ 
+   PROCEDURE InsertUnicode*;
+     VAR S: Texts.Scanner;
+-      W: Texts.Writer;
+       T: Texts.Text;
+-      F: TextFrames.Frame;
++      F: UTextFrames.Frame;
+       codepoint: INTEGER;
+   BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF (S.class = Texts.Int) & (Oberon.FocusViewer.dsc.next IS TextFrames.Frame) THEN
+-      Texts.OpenWriter(W);
+-      TextsU.WriteUnicode(W, S.i);
+-      F := Oberon.FocusViewer.dsc.next(TextFrames.Frame);
++    IF (S.class = Texts.Int) & (Oberon.FocusViewer.dsc.next IS UTextFrames.Frame) THEN
++      UTexts.WriteUnicode(W, S.i);
++      F := Oberon.FocusViewer.dsc.next(UTextFrames.Frame);
+       Texts.Insert(F.text, F.carloc.pos, W.buf);
+-      TextFrames.SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(S.i))
++      UTextFrames.SetCaret(F, F.carloc.pos + UTexts.UnicodeWidth(S.i))
+     END
+   END InsertUnicode;
+ 
+ BEGIN Texts.OpenWriter(W)
+-END EditU.
++END UEdit.
+--- unicode/uedit.ort
++++ unicode/uedit.ort
+@@ -1,2 +1,5 @@
+-EditU.Open ^  EditU.CopyLooks
+-EditU.InsertUnicode 20ACH
++UEdit.Open ^  UEdit.CopyLooks
++UEdit.InsertUnicode 20ACH
++
++UFontIndex.Build data/font/ob10.fnt ~
++UFontIndex.Build data/font/uunifont.fnt ~
+--- unicode/ufontind.mod
++++ unicode/ufontind.mod
+@@ -1,5 +1,5 @@
+-MODULE UnicodeFontIndex;
+-  IMPORT Files, Texts, Oberon;
++MODULE UFontIndex;
++  IMPORT Files, Texts, TextFrames, Oberon;
+ 
+   CONST IdxFileId = 01694675H;
+ 
+@@ -28,7 +28,7 @@
+     END
+   END InitPage;
+ 
+-  PROCEDURE BuildIndex(fntname, idxname: FileName);
++  PROCEDURE BuildIndex(VAR fntname, idxname: FileName);
+     VAR F: Files.File; R: Files.Rider;
+       pages: ARRAY 16 OF IndexPage;
+       i, j, w, h, run, totalRuns, totalBoxes, beg, end, range, lastRange, glyphOffset: INTEGER;
+@@ -75,7 +75,7 @@
+         INC(i)
+       END;
+       ASSERT(glyphOffset = Files.Length(F));
+-      F := Files.New(idxname);
++      F := Files.Ensure(idxname);
+       Files.Set(R, F, 0);
+       Files.WriteInt(R, IdxFileId);
+       j := 0;
+@@ -91,7 +91,7 @@
+           END
+         END
+       END;
+-      Files.Register(F);
++      Files.Truncate(F); Files.Close(F)
+   END BuildIndex;
+ 
+   PROCEDURE Build*;
+@@ -99,14 +99,14 @@
+       beg, end, time: INTEGER;
+       idxname: FileName;
+   BEGIN Texts.OpenScanner(S, Oberon.Par.text, Oberon.Par.pos); Texts.Scan(S);
+-    IF (S.class = Texts.Char) & (S.c = "^") THEN
+-      Oberon.GetSelection(T, beg, end, time);
++    IF (S.class = Texts.Char) & (S.c = '^') THEN
++      TextFrames.GetSelection(T, beg, end);
+       IF time >= 0 THEN Texts.OpenScanner(S, T, beg); Texts.Scan(S) END
+     END;
+     WHILE S.class = Texts.Name DO
+       beg := 0; WHILE S.s[beg] # 0X DO idxname[beg] := S.s[beg]; INC(beg) END;
+-      IF (beg > 4) & (S.s[beg-4] = ".") & (S.s[beg-3] = "F") & (S.s[beg-2] = "n") & (S.s[beg-1] = "t") THEN
+-        idxname[beg-3] := "u"; idxname[beg-2] := "F"; idxname[beg-1] := "i"; idxname[beg] := 0X;
++      IF (beg > 4) & (S.s[beg-4] = '.') & (S.s[beg-3] = 'f') & (S.s[beg-2] = 'n') & (S.s[beg-1] = 't') THEN
++        idxname[beg-3] := 'u'; idxname[beg-2] := 'f'; idxname[beg-1] := 'i'; idxname[beg] := 0X;
+         BuildIndex(S.s, idxname); Texts.Scan(S)
+       ELSE
+         S.class := Texts.Inval;
+@@ -114,4 +114,4 @@
+     END
+   END Build;
+ 
+-END UnicodeFontIndex.
+\ No newline at end of file
++END UFontIndex.
+\ No newline at end of file
+--- unicode/ufonts.mod
++++ unicode/ufonts.mod
+@@ -1,5 +1,5 @@
+-MODULE FontsU; (*JG 18.11.90; PDR 8.6.12; NW 18.1.2019*)
+-  IMPORT SYSTEM, Files, Fonts;
++MODULE UFonts;
++  IMPORT Files, Fonts;
+ 
+   CONST FontFileId = 0DBH;
+     IdxFileId = 01694675H;
+@@ -7,20 +7,22 @@
+   TYPE Font* = POINTER TO FontDesc;
+     RasterBlock = POINTER TO RasterBlockDesc;
+     FontDesc* = RECORD
+-      name*, idxName: ARRAY 32 OF CHAR;
+-      height*, minX*, maxX*, minY*, maxY*: INTEGER;
+-      next*: Font;
++      name, idxName: ARRAY 32 OF CHAR;
++      height, minX, maxX, minY, maxY: INTEGER;
++      next: Font;
+       T1: ARRAY 16 OF INTEGER;
+-      block: RasterBlock;
++      block: RasterBlock
+     END;
+ 
+     RasterBlockDesc = RECORD
+       next: RasterBlock;
+       offs: INTEGER;
+-      raster: ARRAY 1000 OF BYTE;
++      raster: ARRAY 1000 OF BYTE
+     END;
+     
+-VAR Default*, root*: Font;
++    RunRec = RECORD beg, end: INTEGER END;
++
++VAR Default, root: Font;
+   FallbackPat: ARRAY 35 OF BYTE;
+   lastFontsFont: Fonts.Font;
+   lastFont: Font;
+@@ -45,13 +47,12 @@
+   WHILE (B.offs MOD align # 0) DO
+     INC(B.offs);
+   END;
+-  result := SYSTEM.ADR(B.raster[B.offs]);
++  result := ADR(B.raster[B.offs]);
+   INC(B.offs, size);
+   RETURN result
+ END FindSpace;
+ 
+ PROCEDURE LoadRange(F: Font; rangeStart: INTEGER);
+-TYPE RunRec = RECORD beg, end: INTEGER END;
+ VAR rangeEnd, skipBytes, skipBoxesBefore, skipBoxesAfter, usedRuns, totalRuns, beg, end, i, j, k, n, a, a1: INTEGER;
+   boxOffs, glyphOffs, skipRuns: INTEGER;
+   f: Files.File; R: Files.Rider;
+@@ -59,7 +60,7 @@
+   run: ARRAY 32 OF RunRec;
+ BEGIN
+   a := FindSpace(F.block, 256, 4);
+-  SYSTEM.PUT(F.T1[rangeStart DIV 1000H] + (rangeStart DIV 40H MOD 40H) * 4, a);
++  PUT(F.T1[rangeStart DIV 1000H] + (rangeStart DIV 40H MOD 40H) * 4, a);
+   rangeEnd := rangeStart + 64; skipBytes := 0; skipBoxesBefore := 0; skipBoxesAfter := 0;
+   IF F.idxName[0] # 0X THEN
+     f := Files.Old(F.idxName);
+@@ -113,9 +114,9 @@
+       IF (dx # 0) OR (w # 0) OR (h # 0) THEN
+         n := (w + 7) DIV 8 * h;
+         a1 := FindSpace(F.block, n+5, 1);
+-        SYSTEM.PUT(a + (j - rangeStart) * 4, a1 + 3);
+-        SYSTEM.PUT(a1, dx); SYSTEM.PUT(a1+1, x); SYSTEM.PUT(a1+2, y);
+-        SYSTEM.PUT(a1+3, w); SYSTEM.PUT(a1+4, h);
++        PUT(a + (j - rangeStart) * 4, a1 + 3);
++        PUT(a1, dx); PUT(a1+1, x); PUT(a1+2, y);
++        PUT(a1+3, w); PUT(a1+4, h);
+       END;
+       INC(j)
+     END;
+@@ -134,12 +135,12 @@
+   WHILE i < usedRuns DO
+     j := run[i].beg;
+     WHILE (j < run[i].end) DO
+-      SYSTEM.GET(a + (j - rangeStart) * 4, a1);
++      GET(a + (j - rangeStart) * 4, a1);
+       IF (a1 # 0) THEN
+-        SYSTEM.GET(a1, w); SYSTEM.GET(a1+1, h);
++        GET(a1, w); GET(a1+1, h);
+         n := (w + 7) DIV 8 * h;
+         INC(a1, 2);
+-        WHILE n # 0 DO DEC(n); Files.ReadByte(R, b); SYSTEM.PUT(a1, b); INC(a1) END;
++        WHILE n # 0 DO DEC(n); Files.ReadByte(R, b); PUT(a1, b); INC(a1) END;
+       END;
+       INC(j)
+     END;
+@@ -151,9 +152,9 @@
+   VAR s : SET; i : INTEGER;
+ BEGIN
+   i := FallbackPat[y * 3 + (x DIV 8) + 2];
+-  s := SYSTEM.VAL(SET, i);
++  s := VAL(SET, i);
+   s := s + {x MOD 8};
+-  i := SYSTEM.VAL(INTEGER, s);
++  i := VAL(INTEGER, s);
+   FallbackPat[y * 3 + (x DIV 8) + 2] := i
+ END PatDot;
+ 
+@@ -165,16 +166,16 @@
+   i3 := codepoint MOD 40H;
+   pa := fnt.T1[i1];
+   IF pa # 0 THEN
+-    SYSTEM.GET(pa + i2 * 4, pa);
++    GET(pa + i2 * 4, pa);
+     IF pa = 1 THEN
+       LoadRange(fnt, codepoint DIV 40H * 40H);
+-      SYSTEM.GET(fnt.T1[i1] + i2 * 4, pa)
++      GET(fnt.T1[i1] + i2 * 4, pa)
+     END
+   END;
+-  IF pa # 0 THEN SYSTEM.GET(pa + i3 * 4, pa) END;
++  IF pa # 0 THEN GET(pa + i3 * 4, pa) END;
+   IF pa # 0 THEN
+     patadr := pa;
+-    SYSTEM.GET(pa-3, dxb); SYSTEM.GET(pa-2, xb); SYSTEM.GET(pa-1, yb); SYSTEM.GET(pa, wb); SYSTEM.GET(pa+1, hb);
++    GET(pa-3, dxb); GET(pa-2, xb); GET(pa-1, yb); GET(pa, wb); GET(pa+1, hb);
+     dx := dxb; x := xb; y := yb; w := wb; h := hb;
+     IF yb < 128 THEN y := yb ELSE y := yb - 256 END
+   ELSE
+@@ -194,16 +195,18 @@
+       IF (h # 1) & (h # 4) & (h # 7) & (h # 0AH) & (h # 0FH) THEN PatDot(x+3, 2); PatDot(x+4, 2) END
+     END;
+     dx := 24; x := 0; y := -2; w := 23; h := 11;
+-    patadr := SYSTEM.ADR(FallbackPat)
++    patadr := ADR(FallbackPat)
+   END
+ END GetUniPat;
+ 
+-PROCEDURE This*(name: ARRAY OF CHAR): Font;
++PROCEDURE This*(basename: ARRAY OF CHAR): Font;
+   VAR F: Font;
+     f, iF: Files.File; R: Files.Rider;
+     minY, b: BYTE;
+     a, beg, end, i, i1, i2, NofRuns, k: INTEGER;
++    name: ARRAY 32 OF CHAR;
+ BEGIN F := root;
++  DUSK.ObStr(DUSK.strcat(DUSK.DuskStr(basename), DUSK.DuskStr("data/font/")), name);
+   WHILE (F # NIL) & (name # F.name) DO F := F.next END;
+   IF F = NIL THEN
+     f := Files.Old(name);
+@@ -218,8 +221,8 @@
+         RdInt16(R, minY); ReadInt16(R, F.maxY); ReadInt16(R, NofRuns);
+         IF minY >= 80H THEN F.minY := minY - 100H ELSE F.minY := minY END;
+         iF := NIL; k := 0; WHILE (k < 32) & (name[k] # 0X) DO F.idxName[k] := name[k]; INC(k) END;
+-        IF (k > 4) & (name[k-4] = ".") & (name[k-3] = "F") & (name[k-2] = "n") & (name[k-1] = "t") THEN
+-          F.idxName[k-3] := "u"; F.idxName[k-2] := "F"; F.idxName[k-1] := "i"; F.idxName[k] := 0X;
++        IF (k > 4) & (name[k-4] = '.') & ((name[k-3] = 'F') OR (name[k-3] = 'f')) & (name[k-2] = 'n') & (name[k-1] = 't') THEN
++          F.idxName[k-3] := 'u'; F.idxName[k-2] := 'F'; F.idxName[k-1] := 'i'; F.idxName[k] := 0X;
+           iF := Files.Old(F.idxName);
+           IF iF # NIL THEN
+             Files.Set(R, iF, 0); Files.ReadInt(R, k);
+@@ -234,7 +237,7 @@
+                   F.T1[i] := FindSpace(F.block, 256, 4);
+                   FOR i1 := 0 TO 40H - 1 DO
+                     Files.ReadInt(R, k); Files.ReadInt(R, k);
+-                    IF k # -1 THEN SYSTEM.PUT(F.T1[i] + i1 * 4, a) END
++                    IF k # -1 THEN PUT(F.T1[i] + i1 * 4, a) END
+                   END
+                 END
+               END
+@@ -251,10 +254,10 @@
+             IF F.T1[i1] = 0 THEN
+               F.T1[i1] := FindSpace(F.block, 256, 4)
+             END;
+-            SYSTEM.GET(F.T1[i1] + i2 * 4, a);
++            GET(F.T1[i1] + i2 * 4, a);
+             IF a = 0 THEN
+               a := 1;
+-              SYSTEM.PUT(F.T1[i1] + i2 * 4, a)
++              PUT(F.T1[i1] + i2 * 4, a)
+             END;
+             INC(i, 40H)
+           END;
+@@ -279,5 +282,5 @@
+   GetUniPat(lastFont, codepoint, dx, x, y, w, h, patadr)
+ END GetMappedUniPat;
+ 
+-BEGIN lastFont := NIL; lastFontsFont := NIL; root := NIL; Default := This("Oberon10.Scn.Fnt")
+-END FontsU.
++BEGIN lastFont := NIL; lastFontsFont := NIL; root := NIL; Default := This("ob10.fnt")
++END UFonts.
+--- unicode/utextfra.mod
++++ unicode/utextfra.mod
+@@ -1,12 +1,12 @@
+-MODULE TextFramesU; (*JG 8.10.90 / NW 10.5.2013 / 11.2.2017*)
+-  IMPORT Modules, Input, Display, Viewers, Fonts, FontsU, Texts, TextsU, Oberon, MenuViewers;
++MODULE UTextFrames; (*JG 8.10.90 / NW 10.5.2013 / 11.2.2017*)
++  IMPORT Input, Display, Viewers, Fonts, UFonts, Texts, UTexts, Oberon, MenuViewers, TextFrames;
+ 
+   CONST replace* = 0; insert* = 1; delete* = 2; unmark* = 3; (*message id*)
+-    BS = 8X; TAB = 9X; CR = 0DX; DEL = 7FX;
++    BS = 8X; TAB = 9X; LF = 0AX; DEL = 7FX;
+ 
+   TYPE Line = POINTER TO LineDesc;
+     LineDesc = RECORD
+-      len: LONGINT;
++      len: INTEGER;
+       wid: INTEGER;
+       eot: BOOLEAN;
+       lsp: BYTE;
+@@ -14,36 +14,35 @@
+     END;
+ 
+     Location* = RECORD
+-      org*, pos*: LONGINT;
+-      dx*, x*, y*: INTEGER;
++      org, pos: INTEGER;
++      dx, x, y: INTEGER;
+       lin: Line
+     END;
+ 
+     Frame* = POINTER TO FrameDesc;
+     FrameDesc* = RECORD
+-      (Display.FrameDesc)
+-      text*: Texts.Text;
+-      org*: LONGINT;
+-      col*: INTEGER;
+-      lsp*: INTEGER;
+-      left*, right*, top*, bot*: INTEGER;
+-      markH*: INTEGER;
+-      time*: LONGINT;
+-      hasCar*, hasSel*, hasMark: BOOLEAN;
+-      carloc*: Location;
+-      selbeg*, selend*: Location;
++      (Viewers.FrameDesc)
++      text: Texts.Text;
++      org: INTEGER;
++      col: INTEGER;
++      lsp: INTEGER;
++      left, right, top, bot: INTEGER;
++      markH: INTEGER;
++      hasCar, hasSel, hasMark: BOOLEAN;
++      carloc: Location;
++      selbeg, selend: Location;
+       trailer: Line
+     END;
+ 
+-    UpdateMsg* = RECORD (Display.FrameMsg)
+-      id*: INTEGER;
+-      text*: Texts.Text;
+-      beg*, end*: LONGINT
++    UpdateMsg* = RECORD (Viewers.FrameMsg)
++      id: INTEGER;
++      text: Texts.Text;
++      beg, end: INTEGER
+     END;
+ 
+-    CopyOverMsg = RECORD (Display.FrameMsg)
++    CopyOverMsg = RECORD (Viewers.FrameMsg)
+       text: Texts.Text;
+-      beg, end: LONGINT
++      beg, end: INTEGER
+     END;
+ 
+   VAR TBuf*, DelBuf: Texts.Buffer;
+@@ -52,20 +51,23 @@
+     nextCodepoint: INTEGER;
+     ScrollMarker: Oberon.Marker;
+     W, KW: Texts.Writer; (*keyboard writer*)
+-
+-  PROCEDURE Min (i, j: INTEGER): INTEGER;
+-  BEGIN IF i < j THEN j := i END ;
+-    RETURN j
+-  END Min;
++    PrevSel: Frame;
+ 
+   (*------------------display support------------------------*)
+ 
+-  PROCEDURE ReplConst (col: INTEGER; F: Frame; X, Y, W, H: INTEGER; mode: INTEGER);
++  PROCEDURE FillBlockClip(col: INTEGER; F: Frame; X, Y, W, H: INTEGER);
++  BEGIN
++    IF X + W <= F.X + F.W THEN Display.FillBlock(col, X, Y, W, H)
++    ELSIF X < F.X + F.W THEN Display.FillBlock(col, X, Y, F.X + F.W - X, H)
++    END
++  END FillBlockClip;
++
++  PROCEDURE InvertBlockClip(col: INTEGER; F: Frame; X, Y, W, H: INTEGER);
+   BEGIN
+-    IF X + W <= F.X + F.W THEN Display.ReplConst(col, X, Y, W, H, mode)
+-    ELSIF X < F.X + F.W THEN Display.ReplConst(col, X, Y, F.X + F.W - X, H, mode)
++    IF X + W <= F.X + F.W THEN Display.InvertBlock(col, X, Y, W, H)
++    ELSIF X < F.X + F.W THEN Display.InvertBlock(col, X, Y, F.X + F.W - X, H)
+     END
+-  END ReplConst;
++  END InvertBlockClip;
+ 
+   PROCEDURE FrameColor(col: INTEGER): INTEGER;
+   BEGIN
+@@ -75,85 +77,73 @@
+   RETURN col
+   END FrameColor;
+ 
+-  PROCEDURE FlipSM(X, Y: INTEGER);
+-    VAR DW, DH, CL: INTEGER;
+-  BEGIN DW := Display.Width; DH := Display.Height; CL := DW;
+-    IF X < CL THEN
+-      IF X < 3 THEN X := 3 ELSIF X > DW - 4 THEN X := DW - 4 END
+-    ELSE
+-      IF X < CL + 3 THEN X := CL + 4 ELSIF X > CL + DW - 4 THEN X := CL + DW - 4 END
+-    END ;
+-    IF Y < 7 THEN Y := 7 ELSIF Y > DH - 7 THEN Y := DH - 7 END;
+-    Display.CopyPattern(Oberon.CursorColor, Display.updown, X-4, Y-7, Display.invert)
+-  END FlipSM;
+-
+   PROCEDURE UpdateMark (F: Frame);  (*in scroll bar*)
+     VAR oldH: INTEGER;
+   BEGIN oldH := F.markH; F.markH := F.org * F.H DIV (F.text.len + 1);
+     IF F.hasMark & (F.left >= barW) & (F.markH # oldH) THEN
+-      Display.ReplConst(Oberon.ScrollMarkColor, F.X + 1, F.Y + F.H - 1 - oldH, markW, 1, Display.invert);
+-      Display.ReplConst(Oberon.ScrollMarkColor, F.X + 1, F.Y + F.H - 1 - F.markH, markW, 1, Display.invert)
++      Display.InvertBlock(Oberon.ScrollMarkColor, F.X + 1, F.Y + F.H - 1 - oldH, markW, 1);
++      Display.InvertBlock(Oberon.ScrollMarkColor, F.X + 1, F.Y + F.H - 1 - F.markH, markW, 1)
+     END
+   END UpdateMark;
+ 
+   PROCEDURE SetChangeMark (F: Frame; on: BOOLEAN);  (*in corner*)
+   BEGIN
+     IF F.H > menuH THEN
+-      IF on THEN  Display.CopyPattern(Oberon.ChangeMarkColor, Display.block, F.X+F.W-12, F.Y+F.H-12, Display.paint)
+-      ELSE Display.ReplConst(FrameColor(F.col), F.X+F.W-12, F.Y+F.H-12, 8, 8, Display.replace)
++      IF on THEN  Display.PaintPattern(Oberon.ChangeMarkColor, Display.block, F.X+F.W-12, F.Y+F.H-12)
++      ELSE Display.FillBlock(FrameColor(F.col), F.X+F.W-12, F.Y+F.H-12, 8, 8)
+       END
+     END
+   END SetChangeMark;
+ 
+-  PROCEDURE Width (VAR R: Texts.Reader; len: LONGINT): INTEGER;
+-    VAR patadr, pos: LONGINT; ox, dx, x, y, w, h: INTEGER;
++  PROCEDURE Width (VAR R: Texts.Reader; len: INTEGER): INTEGER;
++    VAR patadr, pos: INTEGER; ox, dx, x, y, w, h: INTEGER;
+   BEGIN pos := 0; ox := 0;
+     WHILE pos < len DO
+-      FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
+-      ox := ox + dx; INC(pos, TextsU.UnicodeWidth(nextCodepoint)); TextsU.ReadUnicode(R, nextCodepoint)
++      UFonts.GetMappedUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
++      ox := ox + dx; INC(pos, UTexts.UnicodeWidth(nextCodepoint)); UTexts.ReadUnicode(R, nextCodepoint)
+     END;
+     RETURN ox
+   END Width;
+ 
+   PROCEDURE UpdateLineHeight (L: Line; VAR R: Texts.Reader; T: Texts.Text);
+     VAR pos: INTEGER;
+-  BEGIN pos := Texts.Pos(R) - TextsU.UnicodeWidth(nextCodepoint); L.lsp := 0;
+-    WHILE (nextCodepoint # ORD(CR)) & (R.fnt # NIL) DO
++  BEGIN pos := Texts.Pos(R) - UTexts.UnicodeWidth(nextCodepoint); L.lsp := 0;
++    WHILE (nextCodepoint # ORD(LF)) & (R.fnt # NIL) DO
+       IF (L.lsp < R.fnt.height) THEN L.lsp := R.fnt.height END;
+-      TextsU.ReadUnicode(R, nextCodepoint)
++      UTexts.ReadUnicode(R, nextCodepoint)
+     END;
+     IF (R.fnt # NIL) & (L.lsp = 0) THEN L.lsp := R.fnt.height
+     ELSIF (R.fnt = NIL) & (L.lsp = 0) THEN L.lsp := Fonts.Default.height END;
+-    Texts.OpenReader(R, T, pos); TextsU.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, T, pos); UTexts.ReadUnicode(R, nextCodepoint);
+   END UpdateLineHeight;
+ 
+   PROCEDURE DisplayLine (F: Frame; L: Line;
+-    VAR R: Texts.Reader; X, Y: INTEGER; len: LONGINT);
++    VAR R: Texts.Reader; X, Y: INTEGER; len: INTEGER);
+     VAR patadr, NX,  dx, x, y, w, h, dy: INTEGER;
+   BEGIN NX := F.X + F.W;
+-    WHILE (nextCodepoint # ORD(CR)) & (R.fnt # NIL) DO
+-      FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
++    WHILE (nextCodepoint # ORD(LF)) & (R.fnt # NIL) DO
++      UFonts.GetMappedUniPat(R.fnt, nextCodepoint, dx, x, y, w, h, patadr);
+       IF -R.fnt.minY < dsr THEN dy := dsr + R.fnt.minY ELSE dy := 0 END;
+       IF (X + x + w <= NX) & (h # 0) THEN
+-        Display.CopyPattern(R.col, patadr, X + x, Y + y - dy, Display.invert)
+-        ;IF Oberon.MixTextColors & (R.col # 0) THEN
+-          Display.CopyPattern(FrameColor(F.col), patadr, X + x, Y + y - dy, Display.invert)
++        Display.InvertPattern(R.col, patadr, X + x, Y + y - dy);
++        IF Oberon.MixTextColors & (R.col # 0) THEN
++          Display.InvertPattern(FrameColor(F.col), patadr, X + x, Y + y - dy)
+         END
+       END;
+-      X := X + dx; INC(len, TextsU.UnicodeWidth(nextCodepoint)); TextsU.ReadUnicode(R, nextCodepoint)
++      X := X + dx; INC(len, UTexts.UnicodeWidth(nextCodepoint)); UTexts.ReadUnicode(R, nextCodepoint)
+     END;
+     IF (R.fnt # NIL) & (L.lsp = 0) THEN L.lsp := R.fnt.height END;
+     L.len := len + 1; L.wid := X + eolW - (F.X + F.left);
+-    L.eot := R.fnt = NIL; TextsU.ReadUnicode(R, nextCodepoint)
++    L.eot := R.fnt = NIL; UTexts.ReadUnicode(R, nextCodepoint)
+   END DisplayLine;
+ 
+-  PROCEDURE Validate (T: Texts.Text; VAR pos: LONGINT);
++  PROCEDURE Validate (T: Texts.Text; VAR pos: INTEGER);
+     VAR R: Texts.Reader;
+   BEGIN
+     IF pos > T.len THEN pos := T.len
+     ELSIF pos > 0 THEN
+       DEC(pos); Texts.OpenReader(R, T, pos);
+-      REPEAT TextsU.ReadUnicode(R, nextCodepoint); INC(pos, TextsU.UnicodeWidth(nextCodepoint)) UNTIL R.eot OR (nextCodepoint = ORD(CR))
++      REPEAT UTexts.ReadUnicode(R, nextCodepoint); INC(pos, UTexts.UnicodeWidth(nextCodepoint)) UNTIL R.eot OR (nextCodepoint = ORD(LF))
+     ELSE pos := 0
+     END
+   END Validate;
+@@ -161,20 +151,20 @@
+   PROCEDURE Mark* (F: Frame; on: BOOLEAN);
+   BEGIN
+     IF (F.H > 0) & (F.left >= barW) & ((F.hasMark & ~on) OR (~F.hasMark & on)) THEN
+-      Display.ReplConst(Oberon.ScrollMarkColor, F.X + 1, F.Y + F.H - 1 - F.markH, markW, 1, Display.invert)
++      Display.FillBlock(Oberon.ScrollMarkColor, F.X + 1, F.Y + F.H - 1 - F.markH, markW, 1)
+     END;
+     F.hasMark := on
+   END Mark;
+ 
+   PROCEDURE Restore* (F: Frame);
+     VAR R: Texts.Reader; L, l: Line; curY, botY: INTEGER;
+-  BEGIN  Display.ReplConst(FrameColor(F.col), F.X, F.Y, F.W, F.H, Display.replace);
++  BEGIN  Display.FillBlock(FrameColor(F.col), F.X, F.Y, F.W, F.H);
+     IF F.left >= barW THEN
+-      Display.ReplConst(Oberon.ScrollBarColor, F.X + barW - 1, F.Y, 1, F.H, Display.invert)
++      Display.InvertBlock(Oberon.ScrollBarColor, F.X + barW - 1, F.Y, 1, F.H)
+     END;
+     Validate(F.text, F.org);
+     botY := F.Y + F.bot + dsr;
+-    Texts.OpenReader(R, F.text, F.org); TextsU.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, F.text, F.org); UTexts.ReadUnicode(R, nextCodepoint);
+     L := F.trailer; curY := F.Y + F.H - F.top - asr;
+     WHILE ~L.eot & (curY >= botY) DO
+       NEW(l);
+@@ -195,10 +185,10 @@
+ 
+   PROCEDURE Extend* (F: Frame; newY: INTEGER);
+     VAR R: Texts.Reader; L, l: Line;
+-    org: LONGINT; curY, botY: INTEGER;
+-  BEGIN Display.ReplConst(FrameColor(F.col), F.X, newY, F.W, F.Y - newY, Display.replace);
++    org: INTEGER; curY, botY: INTEGER;
++  BEGIN Display.FillBlock(FrameColor(F.col), F.X, newY, F.W, F.Y - newY);
+     IF F.left >= barW THEN
+-      Display.ReplConst(Oberon.ScrollBarColor, F.X + barW - 1, newY, 1, F.Y - newY, Display.invert)
++      Display.InvertBlock(Oberon.ScrollBarColor, F.X + barW - 1, newY, 1, F.Y - newY)
+     END;
+     botY := F.Y + F.bot + dsr; F.H := F.H + F.Y - newY; F.Y := newY;
+     IF F.trailer.next = F.trailer THEN Validate(F.text, F.org) END;
+@@ -207,7 +197,7 @@
+       L := L.next; org := org + L.len; curY := curY - L.lsp
+     END;
+     botY := F.Y + F.bot + dsr;
+-    Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, F.text, org); UTexts.ReadUnicode(R, nextCodepoint);
+     WHILE ~L.eot & (curY >= botY) DO
+       NEW(l);
+       UpdateLineHeight(l, R, F.text);
+@@ -231,19 +221,19 @@
+     END;
+     L.next := F.trailer;
+     IF curY + asr > F.Y THEN
+-      Display.ReplConst(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, curY + asr - F.Y, Display.replace)
++      Display.FillBlock(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, curY + asr - F.Y)
+     END;
+     F.markH := F.org * F.H DIV (F.text.len + 1); Mark(F, TRUE)
+   END Reduce;
+ 
+-  PROCEDURE Show* (F: Frame; pos: LONGINT);
++  PROCEDURE Show* (F: Frame; pos: INTEGER);
+     VAR R: Texts.Reader; L, L0: Line;
+-      org: LONGINT; curY, botY, Y0: INTEGER;
++      org: INTEGER; curY, botY, Y0: INTEGER;
+   BEGIN
+     IF F.trailer.next # F.trailer THEN
+       Validate(F.text, pos);
+       IF pos < F.org THEN Mark(F, FALSE);
+-        Display.ReplConst(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, F.H, Display.replace);
++        Display.FillBlock(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, F.H);
+         botY := F.Y; F.Y := F.Y + F.H; F.H := 0;
+         F.org := pos; F.trailer.next := F.trailer; Extend(F, botY); Mark(F, TRUE)
+       ELSIF pos > F.org THEN
+@@ -257,12 +247,12 @@
+             org := org + L.len; curY := curY - L.lsp; L := L.next
+           END;
+           Display.CopyBlock (F.X + F.left, curY - dsr - L.lsp, F.W - F.left, Y0 + asr + L.lsp - (curY - dsr),
+-              F.X + F.left, curY - dsr + F.Y + F.H - F.top - asr - L.lsp - Y0, 0);
++              F.X + F.left, curY - dsr + F.Y + F.H - F.top - asr - L.lsp - Y0);
+           curY := curY + F.Y + F.H - F.top - asr - L.lsp - Y0;
+-          Display.ReplConst(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, curY - dsr - F.Y, Display.replace);
++          Display.FillBlock(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, curY - dsr - F.Y);
+           botY := F.Y + F.bot + dsr;
+           org := org + L.len;
+-          Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
++          Texts.OpenReader(R, F.text, org); UTexts.ReadUnicode(R, nextCodepoint);
+           WHILE ~L.eot & (curY >= botY) DO
+             NEW(L0);
+             UpdateLineHeight(L0, R, F.text);
+@@ -274,7 +264,7 @@
+           END;
+           L.next := F.trailer; UpdateMark(F)
+         ELSE Mark(F, FALSE);
+-          Display.ReplConst(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, F.H, Display.replace);
++          Display.FillBlock(FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, F.H);
+           botY := F.Y; F.Y := F.Y + F.H; F.H := 0;
+           F.org := pos; F.trailer.next := F.trailer; Extend(F, botY);
+           Mark(F, TRUE)
+@@ -285,7 +275,7 @@
+   END Show;
+ 
+   PROCEDURE LocateLine (F: Frame; y: INTEGER; VAR loc: Location);
+-    VAR L: Line; org: LONGINT; cury: INTEGER;
++    VAR L: Line; org: INTEGER; cury: INTEGER;
+   BEGIN org := F.org; L := F.trailer.next; cury := F.H - F.top - asr - L.lsp;
+     WHILE (L.next # F.trailer) & (cury > y + dsr) DO
+       org := org + L.len; L := L.next; cury := cury - L.lsp
+@@ -295,27 +285,27 @@
+ 
+   PROCEDURE LocateString (F: Frame; x, y: INTEGER; VAR loc: Location);
+     VAR R: Texts.Reader;
+-      patadr, bpos, pos, lim: LONGINT;
++      patadr, bpos, pos, lim: INTEGER;
+       bx, ex, ox, dx, u, v, w, h: INTEGER;
+   BEGIN LocateLine(F, y, loc);
+     lim := loc.org + loc.lin.len - 1;
+     bpos := loc.org; bx := F.left;
+     pos := loc.org; ox := F.left;
+-    Texts.OpenReader(R, F.text, loc.org); TextsU.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, F.text, loc.org); UTexts.ReadUnicode(R, nextCodepoint);
+     REPEAT
+-      WHILE (pos # lim) & (nextCodepoint > ORD(" ")) DO (*scan string*)
+-        FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+-        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx; TextsU.ReadUnicode(R, nextCodepoint)
++      WHILE (pos # lim) & (nextCodepoint > ORD(' ')) DO (*scan string*)
++        UFonts.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++        INC(pos, UTexts.UnicodeWidth(nextCodepoint)); ox := ox + dx; UTexts.ReadUnicode(R, nextCodepoint)
+       END;
+       ex := ox;
+-      WHILE (pos # lim) & (nextCodepoint <= ORD(" ")) DO (*scan gap*)
+-        FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+-        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx; TextsU.ReadUnicode(R, nextCodepoint)
++      WHILE (pos # lim) & (nextCodepoint <= ORD(' ')) DO (*scan gap*)
++        UFonts.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++        INC(pos, UTexts.UnicodeWidth(nextCodepoint)); ox := ox + dx; UTexts.ReadUnicode(R, nextCodepoint)
+       END;
+       IF (pos # lim) & (ox <= x) THEN
+-        FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++        UFonts.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+         bpos := pos; bx := ox;
+-        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx; TextsU.ReadUnicode(R, nextCodepoint)
++        INC(pos, UTexts.UnicodeWidth(nextCodepoint)); ox := ox + dx; UTexts.ReadUnicode(R, nextCodepoint)
+       ELSE pos := lim
+       END
+     UNTIL pos = lim;
+@@ -324,17 +314,17 @@
+ 
+   PROCEDURE LocateChar (F: Frame; x, y: INTEGER; VAR loc: Location);
+     VAR R: Texts.Reader;
+-      patadr, pos, lim: LONGINT;
++      patadr, pos, lim: INTEGER;
+       ox, dx, u, v, w, h: INTEGER;
+   BEGIN LocateLine(F, y, loc);
+     lim := loc.org + loc.lin.len - 1;
+     pos := loc.org; ox := F.left; dx := eolW;
+     Texts.OpenReader(R, F.text, loc.org);
+     WHILE pos # lim DO
+-      TextsU.ReadUnicode(R, nextCodepoint);
+-      FontsU.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
++      UTexts.ReadUnicode(R, nextCodepoint);
++      UFonts.GetMappedUniPat(R.fnt, nextCodepoint, dx, u, v, w, h, patadr);
+       IF ox + dx <= x THEN
+-        INC(pos, TextsU.UnicodeWidth(nextCodepoint)); ox := ox + dx;
++        INC(pos, UTexts.UnicodeWidth(nextCodepoint)); ox := ox + dx;
+         IF pos = lim THEN dx := eolW END
+       ELSE lim := pos
+       END
+@@ -342,9 +332,9 @@
+     loc.pos := pos; loc.dx := dx; loc.x := ox
+   END LocateChar;
+ 
+-  PROCEDURE LocatePos (F: Frame; pos: LONGINT; VAR loc: Location);
++  PROCEDURE LocatePos (F: Frame; pos: INTEGER; VAR loc: Location);
+     VAR T: Texts.Text; R: Texts.Reader; L: Line;
+-      org: LONGINT; cury: INTEGER;  
++      org: INTEGER; cury: INTEGER;
+   BEGIN T := F.text;
+     org := F.org; L := F.trailer.next; cury := F.H - F.top - asr - L.lsp;
+     IF pos < org THEN pos := org END;
+@@ -352,12 +342,12 @@
+       org := org + L.len; L := L.next; cury := cury - L.lsp
+     END;
+     IF pos >= org + L.len THEN pos := org + L.len - 1 END;    
+-    Texts.OpenReader(R, T, org); TextsU.ReadUnicode(R, nextCodepoint);
++    Texts.OpenReader(R, T, org); UTexts.ReadUnicode(R, nextCodepoint);
+     loc.org := org; loc.pos := pos; loc.lin := L;
+     loc.x := F.left + Width(R, pos - org); loc.y := cury
+   END LocatePos;
+ 
+-  PROCEDURE Pos* (F: Frame; X, Y: INTEGER): LONGINT;
++  PROCEDURE Pos* (F: Frame; X, Y: INTEGER): INTEGER;
+     VAR loc: Location;
+   BEGIN LocateChar(F, X - F.X, Y - F.Y, loc); RETURN loc.pos
+   END Pos;
+@@ -365,11 +355,11 @@
+   PROCEDURE FlipCaret (F: Frame);
+   BEGIN
+     IF (F.carloc.x < F.W) & (F.carloc.y >= 10) & (F.carloc.x + 12 < F.W) THEN
+-      Display.CopyPattern(Oberon.CursorColor, Display.hook, F.X + F.carloc.x, F.Y + F.carloc.y - 10, Display.invert)
++      Display.InvertPattern(Oberon.CursorColor, Display.hook, F.X + F.carloc.x, F.Y + F.carloc.y - 10)
+     END
+   END FlipCaret;
+ 
+-  PROCEDURE SetCaret* (F: Frame; pos: LONGINT);
++  PROCEDURE SetCaret* (F: Frame; pos: INTEGER);
+   BEGIN LocatePos(F, pos, F.carloc); FlipCaret(F); F.hasCar := TRUE
+   END SetCaret;
+ 
+@@ -394,24 +384,39 @@
+   PROCEDURE FlipSelection (F: Frame; VAR beg, end: Location);
+     VAR L: Line; Y: INTEGER;
+   BEGIN L := beg.lin; Y := F.Y + beg.y - 2;
+-    IF L = end.lin THEN ReplConst(Oberon.SelectionColor, F, F.X + beg.x, Y, end.x - beg.x, L.lsp, Display.invert)
++    IF L = end.lin THEN InvertBlockClip(Oberon.SelectionColor, F, F.X + beg.x, Y, end.x - beg.x, L.lsp)
+     ELSE
+-      ReplConst(Oberon.SelectionColor, F, F.X + beg.x, Y, F.left + L.wid - beg.x, L.lsp, Display.invert);
++      InvertBlockClip(Oberon.SelectionColor, F, F.X + beg.x, Y, F.left + L.wid - beg.x, L.lsp);
+       L := L.next; Y := Y - L.lsp;
+       WHILE L # end.lin DO
+-        ReplConst(Oberon.SelectionColor, F, F.X + F.left, Y, L.wid, L.lsp, Display.invert);
++        InvertBlockClip(Oberon.SelectionColor, F, F.X + F.left, Y, L.wid, L.lsp);
+         L := L.next; Y := Y - L.lsp
+       END;
+-      ReplConst(Oberon.SelectionColor, F, F.X + F.left, Y, end.x - F.left, L.lsp, Display.invert)
++      InvertBlockClip(Oberon.SelectionColor, F, F.X + F.left, Y, end.x - F.left, L.lsp)
+     END
+   END FlipSelection;
+ 
+-  PROCEDURE SetSelection* (F: Frame; beg, end: LONGINT);
++  PROCEDURE SetGlobalSel(F: Frame);
++  BEGIN
++    F.hasSel := TRUE;
++    IF (PrevSel # F) & (F.text = Texts.Sel) THEN
++      Texts.SelBegin := MIN(F.selbeg.pos, Texts.SelBegin);
++      Texts.SelEnd := MAX(F.selend.pos, Texts.SelEnd);
++    ELSE
++      Texts.Sel := F.text;
++      Texts.SelBegin := F.selbeg.pos;
++      Texts.SelEnd := F.selend.pos;
++    END;
++    PrevSel := F;
++  END SetGlobalSel;
++
++  PROCEDURE SetSelection* (F: Frame; beg, end: INTEGER);
+   BEGIN
+     IF F.hasSel THEN FlipSelection(F, F.selbeg, F.selend) END;
+     LocatePos(F, beg, F.selbeg); LocatePos(F, end, F.selend);
+     IF F.selbeg.pos < F.selend.pos THEN
+-      FlipSelection(F, F.selbeg, F.selend); F.time := Oberon.Time(); F.hasSel := TRUE
++      FlipSelection(F, F.selbeg, F.selend);
++      SetGlobalSel(F)
+     END
+   END SetSelection;
+ 
+@@ -421,11 +426,11 @@
+     IF F.trailer.next # F.trailer THEN
+       IF F.hasSel THEN FlipSelection(F, F.selbeg, F.selend) END;
+       LocateChar(F, X - F.X, Y - F.Y, loc);
+-      IF F.hasSel & (loc.pos = F.selbeg.pos) & (F.selend.pos = F.selbeg.pos + TextsU.UnicodeWidth(nextCodepoint)) THEN
++      IF F.hasSel & (loc.pos = F.selbeg.pos) & (F.selend.pos = F.selbeg.pos + UTexts.UnicodeWidth(nextCodepoint)) THEN
+         LocateChar(F, F.left, Y - F.Y, F.selbeg)
+       ELSE F.selbeg := loc
+       END;
+-      INC(loc.pos, TextsU.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx; F.selend := loc;
++      INC(loc.pos, UTexts.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx; F.selend := loc;
+       FlipSelection(F, F.selbeg, F.selend); keysum := {};
+       REPEAT
+         Input.Mouse(keys, X, Y);
+@@ -433,12 +438,12 @@
+         Oberon.DrawMouseArrow(X, Y);
+         LocateChar(F, X - F.X, Y - F.Y, loc);
+         IF loc.pos < F.selbeg.pos THEN loc := F.selbeg END;
+-        INC(loc.pos, TextsU.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx;
++        INC(loc.pos, UTexts.UnicodeWidth(nextCodepoint)); loc.x := loc.x + loc.dx;
+         IF loc.pos < F.selend.pos THEN FlipSelection(F, loc, F.selend); F.selend := loc
+         ELSIF loc.pos > F.selend.pos THEN FlipSelection(F, F.selend, loc); F.selend := loc
+         END
+       UNTIL keys = {};
+-      F.time := Oberon.Time(); F.hasSel := TRUE
++      SetGlobalSel(F)
+     END
+   END TrackSelection;
+ 
+@@ -446,55 +451,55 @@
+   BEGIN IF F.hasSel THEN FlipSelection(F, F.selbeg, F.selend); F.hasSel := FALSE END
+   END RemoveSelection;
+ 
+-  PROCEDURE TrackLine* (F: Frame; X, Y: INTEGER; VAR org: LONGINT; VAR keysum: SET);
++  PROCEDURE TrackLine* (F: Frame; X, Y: INTEGER; VAR org: INTEGER; VAR keysum: SET);
+     VAR old, new: Location; keys: SET;
+   BEGIN
+     IF F.trailer.next # F.trailer THEN
+       LocateLine(F, Y - F.Y, old);
+-      ReplConst(Oberon.UnderlineColor, F, F.X + F.left, F.Y + old.y - dsr, old.lin.wid, 2, Display.invert);
++      InvertBlockClip(Oberon.UnderlineColor, F, F.X + F.left, F.Y + old.y - dsr, old.lin.wid, 2);
+       keysum := {};
+       REPEAT Input.Mouse(keys, X, Y);
+         keysum := keysum + keys;
+         Oberon.DrawMouse(ScrollMarker, X, Y);
+         LocateLine(F, Y - F.Y, new);
+         IF new.org # old.org THEN
+-          ReplConst(Oberon.UnderlineColor, F, F.X + F.left, F.Y + old.y - dsr, old.lin.wid, 2, Display.invert);
+-          ReplConst(Oberon.UnderlineColor, F, F.X + F.left, F.Y + new.y - dsr, new.lin.wid, 2, Display.invert);
++          InvertBlockClip(Oberon.UnderlineColor, F, F.X + F.left, F.Y + old.y - dsr, old.lin.wid, 2);
++          InvertBlockClip(Oberon.UnderlineColor, F, F.X + F.left, F.Y + new.y - dsr, new.lin.wid, 2);
+           old := new
+         END
+        UNTIL keys = {};
+-       ReplConst(Oberon.UnderlineColor, F, F.X + F.left, F.Y + new.y - dsr, new.lin.wid, 2, Display.invert);
++       InvertBlockClip(Oberon.UnderlineColor, F, F.X + F.left, F.Y + new.y - dsr, new.lin.wid, 2);
+        org := new.org
+     ELSE org := 0   (*<----*)
+     END
+   END TrackLine;
+ 
+-  PROCEDURE TrackWord* (F: Frame; X, Y: INTEGER; VAR pos: LONGINT; VAR keysum: SET);
++  PROCEDURE TrackWord* (F: Frame; X, Y: INTEGER; VAR pos: INTEGER; VAR keysum: SET);
+     VAR old, new: Location; keys: SET;
+   BEGIN
+     IF F.trailer.next # F.trailer THEN
+       LocateString(F, X - F.X, Y - F.Y, old);
+-      ReplConst(Oberon.UnderlineColor, F, F.X + old.x, F.Y + old.y - dsr, old.dx, 2, Display.invert);
++      InvertBlockClip(Oberon.UnderlineColor, F, F.X + old.x, F.Y + old.y - dsr, old.dx, 2);
+       keysum := {};
+       REPEAT
+         Input.Mouse(keys, X, Y); keysum := keysum + keys;
+         Oberon.DrawMouseArrow(X, Y);
+         LocateString(F, X - F.X, Y - F.Y, new);
+         IF new.pos # old.pos THEN
+-          ReplConst(Oberon.UnderlineColor, F, F.X + old.x, F.Y + old.y - dsr, old.dx, 2, Display.invert);
+-          ReplConst(Oberon.UnderlineColor, F, F.X + new.x, F.Y + new.y - dsr, new.dx, 2, Display.invert);
++          InvertBlockClip(Oberon.UnderlineColor, F, F.X + old.x, F.Y + old.y - dsr, old.dx, 2);
++          InvertBlockClip(Oberon.UnderlineColor, F, F.X + new.x, F.Y + new.y - dsr, new.dx, 2);
+           old := new
+         END
+       UNTIL keys = {};
+-      ReplConst(Oberon.UnderlineColor, F, F.X + new.x, F.Y + new.y - dsr, new.dx, 2, Display.invert);
++      InvertBlockClip(Oberon.UnderlineColor, F, F.X + new.x, F.Y + new.y - dsr, new.dx, 2);
+       pos := new.pos
+     ELSE pos := 0  (*<----*)
+     END
+   END TrackWord;
+   
+-  PROCEDURE Replace* (F: Frame; beg, end: LONGINT);
++  PROCEDURE Replace* (F: Frame; beg, end: INTEGER);
+     VAR R: Texts.Reader; L: Line;
+-      org, len: LONGINT; curY, ll, wid: INTEGER;
++      org, len: INTEGER; curY, ll, wid: INTEGER;
+       hchg: BOOLEAN;
+   BEGIN
+     IF end > F.org THEN
+@@ -504,21 +509,21 @@
+         org := org + L.len; L := L.next; curY := curY - L.lsp
+       END;
+       IF L # F.trailer THEN
+-        Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
++        Texts.OpenReader(R, F.text, org); UTexts.ReadUnicode(R, nextCodepoint);
+         ll := L.lsp; curY := curY + L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
+         IF ll # L.lsp THEN
+-          hchg := TRUE; len := 0; wid := 0; ReplConst(FrameColor(F.col), F, F.X + F.left + L.wid, curY - dsr, F.W - F.left - L.wid, L.lsp, Display.replace)
++          hchg := TRUE; len := 0; wid := 0; FillBlockClip(FrameColor(F.col), F, F.X + F.left + L.wid, curY - dsr, F.W - F.left - L.wid, L.lsp)
+         ELSE
+           hchg := FALSE; len := beg - org; wid := Width(R, len)
+         END;
+-        ReplConst(FrameColor(F.col), F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp, Display.replace);
++        FillBlockClip(FrameColor(F.col), F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+         org := org + L.len; L := L.next;
+         WHILE (L # F.trailer) & (org <= end) & (~hchg OR (curY - L.lsp > F.Y + F.bot + dsr)) DO
+          ll := L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
+          IF ll # L.lsp THEN hchg := TRUE END;
+          IF (~hchg OR (curY > F.Y + F.bot + dsr)) THEN
+-          Display.ReplConst(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
++          Display.FillBlock(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, L.lsp);
+           DisplayLine(F, L, R, F.X + F.left, curY, 0);
+           org := org + L.len; L := L.next
+          ELSE
+@@ -531,9 +536,9 @@
+     UpdateMark(F)
+   END Replace;
+ 
+-  PROCEDURE Insert* (F: Frame; beg, end: LONGINT);
++  PROCEDURE Insert* (F: Frame; beg, end: INTEGER);
+     VAR R: Texts.Reader; L, L0, l: Line;
+-      org, len: LONGINT; curY, botY, Y0, Y1, Y2, dY, wid: INTEGER;
++      org, len: INTEGER; curY, botY, Y0, Y1, Y2, dY, wid: INTEGER;
+   BEGIN
+     IF beg < F.org THEN F.org := F.org + (end - beg)
+     ELSE
+@@ -543,14 +548,14 @@
+       END;
+       IF L # F.trailer THEN
+         botY := F.Y + F.bot + dsr;
+-        Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint);
++        Texts.OpenReader(R, F.text, org); UTexts.ReadUnicode(R, nextCodepoint);
+         Y1 := curY; curY := curY + L.lsp; UpdateLineHeight(L, R, F.text); curY := curY - L.lsp;
+         IF Y1 # curY THEN
+-          len := 0; wid := 0; ReplConst(FrameColor(F.col), F, F.X + F.left + L.wid, curY - dsr, F.W - F.left - L.wid, L.lsp, Display.replace)
++          len := 0; wid := 0; FillBlockClip (FrameColor(F.col), F, F.X + F.left + L.wid, curY - dsr, F.W - F.left - L.wid, L.lsp)
+         ELSE
+           len := beg - org; wid := Width(R, len)
+         END;
+-        ReplConst (FrameColor(F.col), F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp, Display.replace);
++        FillBlockClip (FrameColor(F.col), F, F.X + F.left + wid, curY - dsr, L.wid - wid, L.lsp);
+         DisplayLine(F, L, R, F.X + F.left + wid, curY, len);
+         org := org + L.len;
+         Y0 := curY; L0 := L.next;
+@@ -559,7 +564,7 @@
+           UpdateLineHeight(l, R, F.text);
+           curY := curY - l.lsp;
+           IF curY >= botY THEN
+-            Display.ReplConst(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, l.lsp, Display.replace);
++            Display.FillBlock(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, l.lsp);
+             DisplayLine(F, l, R, F.X + F.left, curY, 0);
+             L.next := l; L := l;
+             org := org + L.len
+@@ -574,14 +579,14 @@
+           dY := Y0 - Y1;
+           IF Y1 > curY + dY THEN
+             Display.CopyBlock(F.X + F.left, curY + dY - dsr, F.W - F.left, Y1 - curY - dY,
+-              F.X + F.left, curY - dsr, 0);
++              F.X + F.left, curY - dsr);
+             Y2 := Y1 - dY
+           ELSE Y2 := curY
+           END;
+           curY := Y1; L := L0;
+           WHILE curY > Y2 DO
+             curY := curY - L.lsp;
+-            Display.ReplConst(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, L.lsp, Display.replace);
++            Display.FillBlock(FrameColor(F.col), F.X + F.left, curY - dsr, F.W - F.left, L.lsp);
+             DisplayLine(F, L, R, F.X + F.left, curY, 0);
+             L := L.next
+           END
+@@ -591,9 +596,9 @@
+     UpdateMark(F)
+   END Insert;
+ 
+-  PROCEDURE Delete* (F: Frame; beg, end: LONGINT);
++  PROCEDURE Delete* (F: Frame; beg, end: INTEGER);
+     VAR R: Texts.Reader; L, L0, l: Line;
+-      org, org0, len: LONGINT; curY, botY, Y0, Y1, wid: INTEGER;
++      org, org0, len: INTEGER; curY, botY, Y0, Y1, wid: INTEGER;
+   BEGIN
+     IF end <= F.org THEN F.org := F.org - (end - beg)
+     ELSE
+@@ -611,14 +616,14 @@
+         WHILE (L # F.trailer) & (org <= end) DO
+           org := org + L.len; L := L.next; curY := curY - L.lsp
+         END;
+-        Texts.OpenReader(R, F.text, org0); TextsU.ReadUnicode(R, nextCodepoint);
++        Texts.OpenReader(R, F.text, org0); UTexts.ReadUnicode(R, nextCodepoint);
+         Y1 := Y0; Y0 := Y0 + L0.lsp; UpdateLineHeight(L0, R, F.text); Y0 := Y0 - L0.lsp;
+         IF Y1 = Y0 THEN
+           len := beg - org0; wid := Width(R, len)
+         ELSE
+           len := 0; wid := 0
+         END;
+-        ReplConst (FrameColor(F.col), F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, L0.lsp, Display.replace);
++        FillBlockClip (FrameColor(F.col), F, F.X + F.left + wid, Y0 - dsr, L0.wid - wid, L0.lsp);
+         DisplayLine(F, L0, R, F.X + F.left + wid, Y0, len);
+         IF (L # L0.next) OR (Y1 # Y0) THEN
+           Y0 := Y0 - L.lsp;
+@@ -629,10 +634,10 @@
+             L := L.next; org := org + L.len; curY := curY - L.lsp
+           END;
+           Display.CopyBlock(F.X + F.left, curY + L0.next.lsp - dsr, F.W - F.left, Y1 - curY,
+-              F.X + F.left, curY + L0.next.lsp - dsr + (Y0 - Y1), 0);
++              F.X + F.left, curY + L0.next.lsp - dsr + (Y0 - Y1));
+           curY := curY + (Y0 - Y1);
+-          Display.ReplConst (FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, curY + L0.next.lsp - (F.Y + dsr), Display.replace);
+-          Texts.OpenReader(R, F.text, org); TextsU.ReadUnicode(R, nextCodepoint); curY := curY + L0.next.lsp;
++          Display.FillBlock (FrameColor(F.col), F.X + F.left, F.Y, F.W - F.left, curY + L0.next.lsp - (F.Y + dsr));
++          Texts.OpenReader(R, F.text, org); UTexts.ReadUnicode(R, nextCodepoint); curY := curY + L0.next.lsp;
+           WHILE ~L.eot & (curY >= botY) DO
+             NEW(l);
+             UpdateLineHeight(l, R, F.text);
+@@ -659,23 +664,23 @@
+   BEGIN RemoveCaret(F); RemoveSelection(F)
+   END RemoveMarks;
+ 
+-  PROCEDURE NotifyDisplay* (T: Texts.Text; op: INTEGER; beg, end: LONGINT);
++  PROCEDURE NotifyDisplay* (T: Texts.Text; op: INTEGER; beg, end: INTEGER);
+     VAR M: UpdateMsg;
+   BEGIN M.id := op; M.text := T; M.beg := beg; M.end := end; Viewers.Broadcast(M)
+   END NotifyDisplay;
+ 
+-  PROCEDURE Call* (F: Frame; pos: LONGINT; new: BOOLEAN);
++  PROCEDURE Call* (F: Frame; pos: INTEGER; new: BOOLEAN);
+     VAR S: Texts.Scanner; res: INTEGER;
+   BEGIN
+     Texts.OpenScanner(S, F.text, pos); Texts.Scan(S);
+     IF (S.class = Texts.Name) & (S.line = 0) THEN
+       Oberon.SetPar(F, F.text, pos + S.len); Oberon.Call(S.s, res);
+       IF res > 0 THEN
+-        Texts.WriteString(W, "Call error: "); Texts.WriteString(W, Modules.importing);
++        Texts.WriteString(W, "Call error: ");
+         IF res = 1 THEN Texts.WriteString(W, " module not found")
+         ELSIF res = 2 THEN  Texts.WriteString(W, " bad version")
+         ELSIF res = 3 THEN Texts.WriteString(W, " imports ");
+-          Texts.WriteString(W, Modules.imported); Texts.WriteString(W, " with bad key");
++          Texts.WriteString(W, " with bad key");
+         ELSIF res = 4 THEN Texts.WriteString(W, " corrupted obj file")
+         ELSIF res = 5 THEN Texts.WriteString(W, " command not found")
+         ELSIF res = 7 THEN Texts.WriteString(W, " insufficient space")
+@@ -685,7 +690,7 @@
+     END
+   END Call;
+ 
+-  PROCEDURE Write* (F: Frame; codepoint: INTEGER; fnt: Fonts.Font; col, voff: INTEGER);
++  PROCEDURE Write* (F: Frame; codepoint: INTEGER);
+     VAR buf: Texts.Buffer; R: Texts.Reader; charlen: INTEGER; ch: CHAR;
+   BEGIN (*F.hasCar*)
+     IF codepoint = ORD(BS) THEN  (*backspace*)
+@@ -697,6 +702,26 @@
+         UNTIL (ch < 80X) OR (ch >= 0C0X); (* skip over continuation *)
+         Texts.Delete(F.text, F.carloc.pos - charlen, F.carloc.pos, DelBuf); SetCaret(F, F.carloc.pos - charlen)
+       END
++    ELSIF codepoint = ORD(7FX) THEN (*delete*)
++      IF F.carloc.pos < F.text.len THEN
++        Texts.Delete(F.text, F.carloc.pos, F.carloc.pos + 1, DelBuf);
++        SetCaret(F, F.carloc.pos)
++      END
++    ELSIF codepoint = ORD(11X) THEN (*cursor left*)
++      IF F.carloc.pos > F.org THEN
++        RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x - 1, F.Y + F.carloc.y))
++      END
++    ELSIF codepoint = ORD(12X) THEN (*cursor right*)
++      IF F.carloc.pos < F.text.len THEN
++        RemoveCaret(F); SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y));
++        RemoveCaret(F); SetCaret(F, F.carloc.pos + UTexts.UnicodeWidth(nextCodepoint))
++      END
++    ELSIF codepoint = ORD(13X) THEN (*cursor up*)
++      RemoveCaret(F);
++      SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y + F.carloc.lin.lsp))
++    ELSIF codepoint = ORD(14X) THEN (*cursor down*)
++      RemoveCaret(F);
++      SetCaret(F, Pos(F, F.X + F.carloc.x, F.Y + F.carloc.y - dsr - 1))
+     ELSIF codepoint = ORD(3X) THEN (* ctrl-c  copy*)
+       IF F.hasSel THEN
+         NEW(TBuf); Texts.OpenBuf(TBuf); Texts.Save(F.text, F.selbeg.pos, F.selend.pos, TBuf)
+@@ -708,10 +733,10 @@
+       IF F.hasSel THEN
+         NEW(TBuf); Texts.OpenBuf(TBuf); Texts.Delete(F.text, F.selbeg.pos, F.selend.pos, TBuf)
+       END
+-    ELSIF (20H <= codepoint) & (codepoint <= 010FFFFH) OR (codepoint = ORD(CR)) OR (codepoint = ORD(TAB)) THEN
+-      KW.fnt := fnt; KW.col := col; KW.voff := voff; TextsU.WriteUnicode(KW, codepoint);
++    ELSIF (20H <= codepoint) & (codepoint <= 010FFFFH) OR (codepoint = ORD(LF)) OR (codepoint = ORD(TAB)) THEN
++      Texts.Attributes(F.text, F.carloc.pos, KW.fnt, KW.col, KW.voff); UTexts.WriteUnicode(KW, codepoint);
+       Texts.Insert(F.text, F.carloc.pos, KW.buf);
+-      SetCaret(F, F.carloc.pos + TextsU.UnicodeWidth(codepoint))
++      SetCaret(F, F.carloc.pos + UTexts.UnicodeWidth(codepoint))
+     END
+   END Write;
+ 
+@@ -727,16 +752,16 @@
+   BEGIN
+     Mark(F, FALSE); RemoveMarks(F); SetChangeMark(F,  FALSE);
+     IF id = MenuViewers.extend THEN
+-      IF dY > 0 THEN Display.CopyBlock(F.X, F.Y, F.W, F.H, F.X, F.Y + dY, 0); F.Y := F.Y + dY END;
++      IF dY > 0 THEN Display.CopyBlock(F.X, F.Y, F.W, F.H, F.X, F.Y + dY); F.Y := F.Y + dY END;
+       Extend(F, Y)
+     ELSIF id = MenuViewers.reduce THEN
+       Reduce(F, Y + dY);
+-      IF dY > 0 THEN Display.CopyBlock(F.X, F.Y, F.W, F.H, F.X, Y, 0); F.Y := Y END
++      IF dY > 0 THEN Display.CopyBlock(F.X, F.Y, F.W, F.H, F.X, Y); F.Y := Y END
+     END;
+     IF F.H > 0 THEN Mark(F, TRUE); SetChangeMark(F,  F.text.changed) END
+   END Modify;
+ 
+-  PROCEDURE Open* (F: Frame; H: Display.Handler; T: Texts.Text; org: LONGINT;
++  PROCEDURE Open* (F: Frame; H: Viewers.Handler; T: Texts.Text; org: INTEGER;
+         col, left, right, top, bot, lsp: INTEGER);
+     VAR L: Line;
+   BEGIN NEW(L);
+@@ -751,7 +776,7 @@
+     Open(F1, F.handle, F.text, F.org, F.col, F.left, F.right, F.top, F.bot, F.lsp)
+   END Copy;
+ 
+-  PROCEDURE CopyOver(F: Frame; text: Texts.Text; beg, end: LONGINT);
++  PROCEDURE CopyOver(F: Frame; text: Texts.Text; beg, end: INTEGER);
+     VAR buf: Texts.Buffer;
+   BEGIN
+     IF F.hasCar THEN
+@@ -761,18 +786,6 @@
+     END
+   END CopyOver;
+ 
+-  PROCEDURE GetSelection* (F: Frame; VAR text: Texts.Text; VAR beg, end, time: LONGINT);
+-  BEGIN
+-    IF F.hasSel THEN
+-      IF F.text = text THEN
+-        IF F.selbeg.pos < beg THEN beg := F.selbeg.pos END ;  (*leftmost*)
+-        IF F.time > time THEN end := F.selend.pos; time := F.time END ; (*last selected*)
+-      ELSIF F.time > time THEN
+-        text := F.text; beg := F.selbeg.pos; end := F.selend.pos; time := F.time
+-      END
+-    END
+-  END GetSelection;
+-
+   PROCEDURE Update* (F: Frame; VAR M: UpdateMsg);
+   BEGIN (*F.text = M.text*) SetChangeMark(F, FALSE);
+     RemoveMarks(F); Oberon.RemoveMarks(F.X, F.Y, F.W, F.H);
+@@ -788,12 +801,12 @@
+       text: Texts.Text;
+       buf: Texts.Buffer;
+       v: Viewers.Viewer;
+-      beg, end, time, pos: LONGINT;
++      beg, end, time, pos: INTEGER;
+       keysum: SET;
+       fnt: Fonts.Font;
+       col, voff: INTEGER;
+   BEGIN
+-    IF X < F.X + Min(F.left, barW) THEN  (*scroll bar*)
++    IF X < F.X + MIN(F.left, barW) THEN  (*scroll bar*)
+       Oberon.DrawMouse(ScrollMarker, X, Y); keysum := Keys;
+       IF Keys = {2} THEN   (*ML, scroll up*)
+         TrackLine(F, X, Y, pos, keysum);
+@@ -829,11 +842,11 @@
+         TrackSelection(F, X, Y, keysum);
+         IF F.hasSel THEN
+           IF keysum = {0, 2} THEN (*MR, ML: delete text*)
+-            Oberon.GetSelection(text, beg, end, time);
++            TextFrames.GetSelection(text, beg, end);
+             Texts.Delete(text, beg, end, TBuf);
+             Oberon.PassFocus(Viewers.This(F.X, F.Y)); SetCaret(F, beg)
+           ELSIF keysum = {0, 1} THEN  (*MR, MM: copy to caret*)
+-            Oberon.GetSelection(text, beg, end, time);
++            TextFrames.GetSelection(text, beg, end);
+             M.text := text; M.beg := beg; M.end := end;
+             Oberon.FocusViewer.handle(Oberon.FocusViewer, M)
+           END
+@@ -845,7 +858,7 @@
+         Oberon.PassFocus(Viewers.This(F.X, F.Y));
+         TrackCaret(F, X, Y, keysum);
+         IF keysum = {2, 1} THEN (*ML, MM: copy from selection to caret*)
+-          Oberon.GetSelection(text, beg, end, time);
++           TextFrames.GetSelection(text, beg, end);
+            IF time >= 0 THEN
+             NEW(TBuf); Texts.OpenBuf(TBuf);
+             Texts.Save(text, beg, end, TBuf); Texts.Insert(F.text, F.carloc.pos, TBuf);
+@@ -857,7 +870,7 @@
+             SetCaret(F, F.carloc.pos + buf.len)
+           END
+         ELSIF keysum = {2, 0} THEN (*ML, MR: copy looks*)
+-          Oberon.GetSelection(text, beg, end, time);
++          TextFrames.GetSelection(text, beg, end);
+           IF time >= 0 THEN
+             Texts.Attributes(F.text, F.carloc.pos, fnt, col, voff);
+             IF fnt # NIL THEN Texts.ChangeLooks(text, beg, end, {0,1,2}, fnt, col, voff) END
+@@ -867,22 +880,19 @@
+     END
+   END Edit;
+ 
+-  PROCEDURE Handle* (F: Display.Frame; VAR M: Display.FrameMsg);
++  PROCEDURE Handle* (F: Viewers.Frame; VAR M: Viewers.FrameMsg);
+     VAR F1: Frame; buf: Texts.Buffer;
+   BEGIN
+     CASE F OF Frame:
+       CASE M OF
+-      Oberon.InputMsg:
+-        IF M.id = Oberon.track THEN Edit(F, M.X, M.Y, M.keys)
+-        ELSIF M.id = Oberon.consume THEN
+-          IF F.hasCar THEN Write(F, ORD(M.ch), M.fnt, M.col, M.voff) END
+-        END |
++      Oberon.MouseMsg:
++        Edit(F, M.X, M.Y, M.keys) |
++      Oberon.KeyMsg:
++        IF F.hasCar THEN Write(F, ORD(M.ch)) END |
+       Oberon.ControlMsg:
+         IF M.id = Oberon.defocus THEN Defocus(F)
+         ELSIF M.id = Oberon.neutralize THEN Neutralize(F)
+         END |
+-      Oberon.SelectionMsg:
+-        GetSelection(F, M.text, M.beg, M.end, M.time) |
+       Oberon.CopyMsg: Copy(F, F1); M.F := F1 |
+       MenuViewers.ModifyMsg: Modify(F, M.id, M.dY, M.Y, M.H) |
+       CopyOverMsg: CopyOver(F, M.text, M.beg, M.end) |
+@@ -911,7 +921,7 @@
+     Open(F, Handle, T, 0, -2, left DIV 4, 0, 0, 0, lsp); RETURN F
+   END NewMenu;
+ 
+-  PROCEDURE NewText* (text: Texts.Text; pos: LONGINT): Frame;
++  PROCEDURE NewText* (text: Texts.Text; pos: INTEGER): Frame;
+     VAR F: Frame;
+   BEGIN NEW(F);
+     Open(F, Handle, text, pos, -1, left, right, top, bot, lsp); RETURN F
+@@ -927,6 +937,7 @@
+   dsr := -Fonts.Default.minY;
+   selH := lsp; markW := lsp DIV 2;
+   eolW := lsp DIV 2;
+-  ScrollMarker.Fade := FlipSM; ScrollMarker.Draw := FlipSM;
++  ScrollMarker.patadr := Display.updown;
++  ScrollMarker.DX := 4; ScrollMarker.DY := 7;
+   Texts.OpenWriter(W); Texts.OpenWriter(KW)
+-END TextFramesU.
++END UTextFrames.
+--- unicode/utexts.mod
++++ unicode/utexts.mod
+@@ -1,4 +1,4 @@
+-MODULE TextsU;
++MODULE UTexts;
+   IMPORT Texts;
+ 
+   PROCEDURE UnicodeWidth* (codepoint: INTEGER): INTEGER;
+@@ -58,4 +58,4 @@
+     END
+   END WriteUnicode;
+ 
+-END TextsU.
++END UTexts.

@@ -59,6 +59,7 @@ script expects patched sources in `work` directory and builds a disk image from 
 | **[DefragmentFreeSpace](DefragmentFreeSpace/README.md)** | Defragment all files and move them to the beginning of the filesystem | None |
 | **[DoubleTrap](DoubleTrap/README.md)** | Detect when a trap occurs in the trap handler and work around it | Minimal: Recompile `System.Mod`; Full: Recompile inner core |
 | **[DrawAddons](DrawAddons/README.md)** | More features for Oberon Draw | Optionally recompile `Graphics.Mod` |
+| **[DuskberonBuilder](DuskberonBuilder/README.md)**† | Build an Oberon disk image using Dusk OS's Oberon compiler written in Forth | Recompile everything |
 | **[DynamicMemorySplit](DynamicMemorySplit/README.md)** | Move the address that separates heap from stack and modules | Rebuild inner core |
 | **[EditImprovements](EditImprovements/README.md)** | Edit.Locate and ~.Search display the target location in the first line of the viewer | Recompile Edit.Mod |
 | **[EmbeddableCompiler](EmbeddableCompiler/README.md)**† | Version of the Oberon RISC Compiler that does not (directly) depend on Fonts/Texts/Oberon | None |
