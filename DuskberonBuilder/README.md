@@ -14,7 +14,7 @@ to compile a basic Oberon system (with modifications) and create a disk image th
 in Dusk OS's included RISC5 emulator.
 
 Due to the filesystem limitation, only the outer core of the sources is added as individual files
-to the Dusk OS file tree, all the ohter files are concatenated to a large file and unpacked
+to the Dusk OS file tree, all the other files are concatenated to a large file and unpacked
 by [`Unpack.Mod`)(Unpack.Mod] in the resulting system.
 
 This process has been tested with [v26](https://git.sr.ht/~vdupras/duskos/refs/v26) with
