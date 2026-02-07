@@ -6,7 +6,7 @@ Description
 The oberon filesystem limits the file size to 3131 sectors of each 1KB, so slighty
 more than 3 MB. For most files, this is sufficient, but occasionally (e.g. when
 building Oberon disk images within Oberon or when splitting large Oberon text files
-into parts), a tiny fractions of the files need to be larger.
+into parts), a tiny fraction of the files need to be larger.
 
 Therefore, I did not try to do any more sophisticated size limit expansion, but
 instead opted to use this slight modification of the filesystem structure:
@@ -21,12 +21,12 @@ compatible between these two formats.
 
 The filesystem size limit of 64 MB is caused by a sector bitmap which is stored
 in RAM (in the Kernel module). The easiest way to overcome this limitation (without
-requiring an on-disk bitmap or increasing the RAM usage) is to notice that a sector
-that has been used will not be freed until the next reboot. Therefore it is
+requiring an on-disk bitmap or increasing the RAM usage) is to take advantage of the fact
+that a used sector will not be freed until the next reboot, if at all. Therefore it is
 sufficient to keep a "sliding window" of the sector bitmap in the RAM; once all
 sectors in this sliding window are used, rescan the filesystem to generate the next
 window. For performance reasons, and to enable features like the Defragger, the
-last used sector number is also kept available all the time, even when it is outside
+last used sector number is also kept available all the time, even if it is outside
 the current sliding window.
 
 

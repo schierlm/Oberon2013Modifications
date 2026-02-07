@@ -6,9 +6,10 @@ Description
 Oberon's original filesystem with its limits (64 MB filesystem size, ~3 MB file size)
 is well-suited for small files. But when
 [removing the limits](../RemoveFilesizeLimit/README.md), performance for large files
-is pretty slow. Also, 32 character file names are sometimes too limited.
+is pretty bad. Also, 32 character long file names (including the terminating 0X) are
+sometimes too limited.
 
-This modification provides an example how to increase the sector size to 4 KB, file
+This modification provides an example on how to increase the sector size to 4 KB, file
 name length to 64 characters, while also increasing the size of internal structures
 (128 extended entries per file header). These values are by no means optimal; they
 serve as example values. If you want to use different values, it should suffice to
