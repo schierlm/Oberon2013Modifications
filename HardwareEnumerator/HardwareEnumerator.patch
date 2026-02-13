@@ -98,7 +98,7 @@
 +        pvDisk := 0; spiCtrl := 0; spiData := 0
 +      END
 +    END;
-+    SYSTEM.GET(timer, clockTime);
++    (* not needed here: SYSTEM.GET(timer, clockTime); *)
 +  END EnumerateHardware;
 +
 +(* ---------- Reset ----------*)
